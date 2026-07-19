@@ -1,55 +1,38 @@
 "use client";
 
 import { useCart } from "@/context/CartContext";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { createRazorpayOrder } from "@/lib/payment/razorpay";
+import { Input } from "@/components/ui/input";
+import { buildWhatsAppUrl } from "@/lib/whatsapp";
 
 export default function CheckoutPage() {
   const { items, total, clearCart } = useCart();
-  const [orderId, setOrderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [name, setName] = useState("");
+  const [address, setAddress] = useState("");
+  const [pincode, setPincode] = useState("");
+  const [phone, setPhone] = useState("");
 
-  const handleCheckout = async () => {
-    setLoading(true);
-    try {
-      const receipt = `order-${Date.now()}`;
-      const order = await createRazorpayOrder({
-        amountInRupees: total / 100,
-        receipt,
-      });
-      setOrderId(order.id);
-      // Load Razorpay script and open checkout (client side)
-      const script = document.createElement("script");
-      script.src = "https://checkout.razorpay.com/v1/checkout.js";
-      script.async = true;
-      document.body.appendChild(script);
-      script.onload = () => {
-        const options = {
-          key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-          amount: order.amount,
-          currency: order.currency,
-          name: "Stix N Vibes",
-          description: "Order " + receipt,
-          order_id: order.id,
-          handler: async function (response: any) {
-            // In real app you would verify on server.
-            alert("Payment successful! Payment ID: " + response.razorpay_payment_id);
-            clearCart();
-          },
-          prefill: {},
-          theme: { color: "#F37254" },
-        } as any;
-        // @ts-ignore
-        const rzp = new window.Razorpay(options);
-        rzp.open();
-      };
-    } catch (e) {
-      console.error(e);
-      alert("Checkout failed");
-    } finally {
-      setLoading(false);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name || !address || !pincode || !phone) {
+      alert("Please fill all fields");
+      return;
     }
+    setLoading(true);
+    const url = buildWhatsAppUrl({
+      name,
+      address,
+      pincode,
+      phone,
+      items,
+      totalRupees: total / 100,
+    });
+    // open WhatsApp in new tab/window
+    window.open(url, "_blank");
+    clearCart();
+    setLoading(false);
   };
 
   if (items.length === 0) {
@@ -58,19 +41,16 @@ export default function CheckoutPage() {
 
   return (
     <section className="section-pad">
-      <h1 className="text-2xl font-bold mb-4">Checkout</h1>
-      <p className="mb-2">Total: {formatPrice(total / 100)}</p>
-      <Button onClick={handleCheckout} disabled={loading}>
-        {loading ? "Processing…" : "Pay with Razorpay"}
-      </Button>
+      <h1 className="text-2xl font-bold mb-4">Checkout via WhatsApp</h1>
+      <form onSubmit={handleSubmit} className="space-y-4 max-w-lg">
+        <Input placeholder="Full Name" value={name} onChange={(e) => setName(e.target.value)} required />
+        <Input placeholder="Address" value={address} onChange={(e) => setAddress(e.target.value)} required />
+        <Input placeholder="Pincode" value={pincode} onChange={(e) => setPincode(e.target.value)} required />
+        <Input placeholder="Phone Number" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+        <Button type="submit" disabled={loading}>
+          {loading ? "Redirecting…" : "Place Order on WhatsApp"}
+        </Button>
+      </form>
     </section>
   );
-}
-
-function formatPrice(rupees: number) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(rupees);
 }
