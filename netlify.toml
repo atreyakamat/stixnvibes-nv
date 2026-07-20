@@ -1,0 +1,16 @@
+# Netlify configuration for Stix N Vibes static site
+[build]
+  # Build command runs Next.js static export
+  command = "npm run build && npm run export"
+  # The folder exported by `next export`
+  publish = "out"
+
+[context.production.environment]
+  # Add any environment variables needed at build time here
+  NODE_ENV = "production"
+
+# Optional – redirect all unknown routes to index.html (SPA fallback)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

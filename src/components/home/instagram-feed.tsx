@@ -6,7 +6,8 @@ import { Instagram } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { SectionHeader } from "@/components/layout/section-header";
 import { Button } from "@/components/ui/button";
-import { instagramPosts, siteConfig } from "@/lib/data/products";
+import { instagramPosts } from "@/lib/data/products";
+import { siteConfig } from "@/lib/site-config";
 
 export function InstagramFeed() {
   return (

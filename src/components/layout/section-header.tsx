@@ -19,6 +19,16 @@ export function Kicker({
   );
 }
 
+export type SectionHeaderProps = {
+  kicker?: React.ReactNode;
+  title: React.ReactNode;
+  description?: React.ReactNode;
+  align?: "left" | "center";
+  className?: string;
+  children?: React.ReactNode;
+  id?: string;
+};
+
 export function SectionHeader({
   kicker,
   title,
@@ -27,12 +37,7 @@ export function SectionHeader({
   className,
   children,
   ...props
-}: React.HTMLAttributes<HTMLDivElement> & {
-  kicker?: React.ReactNode;
-  title: React.ReactNode;
-  description?: React.ReactNode;
-  align?: "left" | "center";
-}) {
+}: SectionHeaderProps) {
   return (
     <div
       className={cn(

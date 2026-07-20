@@ -147,6 +147,8 @@ export function Navbar() {
   );
 }
 
+type MegaColumn = { title: string; links: readonly { title: string; href: string }[] };
+
 function MegaMenuItem({
   title,
   href,
@@ -154,7 +156,7 @@ function MegaMenuItem({
 }: {
   title: string;
   href: string;
-  mega: NonNullable<typeof navStructure[number] extends { mega?: infer M } ? M : never>;
+  mega: readonly MegaColumn[];
 }) {
   const [open, setOpen] = React.useState(false);
   return (

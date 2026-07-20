@@ -1,15 +1,18 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
   images: {
-    domains: ["res.cloudinary.com"],
+    formats: ["image/avif", "image/webp"],
+    remotePatterns: [
+      { protocol: "https", hostname: "res.cloudinary.com" },
+      { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "images.ctfassets.net" },
+    ],
   },
   eslint: {
     ignoreDuringBuilds: true,
   },
   experimental: {
-    appDir: true,
     optimizePackageImports: ["lucide-react", "framer-motion"],
   },
 };

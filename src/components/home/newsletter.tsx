@@ -68,7 +68,7 @@ export function Newsletter() {
               role="status"
               aria-live="polite"
             >
-              {state === "ok" && "You’re in. Check your inbox for a welcome vibe ✨"}
+              {state === "ok" && "You're in. Check your inbox for a welcome vibe ✨"}
               {state === "err" && "Please enter a valid email address."}
               {state === "idle" && "By subscribing you agree to our privacy policy."}
             </p>
