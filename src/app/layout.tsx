@@ -4,6 +4,11 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
+import { CartProvider } from "@/context/cart-context";
+import { StoreJsonLd } from "@/components/seo/json-ld";
+import { CartDrawer } from "@/components/cart/cart-drawer";
+import { LiveChat } from "@/components/conversion/live-chat";
+import { ExitIntentModal } from "@/components/conversion/exit-intent-modal";
 import { siteConfig } from "@/lib/site-config";
 
 const inter = Inter({
@@ -89,38 +94,11 @@ export const viewport: Viewport = {
   maximumScale: 5,
 };
 
-const jsonLd = {
-  "@context": "https://schema.org",
-  "@type": "Store",
-  name: siteConfig.name,
-  url: siteConfig.url,
-  description: siteConfig.description,
-  email: siteConfig.social.email,
-  image: `${siteConfig.url}/og-image.png`,
-  address: {
-    "@type": "PostalAddress",
-    addressLocality: "Bengaluru",
-    addressCountry: "IN",
-  },
-  sameAs: [
-    siteConfig.social.instagram,
-    siteConfig.social.twitter,
-    siteConfig.social.youtube,
-    siteConfig.social.tiktok,
-  ],
-};
-
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
-      </head>
       <body className={`${inter.variable} ${spaceGrotesk.variable} antialiased`}>
         <ThemeProvider
           attribute="class"
@@ -128,19 +106,25 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <a
-            href="#main"
-            className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-full focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:shadow-premium focus:border focus:border-border"
-          >
-            Skip to content
-          </a>
-          <div className="relative flex min-h-dvh flex-col">
-            <Navbar />
-            <main id="main" className="relative flex-1">
-              {children}
-            </main>
-            <Footer />
-          </div>
+          <CartProvider>
+            <StoreJsonLd />
+            <a
+              href="#main"
+              className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-full focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:shadow-premium focus:border focus:border-border"
+            >
+              Skip to content
+            </a>
+            <div className="relative flex min-h-dvh flex-col">
+              <Navbar />
+              <main id="main" className="relative flex-1">
+                {children}
+              </main>
+              <Footer />
+              <CartDrawer />
+              <LiveChat />
+              <ExitIntentModal />
+            </div>
+          </CartProvider>
         </ThemeProvider>
       </body>
     </html>

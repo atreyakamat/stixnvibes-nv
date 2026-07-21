@@ -13,8 +13,17 @@
 - `npm run build` — production build
 - `npm run lint` — eslint (next/core-web-vitals)
 - `npm run typecheck` — tsc --noEmit
+- `npm test` — vitest (watch mode)
+- `npm run test:run` — vitest single-run (unit tests)
+- `npm run test:e2e` — Playwright E2E (needs `npm run build` first)
+- `npm run test:e2e:install` — install Playwright browsers
 
 Run lint AND typecheck before declaring a coding task complete.
+
+## Docker (run the whole suite in a container)
+- `docker compose run --rm tests` — builds the tests image and runs lint + typecheck + vitest + Playwright end-to-end
+- `docker compose up dev` — hot-reload dev server on http://localhost:3000 inside Docker
+- `docker compose up prod` — production build served via `next start` inside Docker
 
 ## Architecture
 ```

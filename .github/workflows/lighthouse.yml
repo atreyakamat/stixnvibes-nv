@@ -1,0 +1,32 @@
+name: Lighthouse CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    # Nightly 02:30 IST (21:00 UTC previous day)
+    - cron: '0 21 * * *'
+
+jobs:
+  lighthouse:
+    name: Lighthouse Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci --no-audit --no-fund
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+      - name: Run Lighthouse CI
+        run: |
+          npx --yes @lhci/cli@0.13.x autorun --config=./lighthouserc.json || \
+          npx --yes @lhci/cli@0.13.x autorun --config=./lighthouserc.json
+        env:
+          LHCI_BUILD_CONTEXT__GITHUB_REPO: ${{ github.repository }}

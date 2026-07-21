@@ -1,96 +1,193 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { createBrowser } from "@/lib/supabase/client";
+import * as React from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Container } from "@/components/layout/container";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ShieldCheck, ShoppingCart, Package, Tag, LogOut, Sparkles, RefreshCw, Loader2 } from "lucide-react";
 
-// Simple admin dashboard – lists categories and products via the admin API.
-export default function AdminDashboard() {
-  const [user, setUser] = useState<any>(null);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+type OrderRow = {
+  id: string;
+  created_at: string;
+  customer_name: string;
+  total_cents: number;
+  status: string;
+  whatsapp_url: string | null;
+};
+type ProductRow = {
+  id: string;
+  name: string;
+  slug: string;
+  price_cents: number;
+  stock: number;
+  is_featured: boolean;
+};
 
-  useEffect(() => {
-    const supabase = createBrowser();
-    if (!supabase) return;
-    // Listen to auth changes
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-    });
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-    // Fetch admin data if logged in
-    if (user) {
-      fetchData();
+export default function AdminPage() {
+  const router = useRouter();
+  const [authed, setAuthed] = React.useState(false);
+  const [loading, setLoading] = React.useState(true);
+  const [orders, setOrders] = React.useState<OrderRow[]>([]);
+  const [products, setProducts] = React.useState<ProductRow[]>([]);
+  const [fetching, setFetching] = React.useState(false);
+
+  React.useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("snv.admin.accessToken") : null;
+    if (!token) {
+      router.replace("/login?redirect=/admin");
+      return;
     }
-    return () => {
-      authListener?.subscription?.unsubscribe?.();
-    };
-  }, [user]);
+    setAuthed(true);
+    setLoading(false);
+    void loadAll();
+  }, [router]);
 
-  const fetchData = async () => {
+  async function loadAll() {
+    setFetching(true);
     try {
-      const [catRes, prodRes] = await Promise.all([
-        fetch("/api/admin/categories"),
-        fetch("/api/admin/products"),
-      ]);
-      const [catData, prodData] = await Promise.all([catRes.json(), prodRes.json()]);
-      setCategories(catData);
-      setProducts(prodData);
-    } catch (e) {
-      console.error(e);
+      const [o, p] = await Promise.all([fetch("/api/admin/orders").then(r => r.json()), fetch("/api/admin/products").then(r => r.json())]);
+      if (o?.ok) setOrders((o.data ?? []) as OrderRow[]);
+      if (p?.ok) setProducts((p.data ?? []) as ProductRow[]);
     } finally {
-      setLoading(false);
+      setFetching(false);
     }
-  };
+  }
 
-  const handleLogin = async () => {
-    const supabase = createBrowser();
-    if (!supabase) return;
-    await supabase.auth.signInWithOAuth({ provider: "google" });
-  };
+  function logout() {
+    localStorage.removeItem("snv.admin.accessToken");
+    router.replace("/login");
+  }
 
-  if (!user) {
+  if (loading) {
     return (
-      <section className="section-pad text-center">
-        <h1 className="text-2xl font-bold mb-4">Admin Dashboard</h1>
-        <p className="mb-4">You need to sign in to access admin features.</p>
-        <Button onClick={handleLogin}>Sign in with Google</Button>
-      </section>
+      <Container className="grid min-h-[80vh] place-items-center">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="size-5 animate-spin" /> Loading admin...
+        </div>
+      </Container>
     );
+  }
+  if (!authed) return null;
+
+  const totalSalesRupees = orders.reduce((s, o) => s + (o.status === "paid" || o.status === "confirmed" ? Number(o.total_cents) || 0 : 0), 0) / 100;
+  const aov = orders.length ? totalSalesRupees / orders.filter(o => o.status === "paid" || o.status === "confirmed").length : 0;
+
+  function fmt(cents: number) {
+    return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(cents / 100);
   }
 
   return (
-    <section className="section-pad">
-      <h1 className="text-2xl font-bold mb-6">Admin Dashboard</h1>
-      {loading ? (
-        <p>Loading data…</p>
-      ) : (
-        <div className="grid gap-8 md:grid-cols-2">
-          {/* Categories Card */}
-          <Card className="p-4">
-            <h2 className="text-xl font-semibold mb-2">Categories ({categories.length})</h2>
-            <ul className="list-disc list-inside space-y-1">
-              {categories.map((c) => (
-                <li key={c.id}>{c.name} ({c.slug})</li>
-              ))}
-            </ul>
-          </Card>
-
-          {/* Products Card */}
-          <Card className="p-4">
-            <h2 className="text-xl font-semibold mb-2">Products ({products.length})</h2>
-            <ul className="list-disc list-inside space-y-1 max-h-64 overflow-y-auto">
-              {products.map((p) => (
-                <li key={p.id}>{p.name} – {p.price_cents / 100} ₹ ({p.type})</li>
-              ))}
-            </ul>
-          </Card>
+    <Container className="py-12">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="font-display text-3xl font-semibold flex items-center gap-2">
+            <ShieldCheck className="size-7 text-brand-yellow" /> Admin
+          </h1>
+          <p className="text-sm text-muted-foreground">Stix N Vibes back-office · demo dashboard</p>
         </div>
-      )}
-    </section>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => void loadAll()} disabled={fetching}>
+            {fetching ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />} Refresh
+          </Button>
+          <Button variant="ghost" size="sm" onClick={logout}>
+            <LogOut className="size-4" /> Sign out
+          </Button>
+        </div>
+      </div>
+
+      {/* KPIs */}
+      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <KpiCard icon={<ShoppingCart className="size-5 text-brand-yellow" />} label="Orders" value={orders.length.toLocaleString()} />
+        <KpiCard icon={<Sparkles className="size-5 text-brand-orange" />} label="Total sales" value={fmt(totalSalesRupees * 100)} />
+        <KpiCard icon={<Tag className="size-5 text-brand-purple" />} label="AVG order" value={Number.isFinite(aov) && aov > 0 ? fmt(aov * 100) : "—"} />
+      </div>
+
+      {/* Recent orders */}
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base"><ShoppingCart className="size-4" /> Recent orders</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {orders.length === 0 ? (
+            <EmptyState text="No orders yet — they'll appear here once WhatsApp checkout is used." />
+          ) : (
+            <div className="divide-y divide-border">
+              {orders.slice(0, 10).map((o) => (
+                <div key={o.id} className="flex items-center justify-between gap-3 p-4 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{o.customer_name}
+                      <span className="ml-2 text-muted-foreground">{new Date(o.created_at).toLocaleDateString()}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">{o.id}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge variant={o.status === "paid" || o.status === "confirmed" ? "success" : "outline"}>{o.status}</Badge>
+                    <span className="font-medium tabular-nums">{fmt(o.total_cents)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Catalog snapshot */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base"><Package className="size-4" /> Catalog snapshot</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {products.length === 0 ? (
+            <EmptyState text="No products in Supabase. Insert rows via Supabase Studio or POST /api/admin/products." />
+          ) : (
+            <div className="divide-y divide-border">
+              {products.slice(0, 10).map((p) => (
+                <div key={p.id} className="flex items-center justify-between gap-3 p-4 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{p.name}</p>
+                    <p className="text-xs text-muted-foreground">{p.slug}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {p.is_featured ? <Badge variant="brand" size="sm">Featured</Badge> : null}
+                    <Badge variant={p.stock <= 5 ? "accent" : "outline"} size="sm">{p.stock} in stock</Badge>
+                    <span className="font-medium tabular-nums">{fmt(p.price_cents)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="mt-8 flex items-center gap-2 text-xs text-muted-foreground">
+        <Link href="/" className="hover:text-foreground">← Back to store</Link>
+        <span>·</span>
+        <span>For full CRUD use Supabase Studio.</span>
+      </div>
+    </Container>
+  );
+}
+
+function KpiCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        {icon}
+        <span className="text-xs font-semibold uppercase tracking-[0.18em]">{label}</span>
+      </div>
+      <p className="mt-2 font-display text-3xl font-semibold tracking-tight">{value}</p>
+    </div>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="grid place-items-center p-10 text-center">
+      <Sparkles className="size-7 text-muted-foreground/40" />
+      <p className="mt-3 max-w-md text-sm text-muted-foreground">{text}</p>
+    </div>
   );
 }

@@ -17,17 +17,26 @@ import { navStructure, siteConfig } from "@/lib/site-config";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { openCartDrawer } from "@/components/cart/cart-drawer";
+import { useCart } from "@/context/cart-context";
 
 export function Navbar() {
   const [scrolled, setScrolled] = React.useState(false);
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [searchOpen, setSearchOpen] = React.useState(false);
+  const { count: cartCount } = useCart();
 
   React.useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 16);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    // Auto-open the cart drawer when other components dispatch snv:cart:add.
+    const onAdd = () => openCartDrawer();
+    window.addEventListener("snv:cart:add", onAdd);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("snv:cart:add", onAdd);
+    };
   }, []);
 
   return (
@@ -101,16 +110,19 @@ export function Navbar() {
             >
               <User className="size-5" />
             </button>
-            <Link
-              href="/cart"
-              aria-label="Cart"
+            <button
+              type="button"
+              aria-label="Open cart"
+              onClick={() => openCartDrawer()}
               className="relative grid size-10 place-items-center rounded-full text-foreground/80 transition-colors hover:bg-secondary hover:text-foreground"
             >
               <ShoppingBag className="size-5" />
-              <span className="absolute -right-0.5 -top-0.5 grid size-4 place-items-center rounded-full bg-accent text-[10px] font-bold text-accent-foreground">
-                2
-              </span>
-            </Link>
+              {cartCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 grid size-4 place-items-center rounded-full bg-brand-yellow text-[10px] font-bold text-primary-foreground">
+                  {cartCount}
+                </span>
+              )}
+            </button>
             <ThemeToggle />
             <Button
               variant="gradient"

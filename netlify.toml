@@ -1,16 +1,33 @@
-# Netlify configuration for Stix N Vibes static site
+# Netlify configuration for Stix N Vibes
+# Modern Next.js (SSR + RSC) is auto-detected by Netlify's Next runtime.
+# No `next export` needed — Netlify's plugin builds it as a hybrid site:
+#  - Marketing homepage runs as static/edge
+#  - /shop, /checkout, /api/* run as serverless functions
 [build]
-  # Build command runs Next.js static export
-  command = "npm run build && npm run export"
-  # The folder exported by `next export`
-  publish = "out"
+  command = "npm run build"
+  publish = ".next"
 
-[context.production.environment]
-  # Add any environment variables needed at build time here
-  NODE_ENV = "production"
+[build.environment]
+  NODE_VERSION = "20"
+  NPM_FLAGS = "--no-audit --no-fund"
 
-# Optional – redirect all unknown routes to index.html (SPA fallback)
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+# Long-cache static assets
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/favicon.svg"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"
+
+# Security headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"

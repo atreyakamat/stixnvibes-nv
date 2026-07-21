@@ -1,32 +1,21 @@
 import { createBrowserClient } from "@supabase/ssr";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
+const configured = Boolean(supabaseUrl && supabaseAnonKey);
+
+/** True when client env vars are available (returns a boolean — NOT a function). */
+export function isSupabaseConfigured(): boolean {
+  return configured;
+}
+
 /**
- * Browser-side Supabase client (uses cookies for auth via @supabase/ssr).
- * Safe to import in client components.
+ * Browser Supabase client. Safe to import in client components.
+ * Returns null when env vars missing so feature code can gracefully degrade
+ * (e.g. consult mock data instead of throwing).
  */
 export function createBrowser() {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return null;
-  }
+  if (!configured) return null;
   return createBrowserClient(supabaseUrl, supabaseAnonKey);
 }
-
-/**
- * Service-role client for server-side privileged operations ONLY.
- * NEVER expose this to the client. Guard usage carefully in route handlers / server actions.
- */
-export function createService() {
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceKey) {
-    return null;
-  }
-  return createSupabaseClient(supabaseUrl, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
-
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);

@@ -8,6 +8,8 @@ import { cn, formatPrice } from "@/lib/utils";
 import type { Product } from "@/lib/data/products";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useCart } from "@/context/cart-context";
+import { openCartDrawer } from "@/components/cart/cart-drawer";
 
 export function ProductCard({
   product,
@@ -18,6 +20,7 @@ export function ProductCard({
   className?: string;
   onQuickAdd?: (p: Product) => void;
 }) {
+  const cart = useCart();
   const discount = product.compareAt
     ? Math.round(((product.compareAt - product.price) / product.compareAt) * 100)
     : 0;
@@ -75,7 +78,17 @@ export function ProductCard({
             className="w-full shadow-glow"
             onClick={(e) => {
               e.preventDefault();
-              onQuickAdd?.(product);
+              if (onQuickAdd) onQuickAdd(product);
+              else {
+                cart.addItem({
+                  productId: product.id,
+                  name: product.name,
+                  slug: product.slug,
+                  image: product.image,
+                  price_cents: product.price * 100,
+                });
+                openCartDrawer();
+              }
             }}
           >
             <Plus className="size-4" /> Quick Add

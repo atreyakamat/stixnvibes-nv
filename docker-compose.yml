@@ -1,0 +1,53 @@
+# Stix N Vibes — orchestration for tests + dev.
+# `docker compose run --rm tests`  → runs all tests in a clean container.
+# `docker compose up dev`           → starts a hot-reload dev server on :3000.
+
+services:
+  tests:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: tests
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
+      NEXT_PUBLIC_WHATSAPP_NUMBER: "919999999999"
+      NEXT_PUBLIC_SITE_URL: https://stixnvibes.com
+      CI: "true"
+    command: ["sh", "-c", "npm run lint && npm run typecheck && npx vitest run && npx playwright test"]
+    volumes:
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+      - ./coverage:/app/coverage
+
+  dev:
+    image: node:20-slim
+    working_dir: /app
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-http://127.0.0.1:54321}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-dev-anon-key}
+      NEXT_PUBLIC_WHATSAPP_NUMBER: ${NEXT_PUBLIC_WHATSAPP_NUMBER:-919999999999}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    command: sh -c "npm install --no-audit --no-fund && npm run dev -- -H 0.0.0.0"
+
+  prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+      NEXT_PUBLIC_WHATSAPP_NUMBER: ${NEXT_PUBLIC_WHATSAPP_NUMBER:-919999999999}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+    ports:
+      - "3000:3000"
+    command: ["sh", "-c", "npm run start"]

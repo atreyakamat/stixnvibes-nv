@@ -1,4 +1,4 @@
-name: CI & Netlify Deploy
+name: CI
 
 on:
   push:
@@ -6,43 +6,51 @@ on:
   pull_request:
     branches: [main]
 
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
+jobs:
+  build-and-test:
+    name: Lint · Typecheck · Build · Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install
+        run: npm ci --no-audit --no-fund
 
       - name: Lint
         run: npm run lint
 
-      - name: Type check
+      - name: Typecheck
         run: npm run typecheck
 
-      - name: Build & export static site
-        run: |
-          npm run build
-          npm run export
-
-      # Netlify deployment – requires NETLIFY_AUTH_TOKEN and NETLIFY_SITE_ID secrets
-      - name: Install Netlify CLI
-        run: npm i -g netlify-cli
-
-      - name: Deploy to Netlify (production)
+      - name: Build
+        run: npm run build
         env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-        run: |
-          netlify deploy \
-            --dir=out \
-            --prod \
-            --auth=$NETLIFY_AUTH_TOKEN \
-            --site=$NETLIFY_SITE_ID
+          NEXT_TELEMETRY_DISABLED: '1'
+
+      - name: Unit tests
+        run: npm run test -- --run
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321'
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: 'test-anon-key'
+          NEXT_PUBLIC_WHATSAPP_NUMBER: '919999999999'
+          NEXT_PUBLIC_SITE_URL: 'https://stixnvibes.com'
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: next-build
+          path: .next
+          retention-days: 7
