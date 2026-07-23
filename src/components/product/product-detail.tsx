@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Star, Plus, Minus, Heart, ShoppingBag, Truck, ShieldCheck, RefreshCw,
-  ChevronRight, Sparkles, Check, ZoomIn, MessageCircle,
+  ChevronRight, Sparkles, Check, ZoomIn, MessageCircle, Leaf,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,8 +35,8 @@ export function ProductDetail({ product, related }: { product: Product; related:
     ? Math.round(((product.compareAt - product.price) / product.compareAt) * 100)
     : 0;
   const inStock = true; // mock
-  const stockLimited = false; // mock — wire to product.stock ≤ 5
-  const isBundle = false;
+  const stockLimited = (product.stock ?? 0) > 0 && (product.stock ?? 0) <= 5;
+  const isBundle = Boolean(product.isBundle);
 
   function handleAddToCart() {
     addItem(
@@ -149,6 +149,16 @@ export function ProductDetail({ product, related }: { product: Product; related:
               <Badge variant="outline" size="sm">{product.collection}</Badge>
               {product.tags.includes("bestseller") && <Badge variant="brand" size="sm">Best Seller</Badge>}
               {product.tags.includes("new") && <Badge variant="accent" size="sm">New</Badge>}
+              {product.isLimited && (
+                <Badge className="bg-zinc-950 text-brand-yellow border border-brand-yellow/40">
+                  <Sparkles className="size-3" /> Limited Edition
+                </Badge>
+              )}
+              {isBundle && (
+                <Badge variant="premium" className="bg-brand-purple/15 text-brand-purple border border-brand-purple/25">
+                  Bundle · Save more
+                </Badge>
+              )}
               {product.customizable && <Badge variant="default" size="sm" className="border-brand-purple/40 text-brand-purple">Customizable</Badge>}
               {discount > 0 && <Badge variant="premium" size="sm">-{discount}%</Badge>}
             </div>
@@ -301,6 +311,7 @@ export function ProductDetail({ product, related }: { product: Product; related:
               <li className="flex items-center gap-2"><ShieldCheck className="size-4 text-brand-yellow" /> Premium vinyl · waterproof</li>
               <li className="flex items-center gap-2"><RefreshCw className="size-4 text-brand-yellow" /> 7-day easy returns</li>
               <li className="flex items-center gap-2"><Sparkles className="size-4 text-brand-yellow" /> Made with love in India</li>
+              <li className="flex items-center gap-2"><Leaf className="size-4 text-emerald-500" /> Latex eco-inks · recyclable mailer</li>
             </ul>
           </div>
         </div>

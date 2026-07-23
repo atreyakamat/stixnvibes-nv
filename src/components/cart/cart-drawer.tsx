@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Plus, Minus, ShoppingBag, Trash2, ArrowRight, Sparkles, Truck } from "lucide-react";
+import { X, Plus, Minus, ShoppingBag, Trash2, ArrowRight, Sparkles, Truck, Gift, Copy, Check } from "lucide-react";
 import { useCart } from "@/context/cart-context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -161,12 +161,15 @@ export function CartDrawer() {
 
               {/* Recommended */}
               {items.length > 0 && (
-                <div className="mt-6 rounded-2xl border border-dashed border-border p-4 text-center">
-                  <Sparkles className="size-5 mx-auto text-brand-yellow" />
-                  <p className="mt-2 text-sm">Add a <strong>Mystery Pack</strong> (₹299) and a free sticker is on us.</p>
-                  <Button asChild variant="ghost" size="sm" className="mt-3">
-                    <Link href="/shop/mystery" onClick={() => setOpen(false)}>Browse mystery packs →</Link>
-                  </Button>
+                <div className="mt-6 space-y-3">
+                  <div className="rounded-2xl border border-dashed border-border p-4 text-center">
+                    <Sparkles className="size-5 mx-auto text-brand-yellow" />
+                    <p className="mt-2 text-sm">Add a <strong>Mystery Pack</strong> (₹299) and a free sticker is on us.</p>
+                    <Button asChild variant="ghost" size="sm" className="mt-3">
+                      <Link href="/shop/mystery" onClick={() => setOpen(false)}>Browse mystery packs →</Link>
+                    </Button>
+                  </div>
+                  <ReferralCard />
                 </div>
               )}
             </div>
@@ -216,6 +219,60 @@ function Row({ label, value, className }: { label: string; value: string; classN
     <div className={cn("flex items-center justify-between", className)}>
       <dt className="text-muted-foreground">{label}</dt>
       <dd className="tabular-nums">{value}</dd>
+    </div>
+  );
+}
+
+function ReferralCard() {
+  const [copied, setCopied] = React.useState(false);
+  const [code, setCode] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.localStorage.getItem("snv.referral.code");
+      if (stored && /^SNV-[A-Z0-9]{4,12}$/.test(stored)) {
+        setCode(stored);
+        return;
+      }
+      const generated = `SNV-${Math.random().toString(36).slice(2, 6).toUpperCase()}${Date.now().toString(36).slice(-3).toUpperCase()}`;
+      window.localStorage.setItem("snv.referral.code", generated);
+      setCode(generated);
+    } catch {
+      setCode("SNV-FRIENDS");
+    }
+  }, []);
+
+  async function copyLink() {
+    if (!code) return;
+    const link = `${siteConfig.url}?ref=${code}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-brand-yellow/30 bg-brand-yellow/5 p-4">
+      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+        <Gift className="size-4 text-brand-yellow" />
+        Refer & earn ₹100
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Share your link — your friend gets 10% off their first order, you get ₹100 store credit when they buy.
+      </p>
+      <div className="mt-3 flex items-center gap-2">
+        <code className="flex-1 truncate rounded-lg border border-border bg-background/60 px-3 py-1.5 font-mono text-xs">
+          {code ?? "SNV-…"}
+        </code>
+        <Button size="sm" variant="outline" onClick={copyLink} aria-label="Copy referral link">
+          {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+          {copied ? "Copied" : "Copy link"}
+        </Button>
+      </div>
     </div>
   );
 }

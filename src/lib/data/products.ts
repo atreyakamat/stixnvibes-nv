@@ -24,6 +24,9 @@ export type Product = {
   customizable: boolean;
   description: string;
   badge?: string;
+  isLimited?: boolean;
+  isBundle?: boolean;
+  stock?: number;
 };
 
 // Using Unsplash for placeholder imagery. Replace with Cloudinary in production.
@@ -73,7 +76,9 @@ const mystery: Product[] = [
   { id: "m1", slug: "anime-mystery-pack", name: "Anime Mystery Pack", type: "mystery_pack", category: "Mystery Pack", collection: "Anime", price: 299, compareAt: 499, currency: "INR", rating: 4.8, reviewCount: 1410, image: IMG.anime, images: [IMG.anime], tags: ["bestseller", "offer"], customizable: false, description: "10 surprise anime stickers + 1 rare holo. Unboxing joy guaranteed." },
   { id: "m2", slug: "gaming-mystery-pack", name: "Gaming Mystery Pack", type: "mystery_pack", category: "Mystery Pack", collection: "Gaming", price: 349, currency: "INR", rating: 4.7, reviewCount: 712, image: IMG.gaming, images: [IMG.gaming], tags: ["new"], customizable: false, description: "12 gaming stickers + 1 controller magnet. Luck rolled into a pack." },
   { id: "m3", slug: "premium-mystery-pack", name: "Premium Mystery Pack", type: "mystery_pack", category: "Mystery Pack", collection: "Premium", price: 599, currency: "INR", rating: 4.9, reviewCount: 320, image: IMG.purple, images: [IMG.purple], tags: ["premium", "offer"], customizable: false, description: "Mix of 5 vinyl stickers, 1 mini poster, 1 Spotify card, and 1 rare holo.", badge: "Premium" },
-  { id: "m4", slug: "f1-football-mystery-pack", name: "F1 × Football Mystery Pack", type: "mystery_pack", category: "Mystery Pack", collection: "Random Mix", price: 249, currency: "INR", rating: 4.6, reviewCount: 215, image: IMG.football, images: [IMG.football], tags: ["new"], customizable: false, description: "Mixed sports theme — speed and pitch vibes in surprise format." },
+  { id: "m4", slug: "f1-football-mystery-pack", name: "F1 × Football Mystery Pack", type: "mystery_pack", category: "Mystery Pack", collection: "Random Mix", price: 249, currency: "INR", rating: 4.6, reviewCount: 215, image: IMG.football, images: [IMG.football], tags: ["new"], customizable: false, description: "Mixed sports theme — speed and pitch vibes in surprise format.", isLimited: true },
+  { id: "sc4", slug: "spotify-anniversary-number-one-card", name: "#1 Anniversary Spotify Card", type: "spotify_card", category: "Spotify Cards", collection: "Customize", price: 449, currency: "INR", rating: 5, reviewCount: 612, image: IMG.gradient, images: [IMG.gradient], tags: ["new", "customizable"], customizable: true, description: "Limited-run anniversary card — only while stocks last.", isLimited: true },
+  { id: "p5", slug: "f1-race-day-collective-a3-set", name: "F1 Race Day A3 — Collective Set", type: "poster", category: "Posters", collection: "Formula 1", price: 1299, compareAt: 1599, currency: "INR", rating: 4.9, reviewCount: 88, image: IMG.car, images: [IMG.car], tags: ["premium", "offer"], customizable: false, description: "A collector's set of 3 archival A3 prints for the true F1 fan.", isBundle: true },
 ];
 
 export const products: Product[] = [...stickers, ...posters, ...spotifyCards, ...frames, ...mystery];

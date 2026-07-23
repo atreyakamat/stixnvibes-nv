@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Star, Plus, Heart } from "lucide-react";
+import { Star, Plus, Heart, Sparkles } from "lucide-react";
 import { cn, formatPrice } from "@/lib/utils";
 import type { Product } from "@/lib/data/products";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +54,16 @@ export function ProductCard({
             <Badge variant="brand" className="shadow-glow">Best Seller</Badge>
           )}
           {product.tags.includes("new") && <Badge variant="accent">New</Badge>}
+          {product.isLimited && (
+            <Badge className="bg-zinc-950 text-brand-yellow border border-brand-yellow/40">
+              <Sparkles className="size-3" /> Limited Edition
+            </Badge>
+          )}
+          {product.isBundle && (
+            <Badge variant="premium" className="bg-brand-purple/15 text-brand-purple border border-brand-purple/25">
+              Bundle · Save more
+            </Badge>
+          )}
           {discount > 0 && (
             <Badge variant="premium" className="bg-brand-purple/15 text-brand-purple border border-brand-purple/25">
               -{discount}%

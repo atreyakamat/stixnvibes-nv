@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Container } from "@/components/layout/container";
 import { SectionHeader } from "@/components/layout/section-header";
+import { SustainabilityBadge } from "@/components/ui/sustainability-badge";
 
 export const metadata: Metadata = {
   title: "About — Stix N Vibes",
@@ -22,6 +23,9 @@ export default function AboutPage() {
         <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Est. 2024 · Bengaluru
         </span>
+        <div className="mt-5 flex justify-center">
+          <SustainabilityBadge size="sm" />
+        </div>
         <h1 className="mt-5 font-display text-4xl font-semibold tracking-tight md:text-6xl text-balance">
           We're <span className="brand-gradient-text">Stix N Vibes</span>.
         </h1>

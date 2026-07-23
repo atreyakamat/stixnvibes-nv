@@ -2,6 +2,7 @@ import * as React from "react";
 import Link from "next/link";
 import { Sparkles, Instagram, Twitter, Youtube, Mail, MapPin, MessageCircle } from "lucide-react";
 import { siteConfig } from "@/lib/site-config";
+import { SustainabilityBadge } from "@/components/ui/sustainability-badge";
 
 export function Footer() {
   const year = new Date().getFullYear();
@@ -20,6 +21,7 @@ export function Footer() {
             <p className="text-sm text-muted-foreground max-w-sm">
               {siteConfig.description}
             </p>
+            <SustainabilityBadge size="xs" variant="subtle" className="!inline-flex" />
             <div className="flex items-center gap-2">
               {[
                 { Icon: Instagram, href: siteConfig.social.instagram, label: "Instagram" },

@@ -6,6 +6,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { CartProvider } from "@/context/cart-context";
 import { StoreJsonLd } from "@/components/seo/json-ld";
+import { WebVitalsReporter } from "@/components/seo/web-vitals-reporter";
 import { CartDrawer } from "@/components/cart/cart-drawer";
 import { LiveChat } from "@/components/conversion/live-chat";
 import { ExitIntentModal } from "@/components/conversion/exit-intent-modal";
@@ -108,6 +109,7 @@ export default function RootLayout({
         >
           <CartProvider>
             <StoreJsonLd />
+            <WebVitalsReporter />
             <a
               href="#main"
               className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-full focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:shadow-premium focus:border focus:border-border"

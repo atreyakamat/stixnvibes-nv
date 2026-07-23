@@ -54,7 +54,10 @@ function ShopClient() {
   const type = (sp.get("type") || "all") as ProductType | "all";
   const priceBand = sp.get("price") ? Number(sp.get("price")) : null;
   const collection = sp.get("collection") ?? null;
-  const material = sp.get("material")?.split(",").filter(Boolean) ?? [];
+  const material = React.useMemo(
+    () => sp.get("material")?.split(",").filter(Boolean) ?? [],
+    [sp]
+  );
   const [drawerOpen, setDrawerOpen] = React.useState(false);
 
   React.useEffect(() => {
