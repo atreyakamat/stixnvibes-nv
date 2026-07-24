@@ -1,14 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { products, getProductBySlug, getProductsByCategory } from "@/lib/data/products";
+import { products, getProductBySlug } from "@/lib/data/products";
 
 describe("Shop Catalog Engine & Filtering Logic", () => {
   it("filters products by search query keyword", () => {
-    const searchKeyword = "holographic";
+    const searchKeyword = "anime";
     const filtered = products.filter(
       (p) =>
         p.name.toLowerCase().includes(searchKeyword) ||
         p.description.toLowerCase().includes(searchKeyword) ||
-        p.tags.some((t) => t.toLowerCase().includes(searchKeyword))
+        p.tags.some((t) => t.toLowerCase().includes(searchKeyword)) ||
+        p.category.toLowerCase().includes(searchKeyword)
     );
 
     expect(filtered.length).toBeGreaterThan(0);
@@ -16,7 +17,8 @@ describe("Shop Catalog Engine & Filtering Logic", () => {
       const match =
         item.name.toLowerCase().includes(searchKeyword) ||
         item.description.toLowerCase().includes(searchKeyword) ||
-        item.tags.some((t) => t.toLowerCase().includes(searchKeyword));
+        item.tags.some((t) => t.toLowerCase().includes(searchKeyword)) ||
+        item.category.toLowerCase().includes(searchKeyword);
       expect(match).toBe(true);
     }
   });
@@ -42,11 +44,11 @@ describe("Shop Catalog Engine & Filtering Logic", () => {
   });
 
   it("returns product detail by valid slug", () => {
-    const slug = "holographic-cyberpunk-sticker-pack";
+    const slug = "anime-heroes-sticker-pack";
     const p = getProductBySlug(slug);
 
     expect(p).toBeDefined();
     expect(p?.slug).toBe(slug);
-    expect(p?.name).toContain("Holographic");
+    expect(p?.name).toContain("Anime");
   });
 });
