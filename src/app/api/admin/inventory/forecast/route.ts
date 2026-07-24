@@ -38,8 +38,7 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = admin as any;
+  const client = admin as ReturnType<typeof createService>;
   try {
     const sinceIso = new Date(Date.now() - days * 86400_000).toISOString();
 

@@ -48,8 +48,7 @@ export async function POST(req: NextRequest) {
   try {
     const svc = createService();
     if (svc) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const client = svc as any;
+      const client = svc as ReturnType<typeof createService>;
       if (metrics.length > 0) {
         const rows = metrics.map((m) => ({
           event: `web_vital_${m.name.toLowerCase()}`,
