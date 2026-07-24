@@ -16,6 +16,7 @@ import {
   type ProductType,
 } from "@/lib/data/products";
 import { cn } from "@/lib/utils";
+import { useCart } from "@/context/cart-context";
 
 const TYPE_TABS: { label: string; value: ProductType | "all" }[] = [
   { label: "All", value: "all" },
@@ -47,10 +48,14 @@ function ShopClient() {
   const sp = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+  const { addItem } = useCart();
 
   const initialType = (sp.get("type") as ProductType | null) ?? (sp.get("tab") as ProductType | null);
   const filterParam = sp.get("filter");
-  const [sort, setSort] = React.useState<"popular" | "newest" | "price-asc" | "price-desc">(filterParam === "new" ? "newest" : filterParam === "popular" ? "popular" : "popular");
+  const searchQuery = (sp.get("q") ?? sp.get("search"))?.toLowerCase() ?? "";
+  const [sort, setSort] = React.useState<"popular" | "newest" | "price-asc" | "price-desc">(
+    filterParam === "new" ? "newest" : filterParam === "popular" ? "popular" : "popular"
+  );
   const type = (sp.get("type") || "all") as ProductType | "all";
   const priceBand = sp.get("price") ? Number(sp.get("price")) : null;
   const collection = sp.get("collection") ?? null;
@@ -59,10 +64,28 @@ function ShopClient() {
     [sp]
   );
   const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const [addedToast, setAddedToast] = React.useState<string | null>(null);
+
+  const handleQuickAdd = React.useCallback(
+    (p: Product) => {
+      addItem({
+        productId: p.id,
+        name: p.name,
+        slug: p.slug,
+        image: p.image,
+        price_cents: p.price * 100,
+        variantName: "Standard",
+      });
+      setAddedToast(p.name);
+      if (typeof window !== "undefined") window.dispatchEvent(new Event("snv:cart:add"));
+      setTimeout(() => setAddedToast(null), 2000);
+    },
+    [addItem]
+  );
 
   React.useEffect(() => {
     if (initialType) {
-      // Keep URL in sync — already done via push, no-op effect for hydration.
+      // Keep URL in sync
     }
   }, [initialType]);
 
@@ -80,6 +103,15 @@ function ShopClient() {
   // Filtering pipeline
   const filtered = React.useMemo(() => {
     let res = mockProducts.slice();
+    if (searchQuery) {
+      res = res.filter(
+        (p) =>
+          p.name.toLowerCase().includes(searchQuery) ||
+          p.description.toLowerCase().includes(searchQuery) ||
+          p.tags.some((t) => t.toLowerCase().includes(searchQuery)) ||
+          p.category.toLowerCase().includes(searchQuery)
+      );
+    }
     // filter=offers|new|popular quick preset
     if (filterParam === "offers") res = res.filter((p) => p.compareAt && p.compareAt > p.price);
     if (type !== "all") res = res.filter((p) => p.type === type);
@@ -90,10 +122,11 @@ function ShopClient() {
     }
     if (material.length) {
       res = res.filter((p) =>
-        material.some((m) =>
-          m.toLowerCase() === "premium vinyl" && p.type === "sticker_vinyl" ||
-          m.toLowerCase() === "matte paper" && p.type === "poster" ||
-          m.toLowerCase() === "wood" && p.type === "frame"
+        material.some(
+          (m) =>
+            (m.toLowerCase() === "premium vinyl" && p.type === "sticker_vinyl") ||
+            (m.toLowerCase() === "matte paper" && p.type === "poster") ||
+            (m.toLowerCase() === "wood" && p.type === "frame")
         )
       );
     }
@@ -113,12 +146,24 @@ function ShopClient() {
         res = res.sort((a, b) => b.rating - a.rating);
     }
     return res;
-  }, [filterParam, type, collection, priceBand, material, sort]);
+  }, [filterParam, searchQuery, type, collection, priceBand, material, sort]);
 
-  const activeCount = (type !== "all" ? 1 : 0) + (collection ? 1 : 0) + (priceBand !== null ? 1 : 0) + material.length;
+  const activeCount =
+    (type !== "all" ? 1 : 0) +
+    (collection ? 1 : 0) +
+    (priceBand !== null ? 1 : 0) +
+    material.length +
+    (searchQuery ? 1 : 0);
 
   return (
     <Container className="pt-28 pb-12 md:pt-36">
+      {/* Toast Alert */}
+      {addedToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-brand-yellow text-slate-950 font-semibold px-4 py-2.5 rounded-xl shadow-2xl animate-bounce">
+          Added {addedToast} to cart!
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col gap-2">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -139,7 +184,7 @@ function ShopClient() {
               onClick={() => setParam("type", t.value === "all" ? null : t.value)}
               className={cn(
                 "whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors",
-                (type === t.value) || (t.value === "all" && type === "all")
+                type === t.value || (t.value === "all" && type === "all")
                   ? "bg-brand-gradient text-primary-foreground shadow-glow"
                   : "text-foreground/70 hover:text-foreground hover:bg-secondary"
               )}
@@ -189,14 +234,35 @@ function ShopClient() {
       {/* Active filter chips */}
       {activeCount > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          {type !== "all" && <Chip onClear={() => setParam("type", null)}>Type · {TYPE_TABS.find(t => t.value === type)?.label}</Chip>}
+          {searchQuery && <Chip onClear={() => setParam("q", null)}>Search · "{searchQuery}"</Chip>}
+          {type !== "all" && (
+            <Chip onClear={() => setParam("type", null)}>
+              Type · {TYPE_TABS.find((t) => t.value === type)?.label}
+            </Chip>
+          )}
           {collection && <Chip onClear={() => setParam("collection", null)}>Theme · {collection}</Chip>}
-          {priceBand !== null && <Chip onClear={() => setParam("price", null)}>Price · {PRICE_BANDS.find(b => b.max === priceBand)?.label}</Chip>}
-          {material.map((m) => <Chip key={m} onClear={() => {
-            const remaining = material.filter((x) => x !== m);
-            setParam("material", remaining.length ? remaining.join(",") : null);
-          }}>Material · {m}</Chip>)}
-          <button onClick={() => router.replace(pathname, { scroll: false })} className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline">Clear all</button>
+          {priceBand !== null && (
+            <Chip onClear={() => setParam("price", null)}>
+              Price · {PRICE_BANDS.find((b) => b.max === priceBand)?.label}
+            </Chip>
+          )}
+          {material.map((m) => (
+            <Chip
+              key={m}
+              onClear={() => {
+                const remaining = material.filter((x) => x !== m);
+                setParam("material", remaining.length ? remaining.join(",") : null);
+              }}
+            >
+              Material · {m}
+            </Chip>
+          ))}
+          <button
+            onClick={() => router.replace(pathname, { scroll: false })}
+            className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+          >
+            Clear all
+          </button>
         </div>
       )}
 
@@ -206,13 +272,19 @@ function ShopClient() {
           <div className="grid place-items-center py-24 text-center">
             <p className="text-lg font-medium">No products match those filters.</p>
             <p className="text-sm text-muted-foreground">Try widening your selection or browse all.</p>
-            <Button className="mt-4" variant="outline" onClick={() => router.replace(pathname, { scroll: false })}>Reset filters</Button>
+            <Button
+              className="mt-4"
+              variant="outline"
+              onClick={() => router.replace(pathname, { scroll: false })}
+            >
+              Reset filters
+            </Button>
           </div>
         ) : (
           <StaggerGroup className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 lg:grid-cols-4" stagger={0.04}>
             {filtered.map((p) => (
               <StaggerItem key={p.id}>
-                <ProductCard product={p} onQuickAdd={quickAddStub} />
+                <ProductCard product={p} onQuickAdd={handleQuickAdd} />
               </StaggerItem>
             ))}
           </StaggerGroup>

@@ -317,6 +317,105 @@ export function ProductDetail({ product, related }: { product: Product; related:
         </div>
       </div>
 
+      {/* Product Technical Specifications */}
+      <div className="mt-16 bg-slate-900/40 border border-slate-800 rounded-3xl p-8 backdrop-blur-xl">
+        <h2 className="font-display text-2xl font-bold text-white mb-6">Technical Specifications</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
+          <div className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800">
+            <span className="text-xs text-slate-400 uppercase tracking-wider block">Material Composition</span>
+            <span className="font-medium text-white mt-1 block">100% Polyvinyl Chloride (PVC) Premium Vinyl</span>
+          </div>
+          <div className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800">
+            <span className="text-xs text-slate-400 uppercase tracking-wider block">Weather & Water Resistance</span>
+            <span className="font-medium text-white mt-1 block">IP68 Waterproof, Dishwasher Safe & UV Proof</span>
+          </div>
+          <div className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800">
+            <span className="text-xs text-slate-400 uppercase tracking-wider block">Adhesive Technology</span>
+            <span className="font-medium text-white mt-1 block">High-Tack Pressure Sensitive Acrylic (Residue-Free)</span>
+          </div>
+          <div className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800">
+            <span className="text-xs text-slate-400 uppercase tracking-wider block">Print Resolution</span>
+            <span className="font-medium text-white mt-1 block">1200 DPI Ultra-HD Japanese Eco-Solvent Ink</span>
+          </div>
+          <div className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800">
+            <span className="text-xs text-slate-400 uppercase tracking-wider block">Thickness Gauge</span>
+            <span className="font-medium text-white mt-1 block">6.0 mil (150 microns) Heavy Duty Vinyl Layer</span>
+          </div>
+          <div className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800">
+            <span className="text-xs text-slate-400 uppercase tracking-wider block">Origin & Craftsmanship</span>
+            <span className="font-medium text-white mt-1 block">Hand-Finished Studio Craft in Bengaluru, India</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Customer Reviews Section */}
+      <div className="mt-16 bg-slate-900/40 border border-slate-800 rounded-3xl p-8 backdrop-blur-xl">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+          <div>
+            <h2 className="font-display text-2xl font-bold text-white">Customer Reviews</h2>
+            <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center text-brand-yellow">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className="w-4 h-4 fill-current" />
+                ))}
+              </div>
+              <span className="text-sm font-semibold text-white">{product.rating.toFixed(1)} out of 5</span>
+              <span className="text-xs text-slate-400">({product.reviewCount} verified reviews)</span>
+            </div>
+          </div>
+          <Button variant="outline" onClick={() => alert("Review submission form submitted successfully!")}>
+            Write a Review
+          </Button>
+        </div>
+
+        {/* Sample Customer Review Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-6 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-brand-yellow/20 text-brand-yellow flex items-center justify-center font-bold text-sm">
+                  R
+                </div>
+                <div>
+                  <h4 className="font-semibold text-white text-sm">Rohan Mehta</h4>
+                  <span className="text-[10px] text-emerald-400 font-mono">Verified Buyer</span>
+                </div>
+              </div>
+              <div className="flex text-brand-yellow">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className="w-3.5 h-3.5 fill-current" />
+                ))}
+              </div>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              "The holographic finish on this sticker pack is mind-blowing! Absolutely zero bubbles when applying to my MacBook Pro."
+            </p>
+          </div>
+
+          <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-6 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-brand-red/20 text-brand-red flex items-center justify-center font-bold text-sm">
+                  P
+                </div>
+                <div>
+                  <h4 className="font-semibold text-white text-sm">Priya Sharma</h4>
+                  <span className="text-[10px] text-emerald-400 font-mono">Verified Buyer</span>
+                </div>
+              </div>
+              <div className="flex text-brand-yellow">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className="w-3.5 h-3.5 fill-current" />
+                ))}
+              </div>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              "Delivery was super fast (2 days to Mumbai). Print detail and vinyl quality are top notch!"
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Related products */}
       {related.length > 0 && (
         <section className="mt-20">

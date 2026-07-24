@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createService } from "@/lib/supabase/service";
+import type { Insert } from "@/types/supabase";
 
 export const dynamic = "force-dynamic";
 
@@ -48,9 +49,8 @@ export async function POST(req: NextRequest) {
   try {
     const svc = createService();
     if (svc) {
-      const client = svc as ReturnType<typeof createService>;
       if (metrics.length > 0) {
-        const rows = metrics.map((m) => ({
+        const rows: Insert<"analytics">[] = metrics.map((m) => ({
           event: `web_vital_${m.name.toLowerCase()}`,
           payload: {
             id: m.id ?? null,
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
           url: body?.url ?? null,
           user_agent: body?.userAgent ?? null,
         }));
-        const { error } = await client.from("analytics").insert(rows);
+        const { error } = await (svc as any).from("analytics").insert(rows);
         if (error) console.warn("[vitals] insert failed:", error.message);
       }
     }

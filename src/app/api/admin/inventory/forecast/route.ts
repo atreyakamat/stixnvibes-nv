@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const client = admin as ReturnType<typeof createService>;
+  const client = admin;
   try {
     const sinceIso = new Date(Date.now() - days * 86400_000).toISOString();
 
