@@ -63,20 +63,6 @@ export default function AdminPage() {
     router.replace("/login");
   }
 
-  if (loading) {
-    return (
-      <Container className="grid min-h-[80vh] place-items-center">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="size-5 animate-spin" /> Loading admin...
-        </div>
-      </Container>
-    );
-  }
-  if (!authed) return null;
-
-  const totalSalesRupees = orders.reduce((s, o) => s + (o.status === "paid" || o.status === "confirmed" ? Number(o.total_cents) || 0 : 0), 0) / 100;
-  const aov = orders.length ? totalSalesRupees / orders.filter(o => o.status === "paid" || o.status === "confirmed").length : 0;
-
   type CategoryAgg = { key: string; count: number; featured: number };
   const categoryAgg: CategoryAgg[] = React.useMemo(() => {
     const m = new Map<string, CategoryAgg>();
@@ -93,6 +79,20 @@ export default function AdminPage() {
   const totalCatalog = categoryAgg.reduce((s, c) => s + c.count, 0) || 1;
   const lowStock = products.filter(p => typeof p.stock === "number" && p.stock > 0 && p.stock <= 5).slice(0, 6);
   const outOfStock = products.filter(p => typeof p.stock === "number" && p.stock <= 0).length;
+
+  if (loading) {
+    return (
+      <Container className="grid min-h-[80vh] place-items-center">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="size-5 animate-spin" /> Loading admin...
+        </div>
+      </Container>
+    );
+  }
+  if (!authed) return null;
+
+  const totalSalesRupees = orders.reduce((s, o) => s + (o.status === "paid" || o.status === "confirmed" ? Number(o.total_cents) || 0 : 0), 0) / 100;
+  const aov = orders.length ? totalSalesRupees / orders.filter(o => o.status === "paid" || o.status === "confirmed").length : 0;
 
   function fmt(cents: number) {
     return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(cents / 100);

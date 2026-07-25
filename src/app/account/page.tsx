@@ -166,6 +166,7 @@ export default function AccountPage() {
                 <CardContent className="pt-6 space-y-4">
                   {order.items.map((item, idx) => (
                     <div key={idx} className="flex items-center gap-4 py-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={item.image} alt={item.name} className="w-14 h-14 rounded-xl object-cover border border-slate-800 bg-slate-950" />
                       <div className="flex-1 min-w-0">
                         <h4 className="font-semibold text-sm text-white truncate">{item.name}</h4>
@@ -189,6 +190,7 @@ export default function AccountPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {MOCK_SAVED_DESIGNS.map((design) => (
                 <div key={design.id} className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 flex gap-5 items-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={design.thumbnail} alt={design.name} className="w-20 h-20 rounded-2xl object-cover border border-slate-800 bg-slate-950" />
                   <div className="flex-1 min-w-0">
                     <Badge variant="outline" className="text-xs border-brand-yellow/30 text-brand-yellow mb-1">{design.type}</Badge>
