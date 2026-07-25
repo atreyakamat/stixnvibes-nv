@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import type { StaticImageData } from "next/image";
 import { ProductDetail } from "@/components/product/product-detail";
 import { getProductBySlug, products as mockProducts } from "@/lib/data/products";
-import { ProductJsonLd } from "@/components/seo/json-ld";
+import { ProductJsonLd, BreadcrumbJsonLd } from "@/components/seo/json-ld";
 
 interface PageProps {
   params: { slug: string };
@@ -36,6 +36,14 @@ export default function ProductPage({ params }: PageProps) {
 
   return (
     <>
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Home", url: "/" },
+          { name: "Shop", url: "/shop" },
+          { name: product.category, url: `/shop?category=${encodeURIComponent(product.category)}` },
+          { name: product.name, url: `/shop/${product.slug}` },
+        ]}
+      />
       <ProductJsonLd
         name={product.name}
         slug={product.slug}

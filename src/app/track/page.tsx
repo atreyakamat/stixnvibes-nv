@@ -32,10 +32,13 @@ export default function TrackOrderPage() {
   const [loading, setLoading] = React.useState(false);
   const [result, setResult] = React.useState(SAMPLE_TRACKING_RESULT);
 
+  const [notFoundError, setNotFoundError] = React.useState<string | null>(null);
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
     setLoading(true);
+    setNotFoundError(null);
     try {
       const res = await fetch(`/api/orders/track?query=${encodeURIComponent(searchQuery.trim())}`);
       const json = await res.json();
@@ -44,9 +47,11 @@ export default function TrackOrderPage() {
           ...SAMPLE_TRACKING_RESULT,
           ...json.data,
         });
+      } else {
+        setNotFoundError(json.error || `No order found matching "${searchQuery}". Please check your details.`);
       }
     } catch {
-      // Fallback to current view
+      setNotFoundError("Failed to fetch order status. Please check your internet connection.");
     } finally {
       setLoading(false);
     }
@@ -91,9 +96,22 @@ export default function TrackOrderPage() {
           </Card>
         </div>
 
-        {/* Active Tracking Result */}
-        <div className="max-w-3xl mx-auto space-y-8">
-          <Card className="bg-slate-900/60 border-slate-800 rounded-3xl overflow-hidden backdrop-blur-xl">
+        {/* Search Error State */}
+        {notFoundError ? (
+          <div className="max-w-2xl mx-auto mb-12">
+            <Card className="bg-red-500/10 border-red-500/30 rounded-3xl p-6 backdrop-blur-xl text-center space-y-3">
+              <div className="w-12 h-12 bg-red-500/20 text-brand-red rounded-2xl flex items-center justify-center mx-auto">
+                <Search className="w-6 h-6" />
+              </div>
+              <h3 className="font-display font-bold text-white text-lg">Order Not Found</h3>
+              <p className="text-slate-300 text-sm">{notFoundError}</p>
+              <p className="text-xs text-slate-400">Need help? Contact our support team via WhatsApp with your payment receipt.</p>
+            </Card>
+          </div>
+        ) : (
+          /* Active Tracking Result */
+          <div className="max-w-3xl mx-auto space-y-8">
+            <Card className="bg-slate-900/60 border-slate-800 rounded-3xl overflow-hidden backdrop-blur-xl">
             <CardHeader className="bg-slate-950/80 border-b border-slate-800 p-6 sm:p-8">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
@@ -161,6 +179,7 @@ export default function TrackOrderPage() {
             </Button>
           </div>
         </div>
+        )}
       </Container>
     </div>
   );

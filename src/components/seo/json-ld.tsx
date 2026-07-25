@@ -119,3 +119,25 @@ export function FaqJsonLd(props: { questions: { q: string; a: string }[]; id?: s
     />
   );
 }
+
+/**
+ * BreadcrumbList JSON-LD - for navigation hierarchy.
+ */
+export function BreadcrumbJsonLd(props: { items: { name: string; url: string }[]; id?: string }) {
+  return (
+    <JsonLd
+      id={props.id ?? "breadcrumb-jsonld"}
+      data={{
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: props.items.map((item, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          name: item.name,
+          item: item.url.startsWith("http") ? item.url : `https://stixnvibes.com${item.url}`,
+        })),
+      }}
+    />
+  );
+}
+
