@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Container } from "@/components/layout/container";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ShieldCheck, ShoppingCart, Package, Tag, LogOut, Sparkles, RefreshCw, Loader2 } from "lucide-react";
+import { ShieldCheck, ShoppingCart, Package, Tag, LogOut, Sparkles, RefreshCw, Loader2, Download, AlertTriangle, Layers } from "lucide-react";
 
 type OrderRow = {
   id: string;
@@ -24,6 +24,8 @@ type ProductRow = {
   price_cents: number;
   stock: number;
   is_featured: boolean;
+  collection: string | null;
+  type: string;
 };
 
 export default function AdminPage() {
@@ -74,6 +76,23 @@ export default function AdminPage() {
 
   const totalSalesRupees = orders.reduce((s, o) => s + (o.status === "paid" || o.status === "confirmed" ? Number(o.total_cents) || 0 : 0), 0) / 100;
   const aov = orders.length ? totalSalesRupees / orders.filter(o => o.status === "paid" || o.status === "confirmed").length : 0;
+
+  type CategoryAgg = { key: string; count: number; featured: number };
+  const categoryAgg: CategoryAgg[] = React.useMemo(() => {
+    const m = new Map<string, CategoryAgg>();
+    for (const p of products) {
+      const key = (p.collection || p.type || "Other") as string;
+      const prev = m.get(key) ?? { key, count: 0, featured: 0 };
+      prev.count += 1;
+      if (p.is_featured) prev.featured += 1;
+      m.set(key, prev);
+    }
+    return Array.from(m.values()).sort((a, b) => b.count - a.count);
+  }, [products]);
+  const topCategories = categoryAgg.slice(0, 5);
+  const totalCatalog = categoryAgg.reduce((s, c) => s + c.count, 0) || 1;
+  const lowStock = products.filter(p => typeof p.stock === "number" && p.stock > 0 && p.stock <= 5).slice(0, 6);
+  const outOfStock = products.filter(p => typeof p.stock === "number" && p.stock <= 0).length;
 
   function fmt(cents: number) {
     return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(cents / 100);

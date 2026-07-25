@@ -3,7 +3,17 @@ import { createBrowserClient } from "@supabase/ssr";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
-const configured = Boolean(supabaseUrl && supabaseAnonKey);
+function isValidHttpUrl(url: string): boolean {
+  try {
+    if (!url || url.includes("YOUR_") || url.includes("PLACEHOLDER")) return false;
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+const configured = isValidHttpUrl(supabaseUrl) && Boolean(supabaseAnonKey);
 
 /** True when client env vars are available (returns a boolean — NOT a function). */
 export function isSupabaseConfigured(): boolean {

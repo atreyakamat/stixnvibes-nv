@@ -4,12 +4,17 @@ import { cookies } from "next/headers";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
-/**
- * Server-component Supabase client bound to the request cookies.
- * Use in: server components, layout.tsx, page.tsx (server), route handlers.
- */
+function isValidHttpUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return (parsed.protocol === "http:" || parsed.protocol === "https:") && !url.includes("YOUR_SUPABASE_URL");
+  } catch {
+    return false;
+  }
+}
+
 export async function createServer() {
-  if (!supabaseUrl || !supabaseAnonKey) return null;
+  if (!isValidHttpUrl(supabaseUrl) || !supabaseAnonKey) return null;
   const cookieStore = await cookies();
   return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
