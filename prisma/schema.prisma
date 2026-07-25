@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Category {
+  id          String     @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String     @unique
+  parentId    String?    @map("parent_id") @db.Uuid
+  parent      Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Category[] @relation("CategoryHierarchy")
+  icon        String?
+  sortOrder   Int        @default(0) @map("sort_order")
+  isFeatured  Boolean    @default(false) @map("is_featured")
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  products    Product[]
+
+  @@index([parentId])
+  @@index([slug])
+  @@map("categories")
+}
+
+enum ProductType {
+  sticker
+  sticker_vinyl
+  poster
+  spotify_card
+  frame
+  mystery_pack
+}
+
+model Product {
+  id               String       @id @default(uuid()) @db.Uuid
+  name             String
+  slug             String       @unique
+  description      String?
+  shortDescription String?      @map("short_description")
+  priceCents       Int          @map("price_cents")
+  compareAtCents   Int?         @map("compare_at_cents")
+  currency         String       @default("INR")
+  imageUrl         String?      @map("image_url")
+  images           Json         @default("[]")
+  type             ProductType
+  categoryId       String?      @map("category_id") @db.Uuid
+  category         Category?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  collection       String?
+  tags             String[]     @default([])
+  stock            Int          @default(0)
+  isFeatured       Boolean      @default(false) @map("is_featured")
+  isBundle         Boolean      @default(false) @map("is_bundle")
+  isLimited        Boolean      @default(false) @map("is_limited")
+  bundleIds        String[]     @default([]) @map("bundle_ids") @db.Uuid
+  customizable     Boolean      @default(false)
+  rating           Decimal      @default(0) @db.Decimal(2, 1)
+  reviewCount      Int          @default(0) @map("review_count")
+  metadata         Json         @default("{}")
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  variants         Variant[]
+  orderItems       OrderItem[]
+  reviews          Review[]
+
+  @@index([categoryId])
+  @@index([slug])
+  @@index([type])
+  @@index([isFeatured])
+  @@map("products")
+}
+
+model Variant {
+  id                 String      @id @default(uuid()) @db.Uuid
+  productId          String      @map("product_id") @db.Uuid
+  product            Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name               String
+  sku                String?     @unique
+  priceModifierCents Int         @default(0) @map("price_modifier_cents")
+  stock              Int         @default(0)
+  attributes         Json        @default("{}")
+  sortOrder          Int         @default(0) @map("sort_order")
+  createdAt          DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  orderItems         OrderItem[]
+
+  @@index([productId])
+  @@map("variants")
+}
+
+enum OrderStatus {
+  created
+  paid
+  processing
+  shipped
+  delivered
+  cancelled
+  refunded
+}
+
+model Order {
+  id            String      @id @default(uuid()) @db.Uuid
+  customerName  String      @map("customer_name")
+  customerPhone String      @map("customer_phone")
+  customerEmail String?     @map("customer_email")
+  address       String
+  pincode       String
+  totalCents    Int         @map("total_cents")
+  status        OrderStatus @default(created)
+  notes         String?
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  items         OrderItem[]
+
+  @@index([customerPhone])
+  @@index([status])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String   @id @default(uuid()) @db.Uuid
+  orderId    String   @map("order_id") @db.Uuid
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId  String?  @map("product_id") @db.Uuid
+  product    Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variantId  String?  @map("variant_id") @db.Uuid
+  variant    Variant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  name       String
+  quantity   Int
+  priceCents Int      @map("price_cents")
+  imageUrl   String?  @map("image_url")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model Customization {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  name       String
+  type       String
+  state      Json
+  exportUrl  String?  @map("export_url")
+  previewUrl String?  @map("preview_url")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("customizations")
+}
+
+model Review {
+  id         String   @id @default(uuid()) @db.Uuid
+  productId  String   @map("product_id") @db.Uuid
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userName   String   @map("user_name")
+  rating     Int
+  title      String?
+  comment    String?
+  isVerified Boolean  @default(false) @map("is_verified")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([productId])
+  @@map("reviews")
+}
+
+model Referral {
+  id           String   @id @default(uuid()) @db.Uuid
+  code         String   @unique
+  referrerName String   @map("referrer_name")
+  creditCents  Int      @default(0) @map("credit_cents")
+  usesCount    Int      @default(0) @map("uses_count")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("referrals")
+}
+
+model Analytics {
+  id        String   @id @default(uuid()) @db.Uuid
+  metric    String
+  value     Float
+  path      String?
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([metric])
+  @@index([createdAt])
+  @@map("analytics")
+}
