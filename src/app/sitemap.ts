@@ -15,7 +15,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/shop/mystery/premium",
     "/customize", "/customize/spotify-card", "/customize/posters",
     "/customize/frames", "/customize/stickers",
-    "/cart", "/checkout", "/account",
     "/about", "/faq", "/contact",
     "/policies/privacy", "/policies/refund", "/policies/shipping", "/policies/terms", "/policies/cookie",
   ];

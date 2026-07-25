@@ -1,18 +1,13 @@
+"use client";
+
 import * as React from "react";
-import type { Metadata } from "next";
 import Link from "next/link";
-import { Search, PackageCheck, Truck, CheckCircle2, MapPin, Clock, ArrowRight, ShieldCheck } from "lucide-react";
+import { Search, PackageCheck, Truck, CheckCircle2, MapPin, Clock, ArrowRight, ShieldCheck, Loader2 } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Reveal } from "@/components/motion/reveal";
-
-export const metadata: Metadata = {
-  title: "Track Your Order — Stix N Vibes",
-  description: "Live order tracking portal for Delhivery, Shiprocket & WhatsApp orders across India.",
-  alternates: { canonical: "/track" },
-};
 
 const SAMPLE_TRACKING_RESULT = {
   orderId: "ORD-SNV-98421",
@@ -33,6 +28,30 @@ const SAMPLE_TRACKING_RESULT = {
 };
 
 export default function TrackOrderPage() {
+  const [searchQuery, setSearchQuery] = React.useState("ORD-SNV-98421");
+  const [loading, setLoading] = React.useState(false);
+  const [result, setResult] = React.useState(SAMPLE_TRACKING_RESULT);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/orders/track?query=${encodeURIComponent(searchQuery.trim())}`);
+      const json = await res.json();
+      if (json.ok && json.data) {
+        setResult({
+          ...SAMPLE_TRACKING_RESULT,
+          ...json.data,
+        });
+      }
+    } catch {
+      // Fallback to current view
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="bg-slate-950 text-white min-h-screen pt-28 pb-16">
       <Container>
@@ -53,19 +72,20 @@ export default function TrackOrderPage() {
         {/* Search Card */}
         <div className="max-w-2xl mx-auto mb-12">
           <Card className="bg-slate-900/60 border-slate-800 rounded-3xl p-6 backdrop-blur-xl shadow-2xl">
-            <form className="flex flex-col sm:flex-row gap-3">
+            <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
                 <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
                 <input
                   type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="e.g. ORD-SNV-98421 or +91 9876543210"
-                  defaultValue="ORD-SNV-98421"
                   required
                   className="w-full pl-12 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-2xl text-white placeholder-slate-500 outline-none focus:border-brand-yellow text-sm"
                 />
               </div>
-              <Button variant="gradient" size="lg" className="rounded-2xl px-6">
-                Track Order <ArrowRight className="w-4 h-4 ml-2" />
+              <Button type="submit" variant="gradient" size="lg" disabled={loading} className="rounded-2xl px-6">
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Track Order <ArrowRight className="w-4 h-4 ml-2" /></>}
               </Button>
             </form>
           </Card>
@@ -78,19 +98,19 @@ export default function TrackOrderPage() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-3">
-                    <CardTitle className="font-display text-2xl font-bold">{SAMPLE_TRACKING_RESULT.orderId}</CardTitle>
+                    <CardTitle className="font-display text-2xl font-bold">{result.orderId}</CardTitle>
                     <Badge className="bg-brand-yellow/10 text-brand-yellow border-brand-yellow/20 border">
-                      {SAMPLE_TRACKING_RESULT.currentStatus}
+                      {result.currentStatus}
                     </Badge>
                   </div>
                   <CardDescription className="text-slate-400 text-sm mt-1">
-                    Courier: {SAMPLE_TRACKING_RESULT.courier} · AWB: <span className="font-mono text-white">{SAMPLE_TRACKING_RESULT.awb}</span>
+                    Courier: {result.courier} · AWB: <span className="font-mono text-white">{result.awb}</span>
                   </CardDescription>
                 </div>
 
                 <div className="bg-slate-900 border border-slate-800 rounded-2xl px-4 py-2.5 text-right">
                   <p className="text-xs text-slate-400 uppercase tracking-wider">Estimated Delivery</p>
-                  <p className="font-display font-bold text-sm text-emerald-400 mt-0.5">{SAMPLE_TRACKING_RESULT.estimatedDelivery}</p>
+                  <p className="font-display font-bold text-sm text-emerald-400 mt-0.5">{result.estimatedDelivery}</p>
                 </div>
               </div>
             </CardHeader>
@@ -99,7 +119,7 @@ export default function TrackOrderPage() {
               <h3 className="font-display font-bold text-lg text-white mb-6">Shipment Timeline</h3>
 
               <div className="space-y-6 relative before:absolute before:left-3.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-slate-800">
-                {SAMPLE_TRACKING_RESULT.steps.map((step, idx) => (
+                {result.steps.map((step, idx) => (
                   <div key={idx} className="relative flex items-start gap-4 pl-8">
                     <div
                       className={`absolute left-0 top-0.5 w-7 h-7 rounded-full flex items-center justify-center border text-xs font-bold ${
