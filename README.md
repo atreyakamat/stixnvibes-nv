@@ -1,41 +1,52 @@
-# Stix N Vibes
+# Stix N Vibes — Enterprise Commerce & Customization Engine
 
-A premium e-commerce experience for stickers, posters, Spotify cards, frames, and mystery packs. Built with Next.js 14, TypeScript, Tailwind, and Framer Motion. Dark-first, vibrant brand identity.
+A world-class, enterprise-grade digital product ecosystem for stickers, posters, Spotify acrylic cards, custom vinyl studio, and mystery packs. Built with Next.js 14 (App Router), TypeScript, Tailwind CSS, Framer Motion, Supabase, Cloudinary, and Razorpay.
 
-This repository currently contains **Phase 1**: project scaffold, the full design system, navbar/footer/motion helpers, typed mock catalog, environment-gated integration stubs (Supabase/Cloudinary/Razorpay), and a polished animated homepage.
+---
 
-## Quick start
+## Single Unified Command
+
+The entire application—**both Frontend UI & Backend Server APIs** (`/api/checkout`, `/api/spotify/metadata`, `/api/orders/create`, `/api/admin/*`, `/api/analytics/vitals`)—runs seamlessly in a single unified command:
 
 ```bash
-npm install
-cp .env.example .env.local   # fill in keys when ready
 npm run dev
 ```
 
-## Commands
+*Access the application at [http://localhost:3000](http://localhost:3000)*
+
+---
+
+## All Commands
 
 | Command | Description |
 |---|---|
-| `npm run dev` | Dev server at http://localhost:3000 |
-| `npm run build` | Production build |
+| `npm run dev` | **Unified Full-Stack Dev Server** (Frontend + Backend APIs at http://localhost:3000) |
+| `npm run build` | Production bundle build (compiles all 21 static/dynamic pages) |
 | `npm run start` | Start production server |
-| `npm run lint` | ESLint (next/core-web-vitals) |
-| `npm run typecheck` | `tsc --noEmit` |
+| `npm run typecheck` | Run TypeScript strict type verification (`tsc --noEmit`) |
+| `npm run test:run` | Run complete unit & integration test suite (`vitest run`) |
+| `npm run lint` | ESLint static code analysis (`next lint`) |
 
-See `AGENTS.md` for architecture, integration TODOs, and brand conventions.
+---
 
-## Status — Phase 1
+## Docker Support (Run Full Suite in Container)
 
-- [x] Next.js 14 + TS + Tailwind scaffold
-- [x] Design tokens (yellow/red/orange/purple), dark-first brand identity
-- [x] shadcn/ui-style primitives (Button CVA, Card, Badge, Separator)
-- [x] Layout primitives (Container, Section, SectionHeader, Kicker, Navbar w/ mega menu, Footer, ThemeToggle)
-- [x] Motion helpers (Reveal, StaggerGroup, StaggerItem)
-- [x] Typed mock catalog (`src/lib/data/products.ts`)
-- [x] Env-gated integration stubs (Supabase, Cloudinary, Razorpay)
-- [x] Homepage: Hero, Featured Categories, Best Sellers, New Arrivals, Customize Showcase, Trending Collections, Why Choose Us, Reviews, Instagram Feed, Newsletter
-- [x] SEO: sitemap.ts, robots.ts, manifest.ts, OpenGraph/Twitter metadata, JSON-LD Store schema
-- [ ] Phase 2: Shop index, category & product detail pages
-- [ ] Phase 3: Live customizer, cart, checkout
-- [ ] Phase 4: Backend wiring (Supabase schema + RLS, file uploads, Razorpay verify)
-- [ ] Phase 5: Analytics, performance pass, deployment
+```bash
+# Hot-reload development server inside Docker
+docker compose up dev
+
+# Production build served via Next.js inside Docker
+docker compose up prod
+
+# Execute entire automated test suite inside container
+docker compose run --rm tests
+```
+
+---
+
+## Platform Features & Architecture
+
+- **Interactive Live Canvas Customizer**: 2D/3D studio with live transform controls, 300 DPI resolution checker, text typography tools, material finish swatches (Holographic, Glossy, Matte, Clear), and Spotify track metadata auto-lookup.
+- **Shop Catalog & Product Engine**: Multi-category filter pipeline, debounced instant search, price band sliders, variant matrices, technical spec sheets, and verified review submissions.
+- **Cart & Multi-Gateway Checkout**: Optimistic slide-out cart drawer, coupon engine (`VIBES20`, `VIBES10`), free shipping progress bar, Razorpay online payments (UPI/Cards/NetBanking), and single-tap WhatsApp checkout.
+- **Supabase PostgreSQL & Security**: Production database schema (`supabase/schema.sql`) with Row Level Security (RLS) policies, indexes, and automated triggers.

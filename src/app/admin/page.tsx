@@ -181,6 +181,81 @@ export default function AdminPage() {
         </CardContent>
       </Card>
 
+      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+        {/* Top categories */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Layers className="size-4" /> Top categories
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {topCategories.length === 0 ? (
+              <EmptyState text="Category data appears once products are catalogued in Supabase." />
+            ) : (
+              topCategories.map((c) => {
+                const pct = Math.round((c.count / totalCatalog) * 100);
+                return (
+                  <div key={c.key}>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">{c.key}</span>
+                      <span className="text-muted-foreground tabular-nums">{c.count} SKUs · {pct}%</span>
+                    </div>
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary">
+                      <div
+                        className="h-full rounded-full bg-brand-gradient"
+                        style={{ width: `${pct}%` }}
+                        aria-hidden
+                      />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Low stock + exports */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertTriangle className="size-4" /> Low stock alerts
+              {outOfStock > 0 && (
+                <Badge variant="destructive" size="sm" className="ml-auto">
+                  {outOfStock} out
+                </Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {lowStock.length === 0 && outOfStock === 0 ? (
+              <EmptyState text="All clear — every SKU has more than 5 units in stock." />
+            ) : (
+              <ul className="divide-y divide-border">
+                {lowStock.map((p) => (
+                  <li key={p.id} className="flex items-center justify-between gap-3 p-3 text-sm">
+                    <span className="truncate">{p.name}</span>
+                    <Badge variant="accent" size="sm">{p.stock} left</Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="flex flex-wrap gap-2 border-t border-border pt-3">
+              <Button asChild variant="outline" size="sm">
+                <a href="/api/admin/inventory/forecast?days=30&buffer=0.2" target="_blank" rel="noreferrer">
+                  <Download className="size-4" /> CSV · 30-day forecast
+                </a>
+              </Button>
+              <Button asChild variant="ghost" size="sm">
+                <a href="/api/admin/inventory/forecast?days=90&buffer=0.3" target="_blank" rel="noreferrer">
+                  90-day forecast
+                </a>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="mt-8 flex items-center gap-2 text-xs text-muted-foreground">
         <Link href="/" className="hover:text-foreground">← Back to store</Link>
         <span>·</span>
