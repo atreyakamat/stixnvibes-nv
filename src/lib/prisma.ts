@@ -7,11 +7,9 @@
  * the real generated client.
  */
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyClient = any;
 
 interface PrismaLike {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
 }
 
