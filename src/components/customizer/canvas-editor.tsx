@@ -165,23 +165,7 @@ export function CanvasEditor() {
     }
   }, []);
 
-  // Keyboard Shortcuts (Ctrl+Z / Ctrl+Y)
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "z") {
-        e.preventDefault();
-        if (e.shiftKey) handleRedo();
-        else handleUndo();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === "y") {
-        e.preventDefault();
-        handleRedo();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [history, historyIndex]);
-
-  const handleUndo = () => {
+  const handleUndo = React.useCallback(() => {
     if (historyIndex > 0) {
       isUpdatingHistory.current = true;
       const target = history[historyIndex - 1];
@@ -198,9 +182,9 @@ export function CanvasEditor() {
       setHistoryIndex(historyIndex - 1);
       setTimeout(() => { isUpdatingHistory.current = false; }, 50);
     }
-  };
+  }, [history, historyIndex]);
 
-  const handleRedo = () => {
+  const handleRedo = React.useCallback(() => {
     if (historyIndex < history.length - 1) {
       isUpdatingHistory.current = true;
       const target = history[historyIndex + 1];
@@ -217,7 +201,23 @@ export function CanvasEditor() {
       setHistoryIndex(historyIndex + 1);
       setTimeout(() => { isUpdatingHistory.current = false; }, 50);
     }
-  };
+  }, [history, historyIndex]);
+
+  // Keyboard Shortcuts (Ctrl+Z / Ctrl+Y)
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+        e.preventDefault();
+        if (e.shiftKey) handleRedo();
+        else handleUndo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === "y") {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleUndo, handleRedo]);
 
   // Compute total price
   const sizeInches = Number(size.split("x")[0]) || 3;
