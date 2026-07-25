@@ -97,7 +97,7 @@ describe("POST /api/orders/create", () => {
       address: "12 MG Road, Bengaluru",
       pincode: "560001",
       items: [
-        { product_id: "s1", variant_id: "v1", name: "Anime Pack", price_cents: 29900, quantity: 2, variant_name: "Standard" },
+        { product_id: "custom-sticker-id", variant_id: "v1", name: "Anime Pack", price_cents: 29900, quantity: 2, variant_name: "Standard" },
       ],
       notes: "Gift wrap",
     });

@@ -39,7 +39,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: builder
+      target: runner
     environment:
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
@@ -50,4 +50,3 @@ services:
       HOSTNAME: "0.0.0.0"
     ports:
       - "3000:3000"
-    command: ["sh", "-c", "npm run start"]

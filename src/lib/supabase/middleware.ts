@@ -51,6 +51,15 @@ export async function updateSession(request: NextRequest) {
     const protectedPaths = ["/admin", "/account"];
     const isProtected = protectedPaths.some((p) => path.startsWith(p));
 
+    if (path.startsWith("/api/admin") && path !== "/api/admin/login") {
+      if (!user) {
+        return NextResponse.json(
+          { ok: false, error: "Unauthorized: Admin API authentication required" },
+          { status: 401 }
+        );
+      }
+    }
+
     if (isProtected && !user) {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = "/login";

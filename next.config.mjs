@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  output: "standalone",
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [
@@ -8,9 +9,6 @@ const nextConfig = {
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "images.ctfassets.net" },
     ],
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
   },
   experimental: {
     optimizePackageImports: ["lucide-react", "framer-motion"],

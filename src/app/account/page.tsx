@@ -68,8 +68,74 @@ const MOCK_SAVED_DESIGNS = [
   },
 ];
 
+import { createBrowser } from "@/lib/supabase/client";
+
 export default function AccountPage() {
   const [activeTab, setActiveTab] = React.useState<"orders" | "designs" | "addresses" | "settings">("orders");
+  const [userProfile, setUserProfile] = React.useState<{ name: string; email: string; phone?: string } | null>(null);
+  const [orders, setOrders] = React.useState(MOCK_ORDERS);
+  const [loadingUser, setLoadingUser] = React.useState(true);
+
+  React.useEffect(() => {
+    async function loadAccountData() {
+      const client = createBrowser();
+      if (!client) {
+        setLoadingUser(false);
+        return;
+      }
+      try {
+        const { data: { user } } = await client.auth.getUser();
+        if (user) {
+          setUserProfile({
+            name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Stix Fan",
+            email: user.email || "",
+            phone: user.phone || "",
+          });
+          // Fetch real customer orders
+          const { data: dbOrders } = await client
+            .from("orders")
+            .select("*, order_items(*)")
+            .eq("customer_email", user.email)
+            .order("created_at", { ascending: false });
+
+          if (dbOrders && dbOrders.length > 0) {
+            const formatted = dbOrders.map((o: any) => ({
+              id: o.id,
+              date: new Date(o.created_at).toISOString().split("T")[0],
+              status: o.status === "sent" ? "In Transit" : o.status,
+              statusColor: o.status === "delivered" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-brand-yellow/10 text-brand-yellow border-brand-yellow/20",
+              items: (o.order_items || []).map((i: any) => ({
+                name: i.name,
+                qty: i.quantity,
+                priceCents: i.price_cents,
+                image: i.image_url || "https://images.unsplash.com/photo-1572375992501-4b0892d50c69?w=300",
+              })),
+              totalCents: o.total_cents,
+              trackingNumber: `TRACK-${o.id.substring(0, 8).toUpperCase()}`,
+            }));
+            setOrders(formatted);
+          }
+        }
+      } catch (err) {
+        console.warn("[account] failed to load Supabase profile:", err);
+      } finally {
+        setLoadingUser(false);
+      }
+    }
+    loadAccountData();
+  }, []);
+
+  const handleSignOut = async () => {
+    const client = createBrowser();
+    if (client) {
+      await client.auth.signOut();
+      window.location.href = "/login";
+    }
+  };
+
+  const displayName = userProfile?.name || "Alex Rivera";
+  const displayEmail = userProfile?.email || "alex.rivera@example.com";
+  const initialLetter = displayName.charAt(0).toUpperCase();
 
   return (
     <div className="bg-slate-950 text-white min-h-screen pt-28 pb-16">
@@ -80,28 +146,33 @@ export default function AccountPage() {
             <div className="flex items-center gap-5">
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-yellow via-brand-red to-brand-purple p-0.5 shadow-lg">
                 <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center font-display font-bold text-2xl text-white">
-                  A
+                  {initialLetter}
                 </div>
               </div>
               <div>
                 <div className="flex items-center gap-3">
-                  <h1 className="font-display text-2xl sm:text-3xl font-bold text-white">Alex Rivera</h1>
+                  <h1 className="font-display text-2xl sm:text-3xl font-bold text-white">{displayName}</h1>
                   <Badge variant="brand" className="text-xs uppercase tracking-wider">VIP Member</Badge>
                 </div>
-                <p className="text-slate-400 text-sm mt-0.5">alex.rivera@example.com · +91 98765 43210</p>
+                <p className="text-slate-400 text-sm mt-0.5">{displayEmail} {userProfile?.phone && `· ${userProfile.phone}`}</p>
               </div>
             </div>
 
-            {/* Metrics */}
+            {/* Metrics & SignOut */}
             <div className="flex items-center gap-4 border-t sm:border-t-0 border-slate-800 pt-4 sm:pt-0 w-full sm:w-auto">
               <div className="bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-center min-w-[100px]">
                 <p className="text-xs text-slate-400 uppercase tracking-wider">Total Orders</p>
-                <p className="font-display font-bold text-xl text-white mt-0.5">12</p>
+                <p className="font-display font-bold text-xl text-white mt-0.5">{orders.length}</p>
               </div>
               <div className="bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-center min-w-[100px]">
                 <p className="text-xs text-slate-400 uppercase tracking-wider">Vibes Points</p>
                 <p className="font-display font-bold text-xl text-brand-yellow mt-0.5">350 pts</p>
               </div>
+              {userProfile && (
+                <Button variant="outline" size="sm" onClick={handleSignOut} className="border-slate-800 text-slate-400 hover:text-white">
+                  <LogOut className="w-4 h-4 mr-1" /> Logout
+                </Button>
+              )}
             </div>
           </div>
         </div>

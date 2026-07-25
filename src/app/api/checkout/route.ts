@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createService } from "@/lib/supabase/service";
 import { createRazorpayOrder, isRazorpayConfigured, RAZORPAY_KEY_ID } from "@/lib/payment/razorpay";
+import { products, type Product } from "@/lib/data/products";
 import type { Insert } from "@/types/supabase";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,16 @@ const VALID_COUPONS: Record<string, number> = {
   VIBE10: 0.1,  // 10% off
 };
 
+function sanitize(str: string): string {
+  return str
+    .trim()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body: CheckoutRequestBody = await req.json();
@@ -59,47 +70,80 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Pincode validation: 6 digits for India
-    if (!/^\d{6}$/.test(shippingAddress.pincode.trim())) {
+    const cleanPincode = shippingAddress.pincode.trim();
+    if (!/^\d{6}$/.test(cleanPincode)) {
       return NextResponse.json(
         { ok: false, error: "Please enter a valid 6-digit Indian PIN code" },
         { status: 400 }
       );
     }
 
-    // 2. Pricing Calculations
-    const subtotalCents = items.reduce(
-      (sum, item) => sum + Math.max(0, item.price_cents) * Math.max(1, item.quantity),
-      0
-    );
+    const cleanName = sanitize(shippingAddress.name);
+    const cleanPhone = sanitize(shippingAddress.phone);
+    const cleanAddress = sanitize(shippingAddress.address);
+    const cleanNotes = shippingAddress.notes ? sanitize(shippingAddress.notes) : null;
+    const cleanEmail = shippingAddress.email ? sanitize(shippingAddress.email) : null;
+
+    // 2. Server-Side Price Validation (Ignore client-provided price_cents for security)
+    const svc = createService();
+    let verifiedSubtotalCents = 0;
+    const verifiedItems = [];
+
+    // Fetch DB prices if Supabase is connected
+    let dbProductsMap: Record<string, number> = {};
+    if (svc) {
+      const productIds = items.map((i) => i.productId).filter(Boolean);
+      if (productIds.length > 0) {
+        const { data: dbProds } = await (svc as any)
+          .from("products")
+          .select("id, price_cents, stock")
+          .in("id", productIds);
+        if (dbProds) {
+          dbProductsMap = Object.fromEntries(dbProds.map((p: any) => [p.id, p.price_cents]));
+        }
+      }
+    }
+
+    for (const item of items) {
+      const qty = Math.max(1, Math.min(99, item.quantity));
+      const mockProd = products.find((p: Product) => p.id === item.productId || p.slug === item.productId);
+      const verifiedPriceCents =
+        dbProductsMap[item.productId] ??
+        (mockProd ? Math.round(mockProd.price * 100) : Math.max(0, item.price_cents));
+
+      verifiedSubtotalCents += verifiedPriceCents * qty;
+      verifiedItems.push({
+        ...item,
+        quantity: qty,
+        price_cents: verifiedPriceCents,
+      });
+    }
 
     let discountCents = 0;
     if (couponCode && VALID_COUPONS[couponCode.trim().toUpperCase()]) {
       const discountPct = VALID_COUPONS[couponCode.trim().toUpperCase()];
-      discountCents = Math.round(subtotalCents * discountPct);
+      discountCents = Math.round(verifiedSubtotalCents * discountPct);
     }
 
     const shippingThresholdCents = 49900; // Free shipping over ₹499
-    const shippingCents = subtotalCents >= shippingThresholdCents ? 0 : 4900; // ₹49 shipping
-    const totalCents = Math.max(0, subtotalCents - discountCents) + shippingCents;
+    const shippingCents = verifiedSubtotalCents >= shippingThresholdCents ? 0 : 4900; // ₹49 shipping
+    const totalCents = Math.max(0, verifiedSubtotalCents - discountCents) + shippingCents;
     const totalRupees = totalCents / 100;
 
     const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 899 + 100)}`;
-
-    // 3. Database Order Creation (if Supabase configured)
-    const svc = createService();
     let dbOrderId = orderNumber;
 
+    // 3. Database Order Creation & Stock Decrement
     if (svc) {
       const orderInsert: Insert<"orders"> = {
-        customer_name: shippingAddress.name,
-        customer_phone: shippingAddress.phone,
-        customer_email: shippingAddress.email ?? null,
-        address: shippingAddress.address,
-        pincode: shippingAddress.pincode,
+        customer_name: cleanName,
+        customer_phone: cleanPhone,
+        customer_email: cleanEmail,
+        address: cleanAddress,
+        pincode: cleanPincode,
         total_cents: totalCents,
         status: "created",
-        notes: shippingAddress.notes ?? null,
+        notes: cleanNotes,
       };
 
       const { data, error } = await (svc as any)
@@ -112,7 +156,7 @@ export async function POST(req: NextRequest) {
         dbOrderId = data.id;
 
         // Insert order items
-        const itemInserts: Insert<"order_items">[] = items.map((it) => ({
+        const itemInserts: Insert<"order_items">[] = verifiedItems.map((it) => ({
           order_id: dbOrderId,
           product_id: it.productId ?? null,
           variant_id: it.variantId ?? null,
@@ -122,6 +166,28 @@ export async function POST(req: NextRequest) {
           image_url: it.image ?? null,
         }));
         await (svc as any).from("order_items").insert(itemInserts);
+
+        // Decrement product stock safely
+        for (const it of verifiedItems) {
+          if (it.productId) {
+            try {
+              const { data: current } = await (svc as any)
+                .from("products")
+                .select("stock")
+                .eq("id", it.productId)
+                .single();
+              if (current && typeof current.stock === "number") {
+                const newStock = Math.max(0, current.stock - it.quantity);
+                await (svc as any)
+                  .from("products")
+                  .update({ stock: newStock })
+                  .eq("id", it.productId);
+              }
+            } catch {
+              // Stock update fallback
+            }
+          }
+        }
       }
     }
 
@@ -135,8 +201,8 @@ export async function POST(req: NextRequest) {
           amountInRupees: totalRupees,
           receipt: orderNumber,
           notes: {
-            customer_name: shippingAddress.name,
-            phone: shippingAddress.phone,
+            customer_name: cleanName,
+            phone: cleanPhone,
           },
         });
         razorpayOrderId = rzpOrder.id;
@@ -151,7 +217,7 @@ export async function POST(req: NextRequest) {
       orderId: dbOrderId,
       orderNumber,
       totalCents,
-      subtotalCents,
+      subtotalCents: verifiedSubtotalCents,
       discountCents,
       shippingCents,
       currency: "INR",

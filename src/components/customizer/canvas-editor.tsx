@@ -80,15 +80,38 @@ export function CanvasEditor() {
   const unitPriceCents = Math.round(basePriceCents * FINISH_PRICE_MULTIPLIER[finish]);
   const totalPriceCents = unitPriceCents * quantity;
 
-  // Handle Image Upload
+  const [uploadError, setUploadError] = React.useState<string | null>(null);
+
+  // Handle Image Upload with file validation (type, size, dimensions)
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setUploadError(null);
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // File type validation
+    const validTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif", "image/svg+xml"];
+    if (!validTypes.includes(file.type)) {
+      setUploadError("Please upload a valid image file (PNG, JPG, WEBP, GIF, SVG).");
+      return;
+    }
+
+    // File size validation (Max 10MB)
+    const MAX_SIZE_BYTES = 10 * 1024 * 1024;
+    if (file.size > MAX_SIZE_BYTES) {
+      setUploadError("Image size exceeds 10MB limit. Please select a smaller file.");
+      return;
+    }
+
     const reader = new FileReader();
+    reader.onerror = () => {
+      setUploadError("Failed to read image file.");
+    };
     reader.onload = (evt) => {
       const src = evt.target?.result as string;
       const img = new Image();
+      img.onerror = () => {
+        setUploadError("Failed to process image content.");
+      };
       img.onload = () => {
         setImageMeta({ width: img.width, height: img.height });
         setImageSrc(src);

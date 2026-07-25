@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "@/lib/zod-lite";
 import { createService } from "@/lib/supabase/service";
 import { buildWhatsAppUrl, type WhatsAppCartItem } from "@/lib/whatsapp";
+import { products, type Product } from "@/lib/data/products";
 
 interface CartLine {
   product_id?: string;
@@ -26,13 +27,22 @@ interface CreateOrderPayload {
 const PhoneRe = /^\+?[0-9]{8,15}$/;
 const PincodeRe = /^[0-9A-Za-z\s-]{3,10}$/;
 
+function sanitize(str: string): string {
+  return str
+    .trim()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+}
+
 function validate(payload: any): payload is CreateOrderPayload {
   if (typeof payload !== "object" || payload === null) return false;
   if (typeof payload.customer_name !== "string" || payload.customer_name.trim().length < 2) return false;
   if (typeof payload.customer_phone !== "string" || !PhoneRe.test(payload.customer_phone)) return false;
   if (typeof payload.address !== "string" || payload.address.trim().length < 6) return false;
   if (typeof payload.pincode !== "string" || !PincodeRe.test(payload.pincode)) return false;
-  // items
   if (!Array.isArray(payload.items) || payload.items.length === 0) return false;
   for (const item of payload.items as CartLine[]) {
     if (typeof item.name !== "string" || !item.name.trim()) return false;
@@ -57,31 +67,50 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid order payload" }, { status: 400 });
   }
 
+  const cleanName = sanitize(payload.customer_name);
+  const cleanPhone = sanitize(payload.customer_phone);
+  const cleanAddress = sanitize(payload.address);
+  const cleanPincode = sanitize(payload.pincode);
+  const cleanNotes = payload.notes ? sanitize(payload.notes) : undefined;
+  const cleanEmail = payload.customer_email ? sanitize(payload.customer_email) : null;
+
+  // Verify prices server-side
   const items = payload.items;
   const quantities = items.map((i) => (typeof i.quantity === "number" ? i.quantity : 1));
-  const totalCents = items.reduce((sum, item, idx) => sum + (item.price_cents * quantities[idx]), 0);
-  const whatsappItems: WhatsAppCartItem[] = items.map((item, idx) => ({
+
+  const verifiedItems = items.map((item, idx) => {
+    const mockProd = products.find((p: Product) => p.id === item.product_id || p.slug === item.product_id);
+    const verifiedPrice = mockProd ? Math.round(mockProd.price * 100) : item.price_cents;
+    return {
+      ...item,
+      name: sanitize(item.name),
+      quantity: quantities[idx],
+      price_cents: verifiedPrice,
+    };
+  });
+
+  const totalCents = verifiedItems.reduce((sum, item) => sum + item.price_cents * item.quantity, 0);
+
+  const whatsappItems: WhatsAppCartItem[] = verifiedItems.map((item, idx) => ({
     id: item.variant_id ?? item.product_id ?? `${item.name}-${idx}`,
     productId: item.product_id!,
     name: item.name,
     price_cents: item.price_cents,
-    quantity: quantities[idx],
+    quantity: item.quantity,
     image: item.image_url,
     variantName: item.variant_name,
   }));
 
   const waUrl = buildWhatsAppUrl({
-    name: payload.customer_name,
-    address: payload.address,
-    pincode: payload.pincode,
-    phone: payload.customer_phone,
+    name: cleanName,
+    address: cleanAddress,
+    pincode: cleanPincode,
+    phone: cleanPhone,
     items: whatsappItems,
     totalRupees: totalCents / 100,
-    notes: payload.notes,
+    notes: cleanNotes,
   });
 
-  // Persist order to Supabase when available.
-  // Note: orders table allows anon insert per our RLS policies.
   let orderId: string | null = null;
   try {
     const { createBrowser } = await import("@/lib/supabase/client");
@@ -90,15 +119,15 @@ export async function POST(req: NextRequest) {
       const { data, error: dbError } = await client
         .from("orders")
         .insert({
-          customer_name: payload.customer_name,
-          customer_phone: payload.customer_phone,
-          customer_email: payload.customer_email ?? null,
-          address: payload.address,
-          pincode: payload.pincode,
+          customer_name: cleanName,
+          customer_phone: cleanPhone,
+          customer_email: cleanEmail,
+          address: cleanAddress,
+          pincode: cleanPincode,
           total_cents: totalCents,
           status: "sent",
           whatsapp_url: waUrl,
-          notes: payload.notes ?? null,
+          notes: cleanNotes ?? null,
         })
         .select()
         .single();
@@ -106,15 +135,14 @@ export async function POST(req: NextRequest) {
         console.error("[api/orders/create] insert failed:", dbError.message);
       } else {
         orderId = (data as { id: string }).id;
-        // Insert line items.
         if (data?.id) {
           await client.from("order_items").insert(
-            items.map((i, idx) => ({
+            verifiedItems.map((i) => ({
               order_id: data!.id,
               product_id: i.product_id ?? null,
               variant_id: i.variant_id ?? null,
               name: i.name,
-              quantity: quantities[idx],
+              quantity: i.quantity,
               price_cents: i.price_cents,
               image_url: i.image_url ?? null,
             }))

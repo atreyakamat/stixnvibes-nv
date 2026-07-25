@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1
 # Stix N Vibes — multi-stage Dockerfile.
 #  - builder   : installs deps + builds the Next.js production app
-#  - tests      : runs lint + typecheck + vitest unit tests + Playwright E2E
-#  - runner     : slim final image serving `next start`
+#  - tests     : runs lint + typecheck + vitest unit tests + Playwright E2E
+#  - runner    : slim production image serving standalone Next.js build as non-root user
 
 ARG NODE_VERSION=20
 
@@ -10,21 +10,17 @@ ARG NODE_VERSION=20
 FROM node:${NODE_VERSION}-slim AS builder
 
 ENV NEXT_TELEMETRY_DISABLED=1 \
-    PNPM_HOME=/usr/local/bin \
     CI=true
 
 WORKDIR /app
 
-# Install OS deps needed for builds and Playwright browsers later.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy manifests first to leverage Docker layer caching.
 COPY package.json package-lock.json* ./
 RUN npm ci --no-audit --no-fund
 
-# Copy source & build.
 COPY . .
 RUN npm run build
 
@@ -40,7 +36,6 @@ ENV NEXT_TELEMETRY_DISABLED=1 \
 
 WORKDIR /app
 
-# Playwright OS deps + browsers
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     git \
@@ -50,12 +45,34 @@ COPY package.json package-lock.json* ./
 RUN npm ci --no-audit --no-fund
 
 COPY . .
-
-# Copy the build output from the builder stage so Playwright can run `next start`
 COPY --from=builder /app/.next ./.next
 
-# Install Playwright browsers + dependencies
 RUN npx playwright install --with-deps chromium
 
-# Default test command — runs unit + lint + typecheck + E2E
 CMD ["sh", "-c", "npm run lint && npm run typecheck && npx vitest run && npx playwright test"]
+
+# ----------------------------------------------------------------------
+FROM node:${NODE_VERSION}-slim AS runner
+
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000 \
+    HOSTNAME="0.0.0.0"
+
+WORKDIR /app
+
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 nextjs
+
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD node -e "fetch('http://localhost:3000/api/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
+
+CMD ["node", "server.js"]

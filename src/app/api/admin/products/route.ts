@@ -4,6 +4,8 @@ import { z } from "@/lib/zod-lite";
 import { createService } from "@/lib/supabase/service";
 import type { Database } from "@/types/supabase";
 
+import { requireAdminAuth } from "@/lib/auth-guard";
+
 function ok(data: unknown) {
   return NextResponse.json({ ok: true, data });
 }
@@ -12,6 +14,9 @@ function bad(error: string, status = 400) {
 }
 
 export async function GET(req: NextRequest) {
+  const authErr = await requireAdminAuth(req);
+  if (authErr) return authErr;
+
   const url = new URL(req.url);
   const type = url.searchParams.get("type") as Database["public"]["Enums"]["product_type"] | null;
   const featured = url.searchParams.get("featured") === "1";
@@ -31,6 +36,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const authErr = await requireAdminAuth(req);
+  if (authErr) return authErr;
+
   const admin = createService();
   if (!admin) return bad("Database not configured", 503);
 

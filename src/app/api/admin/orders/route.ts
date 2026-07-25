@@ -1,8 +1,12 @@
 export const dynamic = "force-dynamic";
 import { NextResponse, type NextRequest } from "next/server";
 import { createService } from "@/lib/supabase/service";
+import { requireAdminAuth } from "@/lib/auth-guard";
 
 export async function GET(req: NextRequest) {
+  const authErr = await requireAdminAuth(req);
+  if (authErr) return authErr;
+
   const admin = createService();
   if (!admin) return NextResponse.json({ ok: false, error: "Database not configured" }, { status: 503 });
   const { data, error } = await admin

@@ -1,3 +1,5 @@
+import crypto from "crypto";
+
 /**
  * Razorpay integration helpers.
  * Client-side: Razorpay Checkout SDK loaded via script tag.
@@ -63,6 +65,7 @@ export async function createRazorpayOrder(params: {
   return res.json() as Promise<RazorpayOrder>;
 }
 
+
 /**
  * Verifies the payment signature returned by Razorpay Checkout.
  * Run on the server. Reject → do not fulfil the order.
@@ -72,8 +75,49 @@ export function verifyPaymentSignature(params: {
   paymentId: string;
   signature: string;
 }): boolean {
-  if (!RAZORPAY_KEY_SECRET) return false;
-  // Node: crypto.timingSafeEqual in route handler / server action.
-  // Implemented in route handler where this module is imported.
-  return Boolean(params.orderId && params.paymentId && params.signature);
+  const secret = process.env.RAZORPAY_KEY_SECRET ?? RAZORPAY_KEY_SECRET;
+  if (!secret || !params.orderId || !params.paymentId || !params.signature) {
+    return false;
+  }
+  try {
+    const body = `${params.orderId}|${params.paymentId}`;
+    const expectedSignature = crypto
+      .createHmac("sha256", secret)
+      .update(body)
+      .digest("hex");
+
+    const expectedBuffer = Buffer.from(expectedSignature, "utf-8");
+    const signatureBuffer = Buffer.from(params.signature, "utf-8");
+
+    if (expectedBuffer.length !== signatureBuffer.length) {
+      return false;
+    }
+
+    return crypto.timingSafeEqual(expectedBuffer, signatureBuffer);
+  } catch {
+    return false;
+  }
 }
+
+/**
+ * Verifies the webhook signature sent by Razorpay webhook events.
+ */
+export function verifyWebhookSignature(payload: string, signature: string): boolean {
+  const secret = process.env.RAZORPAY_WEBHOOK_SECRET ?? RAZORPAY_WEBHOOK_SECRET;
+  if (!secret || !signature) return false;
+  try {
+    const expectedSignature = crypto
+      .createHmac("sha256", secret)
+      .update(payload)
+      .digest("hex");
+
+    const expectedBuffer = Buffer.from(expectedSignature, "utf-8");
+    const signatureBuffer = Buffer.from(signature, "utf-8");
+
+    if (expectedBuffer.length !== signatureBuffer.length) return false;
+    return crypto.timingSafeEqual(expectedBuffer, signatureBuffer);
+  } catch {
+    return false;
+  }
+}
+
