@@ -221,7 +221,7 @@ export default function AdminPage() {
             <CardTitle className="flex items-center gap-2 text-base">
               <AlertTriangle className="size-4" /> Low stock alerts
               {outOfStock > 0 && (
-                <Badge variant="destructive" size="sm" className="ml-auto">
+                <Badge variant="accent" size="sm" className="ml-auto bg-red-500/20 text-red-400 border-red-500/30">
                   {outOfStock} out
                 </Badge>
               )}
