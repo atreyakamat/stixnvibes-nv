@@ -19,8 +19,18 @@ function isValidHttpUrl(url: string): boolean {
  * Returns null if authorized, or a 401/403 NextResponse if unauthorized.
  */
 export async function requireAdminAuth(req: NextRequest): Promise<NextResponse | null> {
-  // If Supabase environment is not configured in local dev, allow bypass with warning
-  if (!isValidHttpUrl(supabaseUrl) || !supabaseAnonKey || supabaseAnonKey.includes("YOUR_")) {
+  const supabaseConfigured = isValidHttpUrl(supabaseUrl) && Boolean(supabaseAnonKey) && !supabaseAnonKey.includes("YOUR_");
+
+  // Hard fail closed in production if Supabase is not configured.
+  if (!supabaseConfigured) {
+    if (process.env.NODE_ENV === "production") {
+      return NextResponse.json(
+        { ok: false, error: "Server misconfigured: auth backend unavailable" },
+        { status: 500 }
+      );
+    }
+    // Local dev: bypass with a server-side warning the developer can see in logs.
+    console.warn("[requireAdminAuth] Supabase not configured; bypassing auth in dev only.");
     return null;
   }
 

@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse, type NextRequest } from "next/server";
 import { createService } from "@/lib/supabase/service";
+import { requireAdminAuth } from "@/lib/auth-guard";
 
 /**
  * Inventory forecast CSV for the back-office.
@@ -20,6 +21,9 @@ function csvEscape(value: unknown) {
 }
 
 export async function GET(req: NextRequest) {
+  const authErr = await requireAdminAuth(req);
+  if (authErr) return authErr;
+
   const days = Math.min(180, Math.max(7, Number(req.nextUrl.searchParams.get("days")) || 30));
   const bufferPct = Math.min(1, Math.max(0, Number(req.nextUrl.searchParams.get("buffer")) || 0.2));
   const admin = createService();
