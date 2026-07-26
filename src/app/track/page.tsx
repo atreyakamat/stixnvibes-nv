@@ -153,10 +153,10 @@ export default function TrackOrderPage() {
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <h4 className={`font-semibold text-sm ${step.status === "upcoming" ? "text-slate-500" : "text-white"}`}>
+                        <h4 className={`font-semibold text-sm ${step.status === "upcoming" ? "text-slate-400" : "text-white"}`}>
                           {step.title}
                         </h4>
-                        <span className="text-xs text-slate-500 font-mono">{step.date}</span>
+                        <span className="text-xs text-slate-400 font-mono">{step.date}</span>
                       </div>
                       <p className="text-xs text-slate-400 mt-0.5">{step.desc}</p>
                     </div>

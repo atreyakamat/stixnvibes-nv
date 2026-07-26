@@ -135,6 +135,8 @@ export function Navbar() {
             <button
               type="button"
               aria-label="Open menu"
+              aria-expanded={mobileOpen}
+              aria-controls="mobile-nav-drawer"
               onClick={() => setMobileOpen(true)}
               className="grid size-10 place-items-center rounded-full text-foreground transition-colors hover:bg-secondary lg:hidden"
             >

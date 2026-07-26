@@ -120,8 +120,17 @@ export async function POST(req: NextRequest) {
     }
 
     let discountCents = 0;
-    if (couponCode && VALID_COUPONS[couponCode.trim().toUpperCase()]) {
-      const discountPct = VALID_COUPONS[couponCode.trim().toUpperCase()];
+    const cleanCoupon = couponCode ? couponCode.trim().toUpperCase() : null;
+    const isWholesaleOrder = verifiedSubtotalCents >= 500000; // ₹5,000+ corporate threshold
+
+    if (cleanCoupon && VALID_COUPONS[cleanCoupon]) {
+      if (isWholesaleOrder) {
+        return NextResponse.json(
+          { ok: false, error: "Promo coupon codes cannot be stacked with corporate wholesale discounts." },
+          { status: 400 }
+        );
+      }
+      const discountPct = VALID_COUPONS[cleanCoupon];
       discountCents = Math.round(verifiedSubtotalCents * discountPct);
     }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Check, Trash2 } from "lucide-react";
 
 export type CartItem = {
   id: string; // unique cart-line id
@@ -19,6 +20,7 @@ type CartContextValue = {
   subtotalCents: number;
   count: number;
   adding: boolean;
+  toastMessage: string | null;
   addItem: (item: Omit<CartItem, "id" | "quantity">, qty?: number) => void;
   updateQuantity: (id: string, quantity: number) => void;
   removeItem: (id: string) => void;
@@ -33,6 +35,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = React.useState<CartItem[]>([]);
   const [adding, setAdding] = React.useState(false);
   const [hydrated, setHydrated] = React.useState(false);
+  const [toastMessage, setToastMessage] = React.useState<string | null>(null);
+
+  const showToast = React.useCallback((msg: string) => {
+    setToastMessage(msg);
+    window.setTimeout(() => setToastMessage(null), 3000);
+  }, []);
 
   // Hydrate from localStorage on mount
   React.useEffect(() => {
@@ -74,9 +82,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         ...incoming,
       }];
     });
-    // Clear the "adding" flag after a tick so toast/UI hooks can pulse
+    showToast(`Added ${incoming.name} to cart!`);
     window.setTimeout(() => setAdding(false), 400);
-  }, []);
+  }, [showToast]);
 
   const updateQuantity = React.useCallback((id: string, quantity: number) => {
     setItems((prev) => {
@@ -86,8 +94,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const removeItem = React.useCallback((id: string) => {
-    setItems((prev) => prev.filter((it) => it.id !== id));
-  }, []);
+    setItems((prev) => {
+      const target = prev.find((it) => it.id === id);
+      if (target) showToast(`Removed ${target.name} from cart.`);
+      return prev.filter((it) => it.id !== id);
+    });
+  }, [showToast]);
 
   const clear = React.useCallback(() => setItems([]), []);
 
@@ -99,13 +111,29 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     subtotalCents,
     count,
     adding,
+    toastMessage,
     addItem,
     updateQuantity,
     removeItem,
     clear,
   };
 
-  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
+  return (
+    <CartContext.Provider value={value}>
+      {children}
+      {toastMessage && (
+        <div
+          role="status"
+          className="fixed bottom-6 right-6 z-[100] flex items-center gap-2.5 rounded-2xl border border-brand-yellow/30 bg-slate-900/95 px-5 py-3.5 text-sm font-semibold text-white shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4"
+        >
+          <div className="grid size-6 place-items-center rounded-full bg-brand-yellow/20 text-brand-yellow">
+            <Check className="size-3.5" />
+          </div>
+          <span>{toastMessage}</span>
+        </div>
+      )}
+    </CartContext.Provider>
+  );
 }
 
 export function useCart() {
