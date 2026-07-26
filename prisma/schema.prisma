@@ -116,30 +116,49 @@ model InventoryLog {
 
 enum OrderStatus {
   created
+  pending
+  payment_pending
   paid
-  processing
+  verified
+  print_queue
+  printing
+  quality_check
+  packing
+  ready_for_dispatch
   shipped
   delivered
+  completed
   cancelled
   refunded
+  replacement
+  returned
+  failed_delivery
+  lost_shipment
 }
 
 model Order {
-  id            String      @id @default(uuid()) @db.Uuid
-  customerName  String      @map("customer_name")
-  customerPhone String      @map("customer_phone")
-  customerEmail String?     @map("customer_email")
+  id            String         @id @default(uuid()) @db.Uuid
+  customerName  String         @map("customer_name")
+  customerPhone String         @map("customer_phone")
+  customerEmail String?        @map("customer_email")
   address       String
   pincode       String
-  totalCents    Int         @map("total_cents")
-  status        OrderStatus @default(created)
+  totalCents    Int            @map("total_cents")
+  status        OrderStatus    @default(created)
+  priority      String         @default("standard")
+  assignedTo    String?        @map("assigned_to")
   notes         String?
-  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt     DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  awbNumber     String?        @map("awb_number")
+  courier       String?
+  metadata      Json           @default("{}")
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   items         OrderItem[]
+  qcInspections QualityCheck[]
 
   @@index([customerPhone])
   @@index([status])
+  @@index([priority])
   @@index([createdAt])
   @@map("orders")
 }
@@ -160,6 +179,40 @@ model OrderItem {
 
   @@index([orderId])
   @@map("order_items")
+}
+
+model PrintBatch {
+  id            String   @id @default(uuid()) @db.Uuid
+  batchNumber   String   @unique @map("batch_number")
+  material      String
+  finish        String
+  size          String
+  printerId     String   @default("Printer-01") @map("printer_id")
+  orderCount    Int      @default(0) @map("order_count")
+  status        String   @default("queued")
+  estTimeMins   Int      @default(30) @map("est_time_mins")
+  operator      String   @default("operator_1")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([status])
+  @@index([material])
+  @@map("print_batches")
+}
+
+model QualityCheck {
+  id            String   @id @default(uuid()) @db.Uuid
+  orderId       String   @map("order_id") @db.Uuid
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  operator      String
+  result        String   // pass, reprint, reject
+  failureReason String?  @map("failure_reason")
+  checklist     Json     @default("{}")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([orderId])
+  @@index([result])
+  @@map("quality_checks")
 }
 
 model Customization {
