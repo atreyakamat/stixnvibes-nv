@@ -53,6 +53,7 @@ model Product {
   collection       String?
   tags             String[]     @default([])
   stock            Int          @default(0)
+  status           String       @default("active")
   isFeatured       Boolean      @default(false) @map("is_featured")
   isBundle         Boolean      @default(false) @map("is_bundle")
   isLimited        Boolean      @default(false) @map("is_limited")
@@ -66,10 +67,14 @@ model Product {
   variants         Variant[]
   orderItems       OrderItem[]
   reviews          Review[]
+  inventoryLogs    InventoryLog[]
 
   @@index([categoryId])
   @@index([slug])
   @@index([type])
+  @@index([status])
+  @@index([collection])
+  @@index([stock])
   @@index([isFeatured])
   @@map("products")
 }
@@ -90,6 +95,23 @@ model Variant {
 
   @@index([productId])
   @@map("variants")
+}
+
+model InventoryLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  productId     String   @map("product_id") @db.Uuid
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  change        Int
+  reason        String
+  previousStock Int      @map("previous_stock")
+  newStock      Int      @map("new_stock")
+  notes         String?
+  operator      String   @default("admin")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([productId])
+  @@index([createdAt])
+  @@map("inventory_logs")
 }
 
 enum OrderStatus {
