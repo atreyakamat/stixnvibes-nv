@@ -50,7 +50,12 @@ export default function AdminPage() {
   async function loadAll() {
     setFetching(true);
     try {
-      const [o, p] = await Promise.all([fetch("/api/admin/orders").then(r => r.json()), fetch("/api/admin/products").then(r => r.json())]);
+      const token = typeof window !== "undefined" ? localStorage.getItem("snv.admin.accessToken") : null;
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+      const [o, p] = await Promise.all([
+        fetch("/api/admin/orders", { headers }).then(r => r.json()),
+        fetch("/api/admin/products", { headers }).then(r => r.json())
+      ]);
       if (o?.ok) setOrders((o.data ?? []) as OrderRow[]);
       if (p?.ok) setProducts((p.data ?? []) as ProductRow[]);
     } finally {

