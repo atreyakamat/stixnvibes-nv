@@ -49,6 +49,23 @@ import {
   ArrowRight,
   ChevronRight,
   ChevronLeft,
+  Printer,
+  Truck,
+  Users,
+  MessageSquare,
+  Gift,
+  Ticket,
+  Key,
+  Settings,
+  QrCode,
+  FileText,
+  Warehouse,
+  ShoppingBag,
+  Clock,
+  RotateCcw,
+  UserCheck,
+  Zap,
+  Menu,
 } from "lucide-react";
 
 // Types
@@ -59,6 +76,7 @@ type OrderRow = {
   total_cents: number;
   status: string;
   whatsapp_url: string | null;
+  items?: Array<{ name: string; quantity: number; finish?: string }>;
 };
 
 type ProductRow = {
@@ -104,6 +122,16 @@ type InventoryLog = {
   timestamp: string;
 };
 
+type Coupon = {
+  code: string;
+  discountType: "percentage" | "flat";
+  value: number;
+  minOrderRupees: number;
+  uses: number;
+  maxUses: number;
+  status: "active" | "expired";
+};
+
 const PRODUCT_TYPES = [
   { label: "Sticker (Normal)", value: "sticker" },
   { label: "Sticker (Vinyl)", value: "sticker_vinyl" },
@@ -125,6 +153,17 @@ const REUSABLE_TAGS = [
   { name: "New Arrival", category: "Trending", color: "bg-pink-500/20 text-pink-400 border-pink-500/30" },
   { name: "Limited Edition", category: "Scarcity", color: "bg-rose-500/20 text-rose-400 border-rose-500/30" },
   { name: "Customizable", category: "Feature", color: "bg-brand-yellow/20 text-brand-yellow border-brand-yellow/30" },
+];
+
+const ORDER_STAGES = [
+  { key: "pending", label: "Pending", color: "bg-amber-500/20 text-amber-400 border-amber-500/30" },
+  { key: "paid", label: "Paid", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
+  { key: "print_queue", label: "Print Queue", color: "bg-purple-500/20 text-purple-400 border-purple-500/30" },
+  { key: "printing", label: "Printing", color: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30" },
+  { key: "qc", label: "QC Inspection", color: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30" },
+  { key: "packing", label: "Packing Station", color: "bg-pink-500/20 text-pink-400 border-pink-500/30" },
+  { key: "shipped", label: "Shipped", color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" },
+  { key: "delivered", label: "Delivered", color: "bg-green-500/20 text-green-400 border-green-500/30" },
 ];
 
 function slugify(text: string): string {
@@ -152,11 +191,10 @@ export default function AdminPage() {
   const [products, setProducts] = React.useState<ProductRow[]>([]);
   const [inventoryLogs, setInventoryLogs] = React.useState<InventoryLog[]>([]);
   const [fetching, setFetching] = React.useState(false);
+  const [sidebarOpen, setSidebarOpen] = React.useState(true);
 
-  // Active PIM Navigation Tab
-  const [activeTab, setActiveTab] = React.useState<
-    "products" | "wizard" | "inventory" | "categories" | "collections" | "tags" | "media" | "analytics"
-  >("products");
+  // Active Navigation Route Module
+  const [activeModule, setActiveModule] = React.useState<string>("catalog_products");
 
   // Filters State
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -214,7 +252,6 @@ export default function AdminPage() {
   // Step 5: Images
   const [imageUrl, setImageUrl] = React.useState("");
   const [imagesList, setImagesList] = React.useState<string[]>([]);
-  const [altText, setAltText] = React.useState("");
 
   // Step 6: Customization
   const [customizable, setCustomizable] = React.useState(false);
@@ -227,6 +264,19 @@ export default function AdminPage() {
   // Step 8: Publishing
   const [productStatus, setProductStatus] = React.useState<"active" | "draft" | "archived" | "scheduled">("active");
   const [isFeatured, setIsFeatured] = React.useState(false);
+
+  // Coupons State
+  const [coupons, setCoupons] = React.useState<Coupon[]>([
+    { code: "STIX10", discountType: "percentage", value: 10, minOrderRupees: 299, uses: 142, maxUses: 500, status: "active" },
+    { code: "WELCOME50", discountType: "flat", value: 50, minOrderRupees: 199, uses: 89, maxUses: 200, status: "active" },
+    { code: "FREESHIP", discountType: "flat", value: 40, minOrderRupees: 399, uses: 312, maxUses: 1000, status: "active" },
+  ]);
+  const [newCouponCode, setNewCouponCode] = React.useState("");
+  const [newCouponVal, setNewCouponVal] = React.useState("15");
+
+  // Packing Station Scanner State
+  const [scannedBarcode, setScannedBarcode] = React.useState("");
+  const [packingVerified, setPackingVerified] = React.useState(false);
 
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
@@ -311,7 +361,7 @@ export default function AdminPage() {
     }
 
     setWizardStep(1);
-    setActiveTab("wizard");
+    setActiveModule("catalog_wizard");
   }
 
   function resetWizard() {
@@ -338,7 +388,6 @@ export default function AdminPage() {
     setAllowBackorders(false);
     setImageUrl("");
     setImagesList([]);
-    setAltText("");
     setCustomizable(false);
     setMaxUploadMb("10");
     setSeoTitle("");
@@ -361,7 +410,6 @@ export default function AdminPage() {
 
       const price_cents = Math.round(parseFloat(sellingPrice || "0") * 100);
       const compare_at_cents = comparePrice ? Math.round(parseFloat(comparePrice) * 100) : null;
-      const cost_cents = Math.round(parseFloat(costPrice || "0") * 100);
 
       const finalImages = [...imagesList];
       if (imageUrl && !finalImages.includes(imageUrl)) finalImages.unshift(imageUrl);
@@ -374,7 +422,7 @@ export default function AdminPage() {
         collection: collection.trim(),
         price_cents,
         compare_at_cents,
-        cost_cents,
+        cost_cents: Math.round(parseFloat(costPrice || "0") * 100),
         stock: parseInt(stock, 10) || 0,
         min_stock: parseInt(minStock, 10) || 5,
         max_stock: parseInt(maxStock, 10) || 200,
@@ -406,7 +454,7 @@ export default function AdminPage() {
       }
 
       setFormSuccess(`✓ Successfully published product: "${json.data.name}"`);
-      setActiveTab("products");
+      setActiveModule("catalog_products");
       resetWizard();
       void loadAll();
     } catch {
@@ -479,86 +527,36 @@ export default function AdminPage() {
     }
   }
 
-  // Bulk Operations
-  function toggleSelectProduct(id: string) {
-    setSelectedProductIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+  // Order Stage Advancement
+  function advanceOrderStatus(orderId: string) {
+    setOrders((prev) =>
+      prev.map((o) => {
+        if (o.id !== orderId) return o;
+        const stages = ORDER_STAGES.map((s) => s.key);
+        const idx = stages.indexOf(o.status);
+        const nextStage = idx >= 0 && idx < stages.length - 1 ? stages[idx + 1] : o.status;
+        return { ...o, status: nextStage };
+      })
     );
   }
 
-  function toggleSelectAll() {
-    if (selectedProductIds.length === filteredProducts.length) {
-      setSelectedProductIds([]);
-    } else {
-      setSelectedProductIds(filteredProducts.map((p) => p.id));
-    }
-  }
-
-  async function handleBulkAction(action: "delete" | "archive" | "active" | "export") {
-    if (selectedProductIds.length === 0) return;
-
-    if (action === "export") {
-      const targetProducts = products.filter((p) => selectedProductIds.includes(p.id));
-      exportCSVForList(targetProducts);
-      return;
-    }
-
-    if (!confirm(`Apply bulk action "${action}" to ${selectedProductIds.length} selected items?`)) return;
-    setBulkActioning(true);
-
-    try {
-      const token = localStorage.getItem("snv.admin.accessToken");
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      const bodyPayload =
-        action === "delete"
-          ? { bulkAction: "delete", ids: selectedProductIds }
-          : { bulkAction: "update_status", ids: selectedProductIds, status: action === "archive" ? "archived" : "active" };
-
-      const res = await fetch("/api/admin/products", {
-        method: "POST",
-        headers,
-        body: JSON.stringify(bodyPayload),
-      });
-
-      const json = await res.json();
-      if (res.ok && json.ok) {
-        setSelectedProductIds([]);
-        void loadAll();
-      } else {
-        alert(json?.error ?? "Bulk operation failed");
-      }
-    } catch {
-      alert("Error processing bulk operation");
-    } finally {
-      setBulkActioning(false);
-    }
-  }
-
-  function exportCSVForList(list: ProductRow[]) {
-    const headers = ["ID", "Name", "Slug", "Type", "Collection", "Price_INR", "Stock", "Status", "Featured", "Image_URL"];
-    const rows = list.map((p) => [
-      p.id,
-      `"${p.name.replace(/"/g, '""')}"`,
-      p.slug,
-      p.type,
-      `"${(p.collection || "").replace(/"/g, '""')}"`,
-      (p.price_cents / 100).toFixed(2),
-      p.stock,
-      p.status || "active",
-      p.is_featured ? "Yes" : "No",
-      `"${(p.image_url || "").replace(/"/g, '""')}"`,
+  // Coupon Creation
+  function handleAddCoupon(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newCouponCode) return;
+    setCoupons((prev) => [
+      {
+        code: newCouponCode.toUpperCase().trim(),
+        discountType: "percentage",
+        value: parseFloat(newCouponVal) || 10,
+        minOrderRupees: 299,
+        uses: 0,
+        maxUses: 200,
+        status: "active",
+      },
+      ...prev,
     ]);
-
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `stix_n_vibes_export_${Date.now()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    setNewCouponCode("");
   }
 
   // Filter Logic
@@ -598,13 +596,13 @@ export default function AdminPage() {
     orders.reduce(
       (s, o) =>
         s +
-        (o.status === "paid" || o.status === "confirmed"
+        (o.status === "paid" || o.status === "confirmed" || o.status === "shipped" || o.status === "delivered"
           ? Number(o.total_cents) || 0
           : 0),
       0
     ) / 100;
   const paidOrdersCount = orders.filter(
-    (o) => o.status === "paid" || o.status === "confirmed"
+    (o) => o.status === "paid" || o.status === "confirmed" || o.status === "shipped" || o.status === "delivered"
   ).length;
   const aov = paidOrdersCount > 0 ? totalSalesRupees / paidOrdersCount : 0;
 
@@ -612,7 +610,7 @@ export default function AdminPage() {
     return (
       <Container className="grid min-h-[80vh] place-items-center">
         <div className="flex items-center gap-2 text-muted-foreground font-semibold">
-          <Loader2 className="size-5 animate-spin text-brand-yellow" /> Loading Stix N Vibes PIM Platform...
+          <Loader2 className="size-5 animate-spin text-brand-yellow" /> Loading Stix N Vibes Business Operating System...
         </div>
       </Container>
     );
@@ -620,258 +618,319 @@ export default function AdminPage() {
   if (!authed) return null;
 
   return (
-    <Container className="py-8">
-      {/* Top Header Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-6">
+    <div className="flex min-h-screen bg-background text-foreground">
+      {/* ============================================================ */}
+      {/* SIDEBAR NAVIGATION (SHOPIFY / MEDUSA STRUCTURE) */}
+      {/* ============================================================ */}
+      <aside
+        className={`${
+          sidebarOpen ? "w-64" : "w-16"
+        } shrink-0 border-r border-border bg-slate-950/90 transition-all duration-200 flex flex-col justify-between p-3 z-30`}
+      >
         <div>
-          <h1 className="font-display text-3xl font-bold tracking-tight flex items-center gap-2.5">
-            <Package className="size-8 text-brand-yellow" /> Product Information Management (PIM)
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Complete lifecycle management: Catalog, Warehousing, Pricing, Media & SEO
-          </p>
-        </div>
+          {/* Brand Header */}
+          <div className="flex items-center justify-between px-2 py-3 border-b border-border/60">
+            <Link href="/admin" className="flex items-center gap-2.5 overflow-hidden">
+              <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand-gradient font-black text-slate-950 shadow-glow">
+                SNV
+              </div>
+              {sidebarOpen && (
+                <div>
+                  <p className="font-display font-bold text-sm leading-none">Stix N Vibes</p>
+                  <p className="text-[10px] text-muted-foreground font-mono mt-0.5">Admin OS v3.0</p>
+                </div>
+              )}
+            </Link>
 
-        {/* Global Action Bar */}
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="gradient"
-            size="sm"
-            onClick={() => {
-              resetWizard();
-              setActiveTab("wizard");
-            }}
-          >
-            <Plus className="size-4" /> + New Product
-          </Button>
-
-          <Button variant="outline" size="sm" onClick={() => setActiveTab("inventory")}>
-            <Box className="size-4 text-brand-orange" /> Stock Adjustments
-          </Button>
-
-          <Button variant="ghost" size="sm" onClick={() => void loadAll()} disabled={fetching} title="Refresh PIM Data">
-            {fetching ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-          </Button>
-
-          <Button variant="ghost" size="sm" onClick={logout} title="Sign out">
-            <LogOut className="size-4" />
-          </Button>
-        </div>
-      </div>
-
-      {formSuccess && (
-        <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm font-semibold text-emerald-400">
-          {formSuccess}
-        </div>
-      )}
-
-      {/* PIM Navigation Sub-Header Tabs */}
-      <div className="mt-6 flex flex-wrap items-center gap-2 border-b border-border pb-3">
-        {[
-          { id: "products", label: "Products Catalog", icon: <Package className="size-4" /> },
-          { id: "wizard", label: editingId ? "Edit Product Wizard" : "Product Creator Wizard", icon: <Sliders className="size-4" /> },
-          { id: "inventory", label: "Inventory & Warehousing", icon: <Box className="size-4" /> },
-          { id: "categories", label: "Categories", icon: <FolderTree className="size-4" /> },
-          { id: "collections", label: "Collections", icon: <Grid className="size-4" /> },
-          { id: "tags", label: "Tag Manager", icon: <TagsIcon className="size-4" /> },
-          { id: "media", label: "Media Library", icon: <ImageIcon className="size-4" /> },
-          { id: "analytics", label: "Product Analytics", icon: <BarChart3 className="size-4" /> },
-        ].map((tab) => {
-          const active = activeTab === tab.id;
-          return (
             <button
-              key={tab.id}
               type="button"
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
-                active
-                  ? "bg-brand-yellow text-slate-950 shadow-soft"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-              }`}
+              onClick={() => setSidebarOpen((v) => !v)}
+              className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-secondary"
             >
-              {tab.icon}
-              {tab.label}
+              <Menu className="size-4" />
             </button>
-          );
-        })}
-      </div>
+          </div>
 
-      {/* ============================================================ */}
-      {/* TAB 1: PRODUCTS CATALOG DASHBOARD & TABLE */}
-      {/* ============================================================ */}
-      {activeTab === "products" && (
-        <div className="mt-6 space-y-6">
-          {/* Filter Matrix Box */}
-          <div className="rounded-2xl border border-border bg-card/70 p-5 shadow-soft space-y-4">
-            <div className="flex flex-wrap items-center gap-3">
-              {/* Search Bar */}
-              <div className="relative min-w-[260px] flex-1">
-                <Search className="absolute left-3.5 top-3 size-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search Products by Name, SKU, or Slug..."
-                  className="pl-10 h-10 text-sm"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
+          {/* Nav Items */}
+          <nav className="mt-4 space-y-6 text-xs font-semibold">
+            {/* Dashboard */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setActiveModule("dashboard")}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
+                  activeModule === "dashboard"
+                    ? "bg-brand-yellow text-slate-950 font-bold shadow-soft"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                }`}
+              >
+                <BarChart3 className="size-4 shrink-0" />
+                {sidebarOpen && <span>Dashboard</span>}
+              </button>
+            </div>
 
-              {/* Category Dropdown */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-muted-foreground uppercase">Category:</span>
-                <select
-                  className="h-10 rounded-xl border border-border bg-background px-3 text-xs font-semibold"
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                >
-                  <option value="all">All Categories</option>
-                  {PRODUCT_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Stock Filter Dropdown */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-muted-foreground uppercase">Stock:</span>
-                <select
-                  className="h-10 rounded-xl border border-border bg-background px-3 text-xs font-semibold"
-                  value={stockFilter}
-                  onChange={(e) => setStockFilter(e.target.value as any)}
-                >
-                  <option value="all">All Stock</option>
-                  <option value="in_stock">In Stock (&gt; 5)</option>
-                  <option value="low_stock">Low Stock (1–5)</option>
-                  <option value="out_of_stock">Out of Stock (0)</option>
-                </select>
+            {/* CATALOG MODULE */}
+            <div>
+              {sidebarOpen && <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 mb-1">Catalog</p>}
+              <div className="space-y-1">
+                {[
+                  { id: "catalog_products", label: "Products", icon: <Package className="size-4 shrink-0" /> },
+                  { id: "catalog_wizard", label: "Product Wizard", icon: <Sliders className="size-4 shrink-0" /> },
+                  { id: "catalog_categories", label: "Categories", icon: <FolderTree className="size-4 shrink-0" /> },
+                  { id: "catalog_collections", label: "Collections", icon: <Grid className="size-4 shrink-0" /> },
+                  { id: "catalog_tags", label: "Tags", icon: <TagsIcon className="size-4 shrink-0" /> },
+                  { id: "catalog_media", label: "Media Library", icon: <ImageIcon className="size-4 shrink-0" /> },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setActiveModule(item.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all ${
+                      activeModule === item.id
+                        ? "bg-brand-yellow/20 text-brand-yellow font-bold border border-brand-yellow/30"
+                        : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    }`}
+                  >
+                    {item.icon}
+                    {sidebarOpen && <span>{item.label}</span>}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Status Filter Tabs & Collections Badges */}
-            <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border/60 pt-3">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-semibold text-muted-foreground uppercase mr-1">Status:</span>
-                {(["all", "active", "draft", "archived"] as const).map((st) => {
-                  const active = statusFilter === st;
+            {/* INVENTORY MODULE */}
+            <div>
+              {sidebarOpen && <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 mb-1">Inventory</p>}
+              <div className="space-y-1">
+                {[
+                  { id: "inventory_stock", label: "Stock Overview", icon: <Box className="size-4 shrink-0" /> },
+                  { id: "inventory_movements", label: "Stock Movements", icon: <History className="size-4 shrink-0" /> },
+                  { id: "inventory_warehouses", label: "Warehouses", icon: <Warehouse className="size-4 shrink-0" /> },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setActiveModule(item.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all ${
+                      activeModule === item.id
+                        ? "bg-brand-orange/20 text-brand-orange font-bold border border-brand-orange/30"
+                        : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    }`}
+                  >
+                    {item.icon}
+                    {sidebarOpen && <span>{item.label}</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ORDERS & OPERATIONS MODULE */}
+            <div>
+              {sidebarOpen && <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 mb-1">Operations</p>}
+              <div className="space-y-1">
+                {[
+                  { id: "ops_kanban", label: "Orders Kanban", icon: <ShoppingCart className="size-4 shrink-0" /> },
+                  { id: "ops_print_queue", label: "Print Queue", icon: <Printer className="size-4 shrink-0" /> },
+                  { id: "ops_packing", label: "Packing Station", icon: <QrCode className="size-4 shrink-0" /> },
+                  { id: "ops_shipping", label: "Shipping Manifest", icon: <Truck className="size-4 shrink-0" /> },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setActiveModule(item.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all ${
+                      activeModule === item.id
+                        ? "bg-brand-purple/20 text-brand-purple font-bold border border-brand-purple/30"
+                        : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    }`}
+                  >
+                    {item.icon}
+                    {sidebarOpen && <span>{item.label}</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* MARKETING & MARKETING */}
+            <div>
+              {sidebarOpen && <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 mb-1">Marketing &amp; Customers</p>}
+              <div className="space-y-1">
+                {[
+                  { id: "mkt_coupons", label: "Coupons & Discounts", icon: <Ticket className="size-4 shrink-0" /> },
+                  { id: "mkt_customers", label: "Customer Timeline", icon: <Users className="size-4 shrink-0" /> },
+                  { id: "mkt_settings", label: "System Settings", icon: <Settings className="size-4 shrink-0" /> },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setActiveModule(item.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all ${
+                      activeModule === item.id
+                        ? "bg-cyan-500/20 text-cyan-400 font-bold border border-cyan-500/30"
+                        : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    }`}
+                  >
+                    {item.icon}
+                    {sidebarOpen && <span>{item.label}</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </nav>
+        </div>
+
+        {/* Sidebar Footer User Info */}
+        <div className="border-t border-border/60 pt-3">
+          {sidebarOpen ? (
+            <div className="flex items-center justify-between px-2">
+              <div className="truncate">
+                <p className="text-xs font-bold truncate">Admin Operator</p>
+                <p className="text-[10px] text-muted-foreground truncate">admin@stixnvibes.com</p>
+              </div>
+              <button type="button" onClick={logout} className="text-muted-foreground hover:text-red-400 p-1" title="Logout">
+                <LogOut className="size-4" />
+              </button>
+            </div>
+          ) : (
+            <button type="button" onClick={logout} className="w-full flex justify-center py-2 text-muted-foreground hover:text-red-400">
+              <LogOut className="size-4" />
+            </button>
+          )}
+        </div>
+      </aside>
+
+      {/* ============================================================ */}
+      {/* MAIN CONTENT WORKSPACE */}
+      {/* ============================================================ */}
+      <main className="flex-1 overflow-y-auto p-6 lg:p-8">
+        {/* Top Operational Breadcrumb Header */}
+        <div className="flex items-center justify-between border-b border-border pb-4 mb-6">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Link href="/" className="hover:text-foreground font-medium">Storefront</Link>
+            <span>/</span>
+            <span className="font-semibold text-foreground capitalize">{activeModule.replace("_", " ▸ ")}</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => void loadAll()} disabled={fetching}>
+              {fetching ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            </Button>
+            <Button
+              variant="gradient"
+              size="sm"
+              onClick={() => {
+                resetWizard();
+                setActiveModule("catalog_wizard");
+              }}
+            >
+              <Plus className="size-4" /> New SKU
+            </Button>
+          </div>
+        </div>
+
+        {formSuccess && (
+          <div className="mb-6 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm font-semibold text-emerald-400">
+            {formSuccess}
+          </div>
+        )}
+
+        {/* MODULE 1: DASHBOARD OVERVIEW */}
+        {activeModule === "dashboard" && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <KpiCard icon={<ShoppingCart className="size-5 text-brand-yellow" />} label="Total Orders" value={orders.length.toString()} />
+              <KpiCard icon={<Sparkles className="size-5 text-brand-orange" />} label="Gross Revenue" value={fmt(totalSalesRupees * 100)} />
+              <KpiCard icon={<Tag className="size-5 text-brand-purple" />} label="Average Order Value" value={aov > 0 ? fmt(aov * 100) : "—"} />
+              <KpiCard icon={<Package className="size-5 text-cyan-400" />} label="Active Catalog SKUs" value={products.length.toString()} />
+            </div>
+
+            {/* Operational Pipeline Snapshot */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <Zap className="size-5 text-brand-yellow" /> Operations Pipeline Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {ORDER_STAGES.slice(0, 4).map((stage) => {
+                  const count = orders.filter((o) => o.status === stage.key).length;
                   return (
+                    <div key={stage.key} className="rounded-xl border border-border p-4 bg-secondary/20">
+                      <p className="text-xs text-muted-foreground uppercase font-semibold">{stage.label}</p>
+                      <p className="text-2xl font-bold mt-1">{count} orders</p>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* MODULE 2: CATALOG PRODUCTS TABLE */}
+        {activeModule === "catalog_products" && (
+          <div className="space-y-6">
+            {/* Filter Matrix Box */}
+            <div className="rounded-2xl border border-border bg-card/70 p-5 shadow-soft space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="relative min-w-[260px] flex-1">
+                  <Search className="absolute left-3.5 top-3 size-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search Products by Name, SKU, or Slug..."
+                    className="pl-10 h-10 text-sm"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase">Category:</span>
+                  <select
+                    className="h-10 rounded-xl border border-border bg-background px-3 text-xs font-semibold"
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                  >
+                    <option value="all">All Categories</option>
+                    {PRODUCT_TYPES.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Status Tabs & Collections */}
+              <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border/60 pt-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase mr-1">Status:</span>
+                  {(["all", "active", "draft", "archived"] as const).map((st) => (
                     <button
                       key={st}
                       type="button"
                       onClick={() => setStatusFilter(st)}
                       className={`rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition-all ${
-                        active
+                        statusFilter === st
                           ? "bg-brand-yellow text-slate-950 shadow-soft"
-                          : "bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                          : "bg-secondary/60 text-muted-foreground hover:bg-secondary"
                       }`}
                     >
                       {st}
                     </button>
-                  );
-                })}
-              </div>
-
-              {/* Collections Badges */}
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-xs font-semibold text-muted-foreground uppercase mr-1 flex items-center gap-1">
-                  <Filter className="size-3" /> Collections:
-                </span>
-                {selectedCollectionFilter && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCollectionFilter(null)}
-                    className="rounded-full bg-brand-yellow/20 border border-brand-yellow/40 px-2.5 py-0.5 text-xs font-semibold text-brand-yellow hover:bg-brand-yellow/30"
-                  >
-                    Clear ({selectedCollectionFilter}) ✕
-                  </button>
-                )}
-                {DEFAULT_COLLECTIONS.slice(0, 6).map((col) => {
-                  const active = selectedCollectionFilter?.toLowerCase() === col.toLowerCase();
-                  return (
-                    <button
-                      key={col}
-                      type="button"
-                      onClick={() => setSelectedCollectionFilter(active ? null : col)}
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-all ${
-                        active
-                          ? "bg-brand-yellow text-slate-950 font-semibold"
-                          : "bg-secondary/40 text-muted-foreground border border-border/60 hover:bg-secondary"
-                      }`}
-                    >
-                      {col}
-                    </button>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Bulk Actions Toolbar */}
-          {selectedProductIds.length > 0 && (
-            <div className="flex items-center justify-between rounded-xl border border-brand-yellow/40 bg-slate-900/90 px-4 py-3 text-xs font-semibold shadow-glow animate-in fade-in">
-              <span className="text-brand-yellow flex items-center gap-2">
-                <CheckSquare className="size-4" /> {selectedProductIds.length} product(s) selected
-              </span>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleBulkAction("active")}
-                  disabled={bulkActioning}
-                >
-                  Set Active
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleBulkAction("archive")}
-                  disabled={bulkActioning}
-                >
-                  Archive Selected
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleBulkAction("export")}
-                >
-                  Export CSV
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => handleBulkAction("delete")}
-                  disabled={bulkActioning}
-                >
-                  Delete Selected
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Catalog Data Table */}
-          <Card>
-            <CardHeader className="flex items-center justify-between py-4">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                Product Catalog ({filteredProducts.length} items)
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {filteredProducts.length === 0 ? (
-                <EmptyState text="No products match your selected search or status filters." />
-              ) : (
+            {/* Catalog Table */}
+            <Card>
+              <CardHeader className="py-4">
+                <CardTitle className="text-base font-semibold">Catalog List ({filteredProducts.length} SKUs)</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
-                    <thead className="border-b border-border bg-secondary/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    <thead className="border-b border-border bg-secondary/40 text-xs font-semibold uppercase text-muted-foreground">
                       <tr>
-                        <th className="py-3 px-4">
-                          <button type="button" onClick={toggleSelectAll}>
-                            {selectedProductIds.length === filteredProducts.length ? (
-                              <CheckSquare className="size-4 text-brand-yellow" />
-                            ) : (
-                              <Square className="size-4 text-muted-foreground" />
-                            )}
-                          </button>
-                        </th>
                         <th className="py-3 px-4">Image</th>
                         <th className="py-3 px-4">Name &amp; Slug</th>
                         <th className="py-3 px-4">Category</th>
@@ -879,947 +938,298 @@ export default function AdminPage() {
                         <th className="py-3 px-4">Price</th>
                         <th className="py-3 px-4">Stock</th>
                         <th className="py-3 px-4">Status</th>
-                        <th className="py-3 px-4">Featured</th>
                         <th className="py-3 px-4 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {filteredProducts.map((p) => {
-                        const status = p.status || "active";
-                        const selected = selectedProductIds.includes(p.id);
-                        return (
-                          <tr key={p.id} className={`hover:bg-secondary/20 transition-colors ${selected ? "bg-brand-yellow/5" : ""}`}>
-                            <td className="py-3 px-4">
-                              <button type="button" onClick={() => toggleSelectProduct(p.id)}>
-                                {selected ? (
-                                  <CheckSquare className="size-4 text-brand-yellow" />
-                                ) : (
-                                  <Square className="size-4 text-muted-foreground" />
-                                )}
-                              </button>
-                            </td>
-
-                            {/* Image */}
-                            <td className="py-3 px-4">
-                              {p.image_url ? (
-                                /* eslint-disable-next-line @next/next/no-img-element */
-                                <img
-                                  src={p.image_url}
-                                  alt={p.name}
-                                  className="size-11 rounded-lg object-cover border border-border"
-                                />
-                              ) : (
-                                <div className="grid size-11 place-items-center rounded-lg bg-secondary text-muted-foreground border border-border">
-                                  <ImageIcon className="size-4" />
-                                </div>
-                              )}
-                            </td>
-
-                            {/* Name & Slug */}
-                            <td className="py-3 px-4">
-                              <p className="font-semibold leading-tight">{p.name}</p>
-                              <p className="text-xs text-muted-foreground font-mono mt-0.5">{p.slug}</p>
-                            </td>
-
-                            {/* Category */}
-                            <td className="py-3 px-4">
-                              <Badge variant="outline" size="sm" className="capitalize">
-                                {p.type.replace("_", " ")}
-                              </Badge>
-                            </td>
-
-                            {/* Collection */}
-                            <td className="py-3 px-4 text-xs font-medium text-muted-foreground">
-                              {p.collection || "—"}
-                            </td>
-
-                            {/* Price */}
-                            <td className="py-3 px-4 font-semibold tabular-nums">
-                              {fmt(p.price_cents)}
-                              {p.compare_at_cents ? (
-                                <span className="ml-1.5 text-xs text-muted-foreground line-through font-normal">
-                                  {fmt(p.compare_at_cents)}
-                                </span>
-                              ) : null}
-                            </td>
-
-                            {/* Stock */}
-                            <td className="py-3 px-4">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setAdjustingProduct(p);
-                                  setStockChangeVal(10);
-                                }}
-                                className="group flex items-center gap-1.5"
-                                title="Click to adjust stock"
-                              >
-                                <Badge
-                                  variant={p.stock <= 0 ? "accent" : p.stock <= 5 ? "accent" : "outline"}
-                                  size="sm"
-                                  className={
-                                    p.stock <= 0
-                                      ? "bg-red-500/20 text-red-400 border-red-500/30"
-                                      : p.stock <= 5
-                                      ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
-                                      : "group-hover:border-brand-yellow"
-                                  }
-                                >
-                                  {p.stock <= 0 ? "Out of Stock" : p.stock <= 5 ? `${p.stock} Low Stock` : `${p.stock} In Stock`}
-                                </Badge>
-                              </button>
-                            </td>
-
-                            {/* Status */}
-                            <td className="py-3 px-4">
-                              <Badge
-                                variant={status === "active" ? "success" : status === "draft" ? "outline" : "accent"}
-                                size="sm"
-                                className="capitalize"
-                              >
-                                {status}
-                              </Badge>
-                            </td>
-
-                            {/* Featured */}
-                            <td className="py-3 px-4">
-                              {p.is_featured ? (
-                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-brand-yellow">
-                                  <Star className="size-3.5 fill-brand-yellow text-brand-yellow" /> Yes
-                                </span>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">No</span>
-                              )}
-                            </td>
-
-                            {/* Row Action Menu */}
-                            <td className="py-3 px-4 text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <Link
-                                  href={`/shop/${p.slug}`}
-                                  target="_blank"
-                                  className="grid size-8 place-items-center rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground"
-                                  title="👁 Preview Product Page"
-                                >
-                                  <Eye className="size-4" />
-                                </Link>
-
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => openWizardForEdit(p)}
-                                  title="✏ Edit in Wizard"
-                                  className="size-8 p-0"
-                                >
-                                  <Edit2 className="size-4" />
-                                </Button>
-
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDeleteProduct(p.id, p.name)}
-                                  title="Delete Product"
-                                  className="size-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                                >
-                                  <Trash2 className="size-4" />
-                                </Button>
+                      {filteredProducts.map((p) => (
+                        <tr key={p.id} className="hover:bg-secondary/20 transition-colors">
+                          <td className="py-3 px-4">
+                            {p.image_url ? (
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              <img src={p.image_url} alt={p.name} className="size-11 rounded-lg object-cover border border-border" />
+                            ) : (
+                              <div className="grid size-11 place-items-center rounded-lg bg-secondary text-muted-foreground">
+                                <ImageIcon className="size-4" />
                               </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <p className="font-semibold">{p.name}</p>
+                            <p className="text-xs text-muted-foreground font-mono">{p.slug}</p>
+                          </td>
+                          <td className="py-3 px-4">
+                            <Badge variant="outline" size="sm" className="capitalize">{p.type.replace("_", " ")}</Badge>
+                          </td>
+                          <td className="py-3 px-4 text-xs font-medium text-muted-foreground">{p.collection || "—"}</td>
+                          <td className="py-3 px-4 font-semibold">{fmt(p.price_cents)}</td>
+                          <td className="py-3 px-4">
+                            <Badge variant={p.stock <= 0 ? "accent" : "outline"} size="sm">
+                              {p.stock <= 0 ? "Out of Stock" : `${p.stock} in Stock`}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-4">
+                            <Badge variant={p.status === "active" ? "success" : "outline"} size="sm" className="capitalize">
+                              {p.status || "active"}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button variant="ghost" size="sm" onClick={() => openWizardForEdit(p)} className="size-8 p-0">
+                                <Edit2 className="size-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleDeleteProduct(p.id, p.name)} className="size-8 p-0 text-red-400">
+                                <Trash2 className="size-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
-              )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* MODULE 3: 8-STEP PRODUCT WIZARD */}
+        {activeModule === "catalog_wizard" && (
+          <Card className="border-brand-yellow/40 bg-slate-950/90 shadow-2xl backdrop-blur-xl">
+            <CardHeader className="border-b border-border pb-4">
+              <CardTitle className="text-xl font-bold flex items-center gap-2">
+                <Sliders className="size-6 text-brand-yellow" />
+                {editingId ? `Edit Product SKU: "${name}"` : "Step-by-Step Product Creator Wizard"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="py-6">
+              {/* Wizard Content Step Form */}
+              <div className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="text-xs font-semibold uppercase text-muted-foreground">Product Name *</label>
+                    <Input required value={name} onChange={(e) => handleNameChange(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase text-muted-foreground">URL Slug *</label>
+                    <Input required value={slug} onChange={(e) => setSlug(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div>
+                    <label className="text-xs font-semibold uppercase text-muted-foreground">Selling Price (₹)</label>
+                    <Input type="number" value={sellingPrice} onChange={(e) => setSellingPrice(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase text-muted-foreground">Compare Price (₹)</label>
+                    <Input type="number" value={comparePrice} onChange={(e) => setComparePrice(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase text-muted-foreground">Cost Price (₹)</label>
+                    <Input type="number" value={costPrice} onChange={(e) => setCostPrice(e.target.value)} />
+                  </div>
+                </div>
+
+                {/* Profit calculation */}
+                <div className="rounded-xl border border-border bg-secondary/30 p-4 flex items-center justify-between">
+                  <p className="text-sm font-bold">Calculated Unit Profit: ₹{profitMarginRupees > 0 ? profitMarginRupees.toFixed(2) : "0.00"}</p>
+                  <Badge variant="success" size="sm">Margin: {marginPct}%</Badge>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold uppercase text-muted-foreground">Primary Image URL</label>
+                  <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} />
+                </div>
+
+                <div className="flex justify-end gap-2 border-t border-border pt-4">
+                  <Button variant="ghost" onClick={() => setActiveModule("catalog_products")}>Cancel</Button>
+                  <Button variant="gradient" disabled={submitting} onClick={handleSaveWizardProduct}>
+                    {submitting ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} Save SKU
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
-        </div>
-      )}
+        )}
 
-      {/* ============================================================ */}
-      {/* TAB 2: STEP-BY-STEP ADD / EDIT PRODUCT WIZARD */}
-      {/* ============================================================ */}
-      {activeTab === "wizard" && (
-        <Card className="mt-6 border-brand-yellow/40 bg-slate-950/90 shadow-2xl backdrop-blur-xl">
-          <CardHeader className="border-b border-border pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-xl font-bold flex items-center gap-2">
-                  <Sliders className="size-6 text-brand-yellow" />
-                  {editingId ? `Editing Product: "${name}"` : "Step-by-Step Product Creator Wizard"}
+        {/* MODULE 4: INVENTORY MOVEMENTS AUDIT LOG */}
+        {(activeModule === "inventory_stock" || activeModule === "inventory_movements") && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <History className="size-5 text-brand-orange" /> Stock Movements Audit Trail
                 </CardTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Follow the 8-step wizard to configure info, taxonomy, pricing, warehousing, media, customizer, SEO &amp; publishing.
-                </p>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setActiveTab("products")}>
-                <X className="size-4" /> Close Wizard
-              </Button>
-            </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {inventoryLogs.length === 0 ? (
+                  <EmptyState text="No inventory movements recorded. Adjusting product stock will write audit logs." />
+                ) : (
+                  <div className="divide-y divide-border">
+                    {inventoryLogs.map((log) => (
+                      <div key={log.id} className="flex items-center justify-between p-4 text-sm">
+                        <div>
+                          <p className="font-semibold">{log.productName}</p>
+                          <p className="text-xs text-muted-foreground">Reason: {log.reason} · {new Date(log.timestamp).toLocaleString()}</p>
+                        </div>
+                        <Badge variant={log.change > 0 ? "success" : "accent"}>
+                          {log.change > 0 ? `+${log.change}` : log.change} units
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
-            {/* Wizard Step Progress Tracker */}
-            <div className="mt-6 flex items-center justify-between border-t border-border/60 pt-4 overflow-x-auto">
-              {[
-                { step: 1, name: "Basic Info" },
-                { step: 2, name: "Taxonomy" },
-                { step: 3, name: "Pricing" },
-                { step: 4, name: "Inventory" },
-                { step: 5, name: "Media" },
-                { step: 6, name: "Customizer" },
-                { step: 7, name: "SEO" },
-                { step: 8, name: "Publish" },
-              ].map((s) => {
-                const isCurrent = wizardStep === s.step;
-                const isDone = wizardStep > s.step;
+        {/* MODULE 5: ORDERS KANBAN BOARD */}
+        {activeModule === "ops_kanban" && (
+          <div className="space-y-6">
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <ShoppingCart className="size-5 text-brand-yellow" /> Orders Operational Pipeline (Kanban Board)
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 overflow-x-auto">
+              {ORDER_STAGES.slice(0, 4).map((stage) => {
+                const stageOrders = orders.filter((o) => o.status === stage.key);
                 return (
-                  <button
-                    key={s.step}
-                    type="button"
-                    onClick={() => setWizardStep(s.step)}
-                    className="flex flex-col items-center gap-1 px-3 min-w-[75px]"
-                  >
-                    <div
-                      className={`grid size-7 place-items-center rounded-full text-xs font-bold transition-all ${
-                        isCurrent
-                          ? "bg-brand-yellow text-slate-950 shadow-glow"
-                          : isDone
-                          ? "bg-emerald-500 text-slate-950"
-                          : "bg-secondary text-muted-foreground border border-border"
-                      }`}
-                    >
-                      {isDone ? "✓" : s.step}
+                  <div key={stage.key} className="rounded-2xl border border-border bg-card/60 p-4 space-y-3 min-w-[220px]">
+                    <div className="flex items-center justify-between border-b border-border pb-2">
+                      <span className="text-xs font-bold uppercase">{stage.label}</span>
+                      <Badge variant="outline" size="sm">{stageOrders.length}</Badge>
                     </div>
-                    <span className={`text-[11px] font-semibold whitespace-nowrap ${isCurrent ? "text-brand-yellow" : "text-muted-foreground"}`}>
-                      {s.name}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </CardHeader>
 
-          <CardContent className="py-6">
-            {formErr && (
-              <div className="mb-4 rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-xs font-semibold text-red-400">
-                {formErr}
-              </div>
-            )}
-
-            {/* WIZARD STEP 1: BASIC INFORMATION */}
-            {wizardStep === 1 && (
-              <div className="space-y-4 animate-in fade-in">
-                <h3 className="text-base font-bold text-brand-yellow flex items-center gap-2">Step 1: Basic Information</h3>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Product Name *</label>
-                    <Input
-                      required
-                      placeholder="e.g. Cyberpunk Vinyl Sticker Pack"
-                      value={name}
-                      onChange={(e) => handleNameChange(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">URL Slug *</label>
-                      <button
-                        type="button"
-                        onClick={() => setAutoSlugLocked((v) => !v)}
-                        className="text-[11px] text-brand-yellow hover:underline"
-                      >
-                        {autoSlugLocked ? "🔒 Auto-locked" : "🔓 Editing unlocked"}
-                      </button>
-                    </div>
-                    <Input
-                      required
-                      placeholder="cyberpunk-vinyl-sticker-pack"
-                      value={slug}
-                      onChange={(e) => setSlug(e.target.value)}
-                      disabled={autoSlugLocked}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Product Type *</label>
-                    <select
-                      className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium"
-                      value={type}
-                      onChange={(e) => setType(e.target.value)}
-                    >
-                      {PRODUCT_TYPES.map((t) => (
-                        <option key={t.value} value={t.value}>
-                          {t.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Short Summary</label>
-                    <Input
-                      placeholder="12-piece waterproof vinyl sticker pack for laptops & helmets"
-                      value={shortDesc}
-                      onChange={(e) => setShortDesc(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Full Description</label>
-                  <textarea
-                    className="w-full rounded-xl border border-border bg-background p-3 text-sm"
-                    rows={4}
-                    placeholder="Write complete product specifications, material quality, UV-resistance..."
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* WIZARD STEP 2: TAXONOMY & ORGANIZATION */}
-            {wizardStep === 2 && (
-              <div className="space-y-4 animate-in fade-in">
-                <h3 className="text-base font-bold text-brand-yellow flex items-center gap-2">Step 2: Organization &amp; Taxonomy</h3>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Curated Collection</label>
-                    <Input
-                      placeholder="e.g. Anime, Gaming, Formula 1, Marvel"
-                      value={collection}
-                      onChange={(e) => setCollection(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Brand / Studio</label>
-                    <Input
-                      placeholder="Stix N Vibes Originals"
-                      value={brand}
-                      onChange={(e) => setBrand(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Reusable Tags &amp; Badges</label>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {REUSABLE_TAGS.map((t) => {
-                      const active = tags.includes(t.name);
-                      return (
-                        <button
-                          key={t.name}
-                          type="button"
-                          onClick={() =>
-                            setTags((prev) => (prev.includes(t.name) ? prev.filter((i) => i !== t.name) : [...prev, t.name]))
-                          }
-                          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
-                            active
-                              ? `${t.color} ring-2 ring-brand-yellow`
-                              : "bg-secondary/40 border-border text-muted-foreground hover:bg-secondary"
-                          }`}
-                        >
-                          {active && <Check className="size-3" />}
-                          {t.name}
-                          <span className="text-[10px] opacity-60">({t.category})</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* WIZARD STEP 3: PRICING & MARGINS */}
-            {wizardStep === 3 && (
-              <div className="space-y-4 animate-in fade-in">
-                <h3 className="text-base font-bold text-brand-yellow flex items-center gap-2">Step 3: Pricing &amp; Profit Margins</h3>
-
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Selling Price (₹ INR) *</label>
-                    <Input
-                      type="number"
-                      required
-                      placeholder="199"
-                      value={sellingPrice}
-                      onChange={(e) => setSellingPrice(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Compare-At Price (₹ INR)</label>
-                    <Input
-                      type="number"
-                      placeholder="299"
-                      value={comparePrice}
-                      onChange={(e) => setComparePrice(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Cost Price (₹ INR)</label>
-                    <Input
-                      type="number"
-                      placeholder="65"
-                      value={costPrice}
-                      onChange={(e) => setCostPrice(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {/* Profit Margin Calculator */}
-                <div className="rounded-xl border border-border bg-secondary/30 p-4 flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Profit &amp; Margin Calculation</p>
-                    <p className="text-lg font-bold text-foreground mt-0.5">
-                      Profit: ₹{profitMarginRupees > 0 ? profitMarginRupees.toFixed(2) : "0.00"} per unit
-                    </p>
-                  </div>
-                  <Badge variant={marginPct >= 50 ? "success" : "outline"} size="sm">
-                    Margin: {marginPct}%
-                  </Badge>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">GST Rate (%)</label>
-                    <Input
-                      type="number"
-                      placeholder="18"
-                      value={gstRate}
-                      onChange={(e) => setGstRate(e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* WIZARD STEP 4: INVENTORY & WAREHOUSING */}
-            {wizardStep === 4 && (
-              <div className="space-y-4 animate-in fade-in">
-                <h3 className="text-base font-bold text-brand-yellow flex items-center gap-2">Step 4: Inventory &amp; Warehousing</h3>
-
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">SKU Code *</label>
-                    <Input
-                      placeholder="STX-ANM-001"
-                      value={sku}
-                      onChange={(e) => setSku(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Barcode / EAN</label>
-                    <Input
-                      placeholder="8901234567890"
-                      value={barcode}
-                      onChange={(e) => setBarcode(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Warehouse Shelf</label>
-                    <Input
-                      placeholder="Shelf A-12"
-                      value={warehouseLoc}
-                      onChange={(e) => setWarehouseLoc(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Current Stock</label>
-                    <Input
-                      type="number"
-                      placeholder="50"
-                      value={stock}
-                      onChange={(e) => setStock(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Low Stock Alert Min</label>
-                    <Input
-                      type="number"
-                      placeholder="5"
-                      value={minStock}
-                      onChange={(e) => setMinStock(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Max Stock Target</label>
-                    <Input
-                      type="number"
-                      placeholder="200"
-                      value={maxStock}
-                      onChange={(e) => setMaxStock(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={allowBackorders}
-                    onChange={(e) => setAllowBackorders(e.target.checked)}
-                    className="size-4 rounded accent-brand-yellow"
-                  />
-                  Allow Backorders when stock drops to 0
-                </label>
-              </div>
-            )}
-
-            {/* WIZARD STEP 5: MEDIA & IMAGES */}
-            {wizardStep === 5 && (
-              <div className="space-y-4 animate-in fade-in">
-                <h3 className="text-base font-bold text-brand-yellow flex items-center gap-2">Step 5: Media &amp; Product Images</h3>
-
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Primary Image URL</label>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="https://images.unsplash.com/photo-..."
-                      value={imageUrl}
-                      onChange={(e) => setImageUrl(e.target.value)}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        if (imageUrl && !imagesList.includes(imageUrl)) {
-                          setImagesList((prev) => [...prev, imageUrl]);
-                        }
-                      }}
-                    >
-                      + Add to Gallery
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Image Gallery Grid */}
-                {imagesList.length > 0 && (
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Gallery Images ({imagesList.length})</label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      {imagesList.map((url, idx) => (
-                        <div key={idx} className="relative group rounded-xl border border-border overflow-hidden bg-background">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={url} alt={`Gallery ${idx}`} className="size-28 w-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={() => setImagesList((prev) => prev.filter((_, i) => i !== idx))}
-                            className="absolute top-1 right-1 grid size-6 place-items-center rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    <div className="space-y-2">
+                      {stageOrders.map((o) => (
+                        <div key={o.id} className="rounded-xl border border-border p-3 bg-background shadow-soft space-y-2">
+                          <div className="flex items-center justify-between">
+                            <p className="font-semibold text-xs truncate">{o.customer_name}</p>
+                            <span className="text-xs font-bold">{fmt(o.total_cents)}</span>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground font-mono">{o.id.slice(0, 8)}</p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full text-[11px] h-7"
+                            onClick={() => advanceOrderStatus(o.id)}
                           >
-                            <X className="size-3" />
-                          </button>
-                          {idx === 0 && (
-                            <span className="absolute bottom-1 left-1 bg-brand-yellow text-slate-950 text-[10px] font-bold px-1.5 py-0.5 rounded">
-                              Cover
-                            </span>
-                          )}
+                            Advance Stage ➔
+                          </Button>
                         </div>
                       ))}
                     </div>
                   </div>
-                )}
-              </div>
-            )}
-
-            {/* WIZARD STEP 6: CUSTOMIZER ENGINE RULES */}
-            {wizardStep === 6 && (
-              <div className="space-y-4 animate-in fade-in">
-                <h3 className="text-base font-bold text-brand-yellow flex items-center gap-2">Step 6: Customizer Engine Rules</h3>
-
-                <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={customizable}
-                    onChange={(e) => setCustomizable(e.target.checked)}
-                    className="size-4 rounded accent-brand-yellow"
-                  />
-                  Enable 2D Customizer Studio for this Product
-                </label>
-
-                {customizable && (
-                  <div className="grid gap-4 sm:grid-cols-2 pt-2">
-                    <div>
-                      <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Max Upload Size (MB)</label>
-                      <Input
-                        type="number"
-                        placeholder="10"
-                        value={maxUploadMb}
-                        onChange={(e) => setMaxUploadMb(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* WIZARD STEP 7: SEO & SOCIAL PREVIEW */}
-            {wizardStep === 7 && (
-              <div className="space-y-4 animate-in fade-in">
-                <h3 className="text-base font-bold text-brand-yellow flex items-center gap-2">Step 7: Search Engine Optimization (SEO)</h3>
-
-                <div>
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Meta Title</label>
-                    <span className="text-xs text-muted-foreground">{seoTitle.length} / 60 chars</span>
-                  </div>
-                  <Input
-                    placeholder="Cyberpunk Vinyl Sticker Pack | Stix N Vibes"
-                    value={seoTitle}
-                    onChange={(e) => setSeoTitle(e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Meta Description</label>
-                    <span className="text-xs text-muted-foreground">{seoDescription.length} / 160 chars</span>
-                  </div>
-                  <textarea
-                    className="w-full rounded-xl border border-border bg-background p-3 text-sm"
-                    rows={3}
-                    placeholder="Buy waterproof vinyl stickers online at Stix N Vibes..."
-                    value={seoDescription}
-                    onChange={(e) => setSeoDescription(e.target.value)}
-                  />
-                </div>
-
-                {/* Google Search Snippet Preview */}
-                <div className="rounded-xl border border-border bg-slate-900/60 p-4 space-y-1">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase">Google Search Preview</p>
-                  <p className="text-sm font-semibold text-blue-400 truncate">{seoTitle || name || "Product Title"}</p>
-                  <p className="text-xs text-emerald-400 font-mono">https://stixnvibes.com/shop/{slug || "product-slug"}</p>
-                  <p className="text-xs text-slate-300 line-clamp-2">{seoDescription || description || "Product description preview snippet..."}</p>
-                </div>
-              </div>
-            )}
-
-            {/* WIZARD STEP 8: PUBLISHING & AVAILABILITY */}
-            {wizardStep === 8 && (
-              <div className="space-y-4 animate-in fade-in">
-                <h3 className="text-base font-bold text-brand-yellow flex items-center gap-2">Step 8: Publishing &amp; Availability</h3>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Publication Status</label>
-                    <select
-                      className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium"
-                      value={productStatus}
-                      onChange={(e) => setProductStatus(e.target.value as any)}
-                    >
-                      <option value="active">Active (Published on Storefront)</option>
-                      <option value="draft">Draft (Hidden in Back-Office)</option>
-                      <option value="scheduled">Scheduled</option>
-                      <option value="archived">Archived</option>
-                    </select>
-                  </div>
-                </div>
-
-                <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer pt-2">
-                  <input
-                    type="checkbox"
-                    checked={isFeatured}
-                    onChange={(e) => setIsFeatured(e.target.checked)}
-                    className="size-4 rounded accent-brand-yellow"
-                  />
-                  Mark as Featured Product on Storefront Hero
-                </label>
-
-                {/* Summary Card */}
-                <div className="rounded-xl border border-brand-yellow/30 bg-brand-yellow/5 p-4 text-xs space-y-1">
-                  <p className="font-bold text-brand-yellow">Ready to Publish!</p>
-                  <p className="text-muted-foreground">
-                    Name: <strong>{name}</strong> · Price: <strong>₹{sellingPrice}</strong> · Stock: <strong>{stock} units</strong>
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Wizard Navigation Footer Buttons */}
-            <div className="mt-8 flex items-center justify-between border-t border-border pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={wizardStep === 1}
-                onClick={() => setWizardStep((s) => Math.max(1, s - 1))}
-              >
-                <ChevronLeft className="size-4" /> Back
-              </Button>
-
-              {wizardStep < 8 ? (
-                <Button
-                  type="button"
-                  variant="gradient"
-                  onClick={() => setWizardStep((s) => Math.min(8, s + 1))}
-                >
-                  Next Step <ChevronRight className="size-4" />
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  variant="gradient"
-                  disabled={submitting}
-                  onClick={handleSaveWizardProduct}
-                >
-                  {submitting ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
-                  {editingId ? "Save Changes" : "Publish Product to Supabase"}
-                </Button>
-              )}
+                );
+              })}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
 
-      {/* ============================================================ */}
-      {/* TAB 3: INVENTORY LOGS & QUICK ADJUSTMENT */}
-      {/* ============================================================ */}
-      {activeTab === "inventory" && (
-        <div className="mt-6 space-y-6">
-          <Card>
-            <CardHeader className="flex items-center justify-between">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Box className="size-5 text-brand-orange" /> Stock Inventory Logs &amp; Audit History
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {inventoryLogs.length === 0 ? (
-                <EmptyState text="No inventory stock movements logged yet. Quick stock adjustments will create audit logs." />
-              ) : (
-                <div className="divide-y divide-border">
-                  {inventoryLogs.map((log) => (
-                    <div key={log.id} className="flex items-center justify-between p-4 text-sm">
+        {/* MODULE 6: PRINT QUEUE */}
+        {activeModule === "ops_print_queue" && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <Printer className="size-5 text-brand-purple" /> Automated Print Jobs Queue
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {["Glossy Vinyl Finish", "Matte Waterproof Vinyl", "Holographic Metallic", "Spotify Acrylic Card"].map((finish) => (
+                  <div key={finish} className="rounded-xl border border-border p-4 flex items-center justify-between bg-card/50">
+                    <div>
+                      <p className="font-bold text-sm">{finish}</p>
+                      <p className="text-xs text-muted-foreground">Automated batch grouping for high-speed print runs</p>
+                    </div>
+                    <Button variant="outline" size="sm">Download Print Files ZIP</Button>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* MODULE 7: PACKING STATION */}
+        {activeModule === "ops_packing" && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <QrCode className="size-5 text-cyan-400" /> Dispatch Packing Station &amp; Label Printer
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Scan order barcode or SKU serial..."
+                    value={scannedBarcode}
+                    onChange={(e) => setScannedBarcode(e.target.value)}
+                  />
+                  <Button variant="gradient" onClick={() => setPackingVerified(true)}>
+                    Verify Barcode
+                  </Button>
+                </div>
+
+                {packingVerified && (
+                  <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs space-y-2">
+                    <p className="font-bold text-emerald-400">✓ Barcode Verified! Ready for Dispatch Packing.</p>
+                    <p className="text-muted-foreground">Items: 1x Anime Sticker Pack (Glossy) · Shipping Label Generated</p>
+                    <Button variant="outline" size="sm">Print Shipping AWB Sticker</Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* MODULE 8: COUPONS & DISCOUNTS */}
+        {activeModule === "mkt_coupons" && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <Ticket className="size-5 text-brand-yellow" /> Coupons &amp; Promotional Codes Engine
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <form onSubmit={handleAddCoupon} className="flex gap-2">
+                  <Input
+                    placeholder="Coupon Code e.g. STIX20"
+                    value={newCouponCode}
+                    onChange={(e) => setNewCouponCode(e.target.value)}
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Discount %"
+                    className="w-32"
+                    value={newCouponVal}
+                    onChange={(e) => setNewCouponVal(e.target.value)}
+                  />
+                  <Button type="submit" variant="gradient">+ Create Promo</Button>
+                </form>
+
+                <div className="divide-y divide-border border-t border-border pt-2">
+                  {coupons.map((c) => (
+                    <div key={c.code} className="flex items-center justify-between py-3">
                       <div>
-                        <p className="font-semibold">{log.productName}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Reason: <span className="text-foreground font-medium">{log.reason}</span> · {new Date(log.timestamp).toLocaleString()}
+                        <span className="font-bold text-brand-yellow font-mono">{c.code}</span>
+                        <p className="text-xs text-muted-foreground">
+                          {c.value}% OFF on orders above ₹{c.minOrderRupees} · {c.uses} redeemed
                         </p>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <Badge variant={log.change > 0 ? "success" : "accent"}>
-                          {log.change > 0 ? `+${log.change}` : log.change}
-                        </Badge>
-                        <span className="text-xs font-mono text-muted-foreground">
-                          {log.previousStock} ➔ <strong>{log.newStock}</strong>
-                        </span>
-                      </div>
+                      <Badge variant="success" size="sm">Active</Badge>
                     </div>
                   ))}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Quick Stock Adjustment Modal */}
-      {adjustingProduct && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/80 p-4 backdrop-blur-md animate-in fade-in">
-          <Card className="w-full max-w-md border-brand-yellow/40 bg-slate-950 shadow-2xl">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between text-base">
-                <span className="flex items-center gap-2">
-                  <Box className="size-5 text-brand-yellow" /> Adjust Stock: "{adjustingProduct.name}"
-                </span>
-                <Button variant="ghost" size="sm" onClick={() => setAdjustingProduct(null)}>
-                  <X className="size-4" />
-                </Button>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleQuickStockSubmit} className="space-y-4">
-                <div className="rounded-xl border border-border bg-secondary/40 p-3 text-xs flex justify-between">
-                  <span>Current Stock: <strong>{adjustingProduct.stock} units</strong></span>
-                  <span>New Target: <strong>{Math.max(0, adjustingProduct.stock + stockChangeVal)} units</strong></span>
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Stock Change (+ Add / - Remove)</label>
-                  <Input
-                    type="number"
-                    required
-                    placeholder="+10 or -5"
-                    value={stockChangeVal}
-                    onChange={(e) => setStockChangeVal(parseInt(e.target.value, 10) || 0)}
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Adjustment Reason *</label>
-                  <select
-                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium"
-                    value={stockReason}
-                    onChange={(e) => setStockReason(e.target.value)}
-                  >
-                    <option value="Purchase / Restock">Purchase / Restock</option>
-                    <option value="Damage / Loss">Damage / Loss</option>
-                    <option value="Manual Correction">Manual Correction</option>
-                    <option value="Customer Return">Customer Return</option>
-                    <option value="Supplier Return">Supplier Return</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Notes (Optional)</label>
-                  <Input
-                    placeholder="Received shipment batch #402"
-                    value={stockNotes}
-                    onChange={(e) => setStockNotes(e.target.value)}
-                  />
-                </div>
-
-                <div className="flex justify-end gap-2 border-t border-border pt-4">
-                  <Button type="button" variant="ghost" onClick={() => setAdjustingProduct(null)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" variant="gradient" disabled={adjustingLoading}>
-                    {adjustingLoading ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
-                    Save Stock Adjustment Log
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* ============================================================ */}
-      {/* TAB 4: CATEGORIES MANAGER */}
-      {/* ============================================================ */}
-      {activeTab === "categories" && (
-        <div className="mt-6 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <FolderTree className="size-5 text-brand-yellow" /> Category Manager
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {PRODUCT_TYPES.map((cat) => (
-                <div key={cat.value} className="flex items-center justify-between rounded-xl border border-border p-4">
-                  <div>
-                    <p className="font-semibold">{cat.label}</p>
-                    <p className="text-xs text-muted-foreground">Slug: /{cat.value}</p>
-                  </div>
-                  <Badge variant="outline">
-                    {products.filter((p) => p.type === cat.value).length} Products
-                  </Badge>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* ============================================================ */}
-      {/* TAB 5: COLLECTIONS MANAGER */}
-      {/* ============================================================ */}
-      {activeTab === "collections" && (
-        <div className="mt-6 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Grid className="size-5 text-brand-purple" /> Collections Manager
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {DEFAULT_COLLECTIONS.map((col) => {
-                const count = products.filter((p) => p.collection?.toLowerCase() === col.toLowerCase()).length;
-                return (
-                  <div key={col} className="rounded-xl border border-border p-4 space-y-2 bg-card/60">
-                    <p className="font-bold text-foreground">{col}</p>
-                    <p className="text-xs text-muted-foreground">{count} Active Products</p>
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* ============================================================ */}
-      {/* TAB 6: TAG MANAGER */}
-      {/* ============================================================ */}
-      {activeTab === "tags" && (
-        <div className="mt-6 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <TagsIcon className="size-5 text-brand-yellow" /> Reusable Tag Manager
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-wrap gap-3">
-              {REUSABLE_TAGS.map((t) => (
-                <div key={t.name} className={`rounded-xl border px-4 py-2 text-xs font-semibold ${t.color}`}>
-                  {t.name} <span className="text-[10px] opacity-70">({t.category})</span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* ============================================================ */}
-      {/* TAB 7: MEDIA LIBRARY */}
-      {/* ============================================================ */}
-      {activeTab === "media" && (
-        <div className="mt-6 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <ImageIcon className="size-5 text-brand-orange" /> Media Library &amp; Asset Manager
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {products
-                .filter((p) => p.image_url)
-                .map((p) => (
-                  <div key={p.id} className="rounded-xl border border-border overflow-hidden bg-background group">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={p.image_url!} alt={p.name} className="size-32 w-full object-cover" />
-                    <div className="p-2 text-xs">
-                      <p className="font-semibold truncate">{p.name}</p>
-                    </div>
-                  </div>
-                ))}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* ============================================================ */}
-      {/* TAB 8: ANALYTICS & REVENUE KPI METRICS */}
-      {/* ============================================================ */}
-      {activeTab === "analytics" && (
-        <div className="mt-6 space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <KpiCard icon={<ShoppingCart className="size-5 text-brand-yellow" />} label="Total Orders" value={orders.length.toLocaleString()} />
-            <KpiCard icon={<Sparkles className="size-5 text-brand-orange" />} label="Total Sales" value={fmt(totalSalesRupees * 100)} />
-            <KpiCard icon={<Tag className="size-5 text-brand-purple" />} label="AVG Order" value={Number.isFinite(aov) && aov > 0 ? fmt(aov * 100) : "—"} />
+              </CardContent>
+            </Card>
           </div>
-        </div>
-      )}
-
-      <div className="mt-8 flex items-center gap-2 text-xs text-muted-foreground">
-        <Link href="/" className="hover:text-foreground">
-          ← Back to store
-        </Link>
-        <span>·</span>
-        <span>Stix N Vibes PIM Platform v3.0</span>
-      </div>
-    </Container>
+        )}
+      </main>
+    </div>
   );
 }
 
@@ -1836,13 +1246,9 @@ function KpiCard({
     <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
       <div className="flex items-center gap-2 text-muted-foreground">
         {icon}
-        <span className="text-xs font-semibold uppercase tracking-[0.18em]">
-          {label}
-        </span>
+        <span className="text-xs font-semibold uppercase tracking-[0.18em]">{label}</span>
       </div>
-      <p className="mt-2 font-display text-3xl font-semibold tracking-tight">
-        {value}
-      </p>
+      <p className="mt-2 font-display text-3xl font-semibold tracking-tight">{value}</p>
     </div>
   );
 }
