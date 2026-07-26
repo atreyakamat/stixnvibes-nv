@@ -2,183 +2,216 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Search, PackageCheck, Truck, CheckCircle2, MapPin, Clock, ArrowRight, ShieldCheck, Loader2 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { Container } from "@/components/layout/container";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Reveal } from "@/components/motion/reveal";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Search, Package, Clock, CheckCircle2, Truck, ExternalLink, ArrowLeft } from "lucide-react";
 
-const SAMPLE_TRACKING_RESULT = {
-  orderId: "ORD-SNV-98421",
-  customerName: "Alex Rivera",
-  placedDate: "July 24, 2026",
-  estimatedDelivery: "July 26, 2026 (Tomorrow by 7 PM)",
-  courier: "Delhivery Surface Express",
-  awb: "DLV9842104IN",
-  currentStatus: "In Transit",
-  destination: "Bengaluru, Karnataka (560038)",
-  steps: [
-    { title: "Order Confirmed & Placed", date: "Jul 24, 10:30 AM", status: "completed", desc: "Payment verified via Razorpay UPI" },
-    { title: "300 DPI Print Inspection Pass", date: "Jul 24, 02:15 PM", status: "completed", desc: "Vinyl die-cut precision verified by print engineer" },
-    { title: "Packed in Eco-Solvent Kraft Mailer", date: "Jul 24, 05:40 PM", status: "completed", desc: "Hand-checked and sealed with water-resistant coating" },
-    { title: "Handed over to Courier Hub", date: "Jul 25, 08:30 AM", status: "in-progress", desc: "In transit from Bengaluru Sorting Facility" },
-    { title: "Out for Local Delivery", date: "Pending", status: "upcoming", desc: "Assigned to local delivery partner" },
-  ],
+type TrackedOrder = {
+  id: string;
+  created_at: string;
+  customer_name: string;
+  status: string;
+  total_cents: number;
+  awb_number?: string | null;
+  courier?: string | null;
+  items?: Array<{ name: string; quantity: number }>;
 };
 
+const STAGE_PROGRESS = [
+  { key: "pending", label: "Order Placed" },
+  { key: "paid", label: "Payment Confirmed" },
+  { key: "print_queue", label: "Print Queue" },
+  { key: "printing", label: "Printing & Laminating" },
+  { key: "quality_check", label: "QC Inspection" },
+  { key: "packing", label: "Packing Station" },
+  { key: "shipped", label: "Shipped & Dispatched" },
+  { key: "delivered", label: "Out for Delivery" },
+];
+
 export default function TrackOrderPage() {
-  const [searchQuery, setSearchQuery] = React.useState("ORD-SNV-98421");
+  return (
+    <React.Suspense fallback={null}>
+      <TrackOrderClient />
+    </React.Suspense>
+  );
+}
+
+function TrackOrderClient() {
+  const sp = useSearchParams();
+  const initialQuery = sp.get("id") || sp.get("awb") || "";
+  const [searchId, setSearchId] = React.useState(initialQuery);
   const [loading, setLoading] = React.useState(false);
-  const [result, setResult] = React.useState(SAMPLE_TRACKING_RESULT);
+  const [trackedOrder, setTrackedOrder] = React.useState<TrackedOrder | null>(null);
+  const [notFound, setNotFound] = React.useState(false);
 
-  const [notFoundError, setNotFoundError] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (initialQuery) {
+      void handleSearch(initialQuery);
+    }
+  }, [initialQuery]);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
+  async function handleSearch(query: string) {
+    if (!query.trim()) return;
     setLoading(true);
-    setNotFoundError(null);
+    setNotFound(false);
+    setTrackedOrder(null);
+
     try {
-      const res = await fetch(`/api/orders/track?query=${encodeURIComponent(searchQuery.trim())}`);
+      const res = await fetch(`/api/admin/orders`);
       const json = await res.json();
-      if (json.ok && json.data) {
-        setResult({
-          ...SAMPLE_TRACKING_RESULT,
-          ...json.data,
-        });
+      if (res.ok && json.ok && Array.isArray(json.data)) {
+        const found = json.data.find(
+          (o: TrackedOrder) =>
+            o.id.toLowerCase() === query.trim().toLowerCase() ||
+            o.id.toLowerCase().includes(query.trim().toLowerCase()) ||
+            (o.awb_number && o.awb_number.toLowerCase() === query.trim().toLowerCase())
+        );
+        if (found) {
+          setTrackedOrder(found);
+        } else {
+          setNotFound(true);
+        }
       } else {
-        setNotFoundError(json.error || `No order found matching "${searchQuery}". Please check your details.`);
+        setNotFound(true);
       }
     } catch {
-      setNotFoundError("Failed to fetch order status. Please check your internet connection.");
+      setNotFound(true);
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  function getStageIndex(status: string) {
+    const idx = STAGE_PROGRESS.findIndex((s) => s.key === status);
+    return idx >= 0 ? idx : 1;
+  }
 
   return (
     <div className="bg-slate-950 text-white min-h-screen pt-28 pb-16">
-      <Container>
-        <Reveal>
-          <div className="text-center max-w-3xl mx-auto mb-12 space-y-4">
-            <Badge variant="brand" className="px-4 py-1 text-sm font-semibold uppercase tracking-widest">
-              Live Logistics Engine
-            </Badge>
-            <h1 className="font-display text-4xl sm:text-5xl font-bold tracking-tight text-white">
-              Track Your <span className="bg-gradient-to-r from-brand-yellow via-brand-red to-brand-purple bg-clip-text text-transparent">Order</span>
-            </h1>
-            <p className="text-slate-400 text-lg">
-              Enter your Order Number or Mobile Number to check real-time print status and shipment journey.
-            </p>
-          </div>
-        </Reveal>
-
-        {/* Search Card */}
-        <div className="max-w-2xl mx-auto mb-12">
-          <Card className="bg-slate-900/60 border-slate-800 rounded-3xl p-6 backdrop-blur-xl shadow-2xl">
-            <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="e.g. ORD-SNV-98421 or +91 9876543210"
-                  required
-                  className="w-full pl-12 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-2xl text-white placeholder-slate-500 outline-none focus:border-brand-yellow text-sm"
-                />
-              </div>
-              <Button type="submit" variant="gradient" size="lg" disabled={loading} className="rounded-2xl px-6">
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Track Order <ArrowRight className="w-4 h-4 ml-2" /></>}
-              </Button>
-            </form>
-          </Card>
+      <Container className="max-w-3xl">
+        <div className="mb-6 flex items-center justify-between">
+          <Link href="/" className="inline-flex items-center text-xs font-semibold text-slate-400 hover:text-brand-yellow">
+            <ArrowLeft className="size-4 mr-1" /> Back to Storefront
+          </Link>
+          <Badge variant="outline" className="text-xs border-brand-yellow/30 text-brand-yellow">
+            Live Production Tracker
+          </Badge>
         </div>
 
-        {/* Search Error State */}
-        {notFoundError ? (
-          <div className="max-w-2xl mx-auto mb-12">
-            <Card className="bg-red-500/10 border-red-500/30 rounded-3xl p-6 backdrop-blur-xl text-center space-y-3">
-              <div className="w-12 h-12 bg-red-500/20 text-brand-red rounded-2xl flex items-center justify-center mx-auto">
-                <Search className="w-6 h-6" />
-              </div>
-              <h3 className="font-display font-bold text-white text-lg">Order Not Found</h3>
-              <p className="text-slate-300 text-sm">{notFoundError}</p>
-              <p className="text-xs text-slate-400">Need help? Contact our support team via WhatsApp with your payment receipt.</p>
-            </Card>
-          </div>
-        ) : (
-          /* Active Tracking Result */
-          <div className="max-w-3xl mx-auto space-y-8">
-            <Card className="bg-slate-900/60 border-slate-800 rounded-3xl overflow-hidden backdrop-blur-xl">
-            <CardHeader className="bg-slate-950/80 border-b border-slate-800 p-6 sm:p-8">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <CardTitle className="font-display text-2xl font-bold">{result.orderId}</CardTitle>
-                    <Badge className="bg-brand-yellow/10 text-brand-yellow border-brand-yellow/20 border">
-                      {result.currentStatus}
-                    </Badge>
-                  </div>
-                  <CardDescription className="text-slate-400 text-sm mt-1">
-                    Courier: {result.courier} · AWB: <span className="font-mono text-white">{result.awb}</span>
-                  </CardDescription>
-                </div>
+        <div className="text-center max-w-xl mx-auto mb-10 space-y-3">
+          <h1 className="font-display text-3xl sm:text-4xl font-bold">Track Your Order Status</h1>
+          <p className="text-slate-400 text-sm">
+            Enter your Order ID or AWB Tracking Number to check real-time print, packing, and dispatch progress.
+          </p>
 
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl px-4 py-2.5 text-right">
-                  <p className="text-xs text-slate-400 uppercase tracking-wider">Estimated Delivery</p>
-                  <p className="font-display font-bold text-sm text-emerald-400 mt-0.5">{result.estimatedDelivery}</p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleSearch(searchId);
+            }}
+            className="flex gap-2 pt-2"
+          >
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-3 size-4 text-slate-500" />
+              <input
+                type="text"
+                placeholder="e.g. ORD-98421 or AWB number..."
+                className="w-full h-11 rounded-xl border border-slate-800 bg-slate-900 pl-10 pr-4 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-brand-yellow"
+                value={searchId}
+                onChange={(e) => setSearchId(e.target.value)}
+              />
+            </div>
+            <Button type="submit" variant="gradient" disabled={loading}>
+              {loading ? "Searching..." : "Track"}
+            </Button>
+          </form>
+        </div>
+
+        {notFound && (
+          <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-6 text-center space-y-2">
+            <p className="font-bold text-red-400">Order Not Found</p>
+            <p className="text-xs text-slate-400">
+              No order matches "{searchId}". Please check your order confirmation email or WhatsApp message.
+            </p>
+          </div>
+        )}
+
+        {trackedOrder && (
+          <Card className="bg-slate-900/80 border-slate-800 rounded-3xl p-6 space-y-6">
+            <CardHeader className="p-0 border-b border-slate-800 pb-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="text-xl font-bold font-display text-white">
+                    Order #{trackedOrder.id.slice(0, 8).toUpperCase()}
+                  </CardTitle>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Customer: {trackedOrder.customer_name} · Date: {new Date(trackedOrder.created_at).toLocaleDateString()}
+                  </p>
                 </div>
+                <Badge variant="success" className="capitalize text-sm px-3 py-1">
+                  Stage: {trackedOrder.status.replace("_", " ")}
+                </Badge>
               </div>
             </CardHeader>
 
-            <CardContent className="p-6 sm:p-8">
-              <h3 className="font-display font-bold text-lg text-white mb-6">Shipment Timeline</h3>
+            <CardContent className="p-0 space-y-6">
+              {/* Production Progress Bar Timeline */}
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Production Progress Timeline</p>
+                <div className="space-y-3">
+                  {STAGE_PROGRESS.map((stage, idx) => {
+                    const currentIdx = getStageIndex(trackedOrder.status);
+                    const isCompleted = idx <= currentIdx;
+                    const isCurrent = idx === currentIdx;
 
-              <div className="space-y-6 relative before:absolute before:left-3.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-slate-800">
-                {result.steps.map((step, idx) => (
-                  <div key={idx} className="relative flex items-start gap-4 pl-8">
-                    <div
-                      className={`absolute left-0 top-0.5 w-7 h-7 rounded-full flex items-center justify-center border text-xs font-bold ${
-                        step.status === "completed"
-                          ? "bg-emerald-500 border-emerald-400 text-slate-950"
-                          : step.status === "in-progress"
-                          ? "bg-brand-yellow border-brand-yellow text-slate-950 animate-pulse"
-                          : "bg-slate-900 border-slate-800 text-slate-500"
-                      }`}
-                    >
-                      {step.status === "completed" ? "✓" : idx + 1}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <h4 className={`font-semibold text-sm ${step.status === "upcoming" ? "text-slate-400" : "text-white"}`}>
-                          {step.title}
-                        </h4>
-                        <span className="text-xs text-slate-400 font-mono">{step.date}</span>
+                    return (
+                      <div key={stage.key} className="flex items-center gap-4 text-xs">
+                        <div
+                          className={`grid size-7 shrink-0 place-items-center rounded-full font-bold transition-all ${
+                            isCurrent
+                              ? "bg-brand-yellow text-slate-950 shadow-glow ring-2 ring-brand-yellow/50"
+                              : isCompleted
+                              ? "bg-emerald-500 text-slate-950"
+                              : "bg-slate-800 text-slate-500 border border-slate-700"
+                          }`}
+                        >
+                          {isCompleted ? "✓" : idx + 1}
+                        </div>
+                        <div className="flex-1 flex items-center justify-between">
+                          <span className={`font-semibold ${isCurrent ? "text-brand-yellow font-bold text-sm" : isCompleted ? "text-white" : "text-slate-500"}`}>
+                            {stage.label}
+                          </span>
+                          {isCurrent && (
+                            <span className="text-[10px] bg-brand-yellow/10 border border-brand-yellow/30 text-brand-yellow px-2 py-0.5 rounded-full font-mono">
+                              Active Stage
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-xs text-slate-400 mt-0.5">{step.desc}</p>
-                    </div>
-                  </div>
-                ))}
+                    );
+                  })}
+                </div>
               </div>
+
+              {/* Courier Tracking Info */}
+              {trackedOrder.awb_number && (
+                <div className="rounded-2xl border border-brand-yellow/30 bg-brand-yellow/5 p-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs text-slate-400">Courier Partner AWB Number</p>
+                    <p className="font-mono font-bold text-brand-yellow text-base">{trackedOrder.awb_number}</p>
+                  </div>
+                  <Button variant="outline" size="sm" asChild className="border-brand-yellow/40 text-brand-yellow">
+                    <a href={`https://track.stixnvibes.com/?awb=${trackedOrder.awb_number}`} target="_blank" rel="noreferrer">
+                      Official Courier Tracking ↗
+                    </a>
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
-
-          {/* Need Assistance Card */}
-          <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div>
-              <h3 className="font-display font-bold text-white text-lg">Need instant order support?</h3>
-              <p className="text-slate-400 text-sm">Our Bengaluru support team is available on WhatsApp Mon–Sat 10 AM – 7 PM IST.</p>
-            </div>
-            <Button variant="outline" asChild className="border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10">
-              <a href="https://wa.me/919876543210" target="_blank" rel="noreferrer">
-                WhatsApp Support
-              </a>
-            </Button>
-          </div>
-        </div>
         )}
       </Container>
     </div>
