@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const type = url.searchParams.get("type") as Database["public"]["Enums"]["product_type"] | null;
   const featured = url.searchParams.get("featured") === "1";
-  const limit = Number(url.searchParams.get("limit") ?? 100);
+  const limit = Number(url.searchParams.get("limit") ?? 200);
 
   const admin = createService();
   if (!admin) return bad("Database not configured", 503);
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   let q = admin.from("products").select("*");
   if (type) q = q.eq("type", type);
   if (featured) q = q.eq("is_featured", true);
-  q = q.limit(Math.min(Math.max(limit, 1), 200)).order("created_at", { ascending: false });
+  q = q.limit(Math.min(Math.max(limit, 1), 500)).order("created_at", { ascending: false });
 
   const { data, error } = await q;
   if (error) return bad(error.message, 500);
@@ -43,12 +43,34 @@ export async function POST(req: NextRequest) {
 
   let body: any;
   try { body = await req.json(); } catch { return bad("Invalid JSON"); }
+
+  // Handle Bulk Operations
+  if (body?.bulkAction && Array.isArray(body?.ids)) {
+    const { bulkAction, ids, status, tags, category } = body;
+    if (bulkAction === "delete") {
+      const { error } = await admin.from("products").delete().in("id", ids);
+      if (error) return bad(error.message, 500);
+      return ok({ bulk: true, action: "delete", count: ids.length });
+    }
+    if (bulkAction === "update_status" && status) {
+      const { error } = await admin.from("products").update({ status } as never).in("id", ids);
+      if (error) return bad(error.message, 500);
+      return ok({ bulk: true, action: "update_status", count: ids.length });
+    }
+    if (bulkAction === "update_tags" && Array.isArray(tags)) {
+      const { error } = await admin.from("products").update({ tags } as never).in("id", ids);
+      if (error) return bad(error.message, 500);
+      return ok({ bulk: true, action: "update_tags", count: ids.length });
+    }
+  }
+
   if (typeof body?.name !== "string" || typeof body?.slug !== "string" || typeof body?.price_cents !== "number") {
     return bad("Missing required fields: name, slug, price_cents");
   }
   if (!z.slug(body.slug)) return bad("Invalid slug format. Use lowercase letters, numbers, and hyphens (e.g. my-cool-sticker).");
 
-  const insertPayload = {
+  const productPayload = {
+    id: body.id || undefined,
     name: body.name,
     slug: body.slug,
     description: body.description ?? null,
@@ -65,8 +87,25 @@ export async function POST(req: NextRequest) {
     is_limited: body.is_limited ?? false,
     customizable: body.customizable ?? false,
     tags: body.tags ?? [],
+    metadata: {
+      cost_cents: body.cost_cents ?? 0,
+      sku: body.sku ?? null,
+      barcode: body.barcode ?? null,
+      min_stock: body.min_stock ?? 5,
+      max_stock: body.max_stock ?? 500,
+      warehouse_location: body.warehouse_location ?? null,
+      gst_rate: body.gst_rate ?? 18,
+      allow_backorders: body.allow_backorders ?? false,
+      seo_title: body.seo_title ?? null,
+      seo_description: body.seo_description ?? null,
+      custom_fonts: body.custom_fonts ?? [],
+      max_upload_mb: body.max_upload_mb ?? 10,
+      status: body.status ?? "active",
+      ...(body.metadata ?? {}),
+    },
   };
-  const { data, error } = await admin.from("products").insert(insertPayload as never).select().single();
+
+  const { data, error } = await admin.from("products").upsert(productPayload as never).select().single();
 
   if (error) return bad(error.message, 500);
   return ok(data);
