@@ -119,6 +119,7 @@ enum OrderStatus {
   pending
   payment_pending
   paid
+  processing
   verified
   print_queue
   printing
