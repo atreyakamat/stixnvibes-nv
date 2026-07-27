@@ -10,7 +10,7 @@ export async function GET() {
 
   return NextResponse.json({
     status: "ok",
-    version: "1.0.0-RC1",
+    version: "1.0.0",
     timestamp: new Date().toISOString(),
     uptimeSeconds: Math.floor(uptime),
     dbConfigured,
