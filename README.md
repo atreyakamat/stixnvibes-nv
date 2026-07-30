@@ -50,3 +50,16 @@ docker compose run --rm tests
 - **Shop Catalog & Product Engine**: Multi-category filter pipeline, debounced instant search, price band sliders, variant matrices, technical spec sheets, and verified review submissions.
 - **Cart & Multi-Gateway Checkout**: Optimistic slide-out cart drawer, coupon engine (`VIBES20`, `VIBES10`), free shipping progress bar, Razorpay online payments (UPI/Cards/NetBanking), and single-tap WhatsApp checkout.
 - **Supabase PostgreSQL & Security**: Production database schema (`supabase/schema.sql`) with Row Level Security (RLS) policies, indexes, and automated triggers.
+
+---
+
+## Database Architecture & Relational Integrity
+
+The Stix N Vibes database architecture, entity relationship diagram, and gaps are documented in the following artifacts:
+- **Entity Relationship Diagram (ERD)**: See [database_erd.md](file:///C:/Users/atkam/.gemini/antigravity-cli/brain/64d9c92b-4c18-44c9-a25c-c49e27cf4204/database_erd.md)
+- **Detailed Database Architecture**: See [database_architecture.md](file:///C:/Users/atkam/.gemini/antigravity-cli/brain/64d9c92b-4c18-44c9-a25c-c49e27cf4204/database_architecture.md)
+- **Gap Analysis & Hardening Verdict**: See [database_gap_analysis.md](file:///C:/Users/atkam/.gemini/antigravity-cli/brain/64d9c92b-4c18-44c9-a25c-c49e27cf4204/database_gap_analysis.md)
+- **Hardening Cross-Examination Report**: See [database_hardening_cross_exam.md](file:///C:/Users/atkam/.gemini/antigravity-cli/brain/64d9c92b-4c18-44c9-a25c-c49e27cf4204/database_hardening_cross_exam.md)
+- **Entity Relationship & Integrity Matrix**: See [database_relationship_matrix.md](file:///C:/Users/atkam/.gemini/antigravity-cli/brain/64d9c92b-4c18-44c9-a25c-c49e27cf4204/database_relationship_matrix.md)
+- **Database Data Flow Diagram**: See [database_data_flow.md](file:///C:/Projects/stixnvibes-nv/.gemini/antigravity-cli/brain/64d9c92b-4c18-44c9-a25c-c49e27cf4204/database_data_flow.md) or the locally stored [database_data_flow.md](file:///C:/Users/atkam/.gemini/antigravity-cli/brain/64d9c92b-4c18-44c9-a25c-c49e27cf4204/database_data_flow.md)
+
