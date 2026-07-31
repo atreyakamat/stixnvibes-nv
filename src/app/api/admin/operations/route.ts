@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic";
+import { randomUUID } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { createService } from "@/lib/supabase/service";
 import { requireAdminAuth } from "@/lib/auth-guard";
@@ -63,8 +64,51 @@ export async function GET(req: NextRequest) {
   const authErr = await requireAdminAuth(req);
   if (authErr) return authErr;
 
+  const admin = createService();
   const url = new URL(req.url);
   const mode = url.searchParams.get("mode") || "batches";
+
+  if (admin) {
+    if (mode === "qc") {
+      const { data, error } = await admin
+        .from("quality_checks")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (!error && data) {
+        return ok({ qcInspections: (data as any[]).map((row: any) => ({
+          id: row.id,
+          orderId: row.order_id,
+          operator: row.operator,
+          result: row.result,
+          checklist: row.checklist ?? {},
+          timestamp: row.created_at,
+        })) });
+      }
+    } else {
+      const { data, error } = await admin
+        .from("print_batches")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (!error && data) {
+        return ok({ printBatches: (data as any[]).map((row: any) => ({
+          id: row.id,
+          batchNumber: row.batch_number,
+          material: row.material,
+          finish: row.finish,
+          size: row.size,
+          orderCount: row.order_count,
+          status: row.status,
+          estTimeMins: row.est_time_mins,
+          operator: row.operator,
+          created_at: row.created_at,
+        })) });
+      }
+    }
+  }
 
   if (mode === "qc") {
     return ok({ qcInspections });
@@ -96,6 +140,41 @@ export async function POST(req: NextRequest) {
       operator: "Operator-01",
       created_at: new Date().toISOString(),
     };
+
+    const admin = createService();
+    if (admin) {
+      const insertPayload = {
+        id: randomUUID(),
+        batch_number: newBatch.batchNumber,
+        material: newBatch.material,
+        finish: newBatch.finish,
+        size: newBatch.size,
+        order_count: newBatch.orderCount,
+        status: newBatch.status,
+        est_time_mins: newBatch.estTimeMins,
+        operator: newBatch.operator,
+      };
+
+      const insertResult = await admin.from("print_batches").insert(insertPayload as never);
+      const insertedRow = (insertResult as any)?.data ?? null;
+      if (!insertResult?.error && insertedRow) {
+        const persistedBatch = {
+          id: insertedRow.id ?? newBatch.id,
+          batchNumber: insertedRow.batch_number ?? newBatch.batchNumber,
+          material: insertedRow.material ?? newBatch.material,
+          finish: insertedRow.finish ?? newBatch.finish,
+          size: insertedRow.size ?? newBatch.size,
+          orderCount: insertedRow.order_count ?? newBatch.orderCount,
+          status: insertedRow.status ?? newBatch.status,
+          estTimeMins: insertedRow.est_time_mins ?? newBatch.estTimeMins,
+          operator: insertedRow.operator ?? newBatch.operator,
+          created_at: insertedRow.created_at ?? newBatch.created_at,
+        };
+        printBatches.unshift(persistedBatch);
+        return ok({ created: true, batch: persistedBatch });
+      }
+    }
+
     printBatches.unshift(newBatch);
     return ok({ created: true, batch: newBatch });
   }
@@ -119,6 +198,33 @@ export async function POST(req: NextRequest) {
       checklist: checklist || {},
       timestamp: new Date().toISOString(),
     };
+
+    const admin = createService();
+    if (admin) {
+      const insertPayload = {
+        id: randomUUID(),
+        order_id: orderId,
+        operator: qcEntry.operator,
+        result,
+        checklist: checklist || {},
+      };
+
+      const insertResult = await admin.from("quality_checks").insert(insertPayload as never);
+      const insertedRow = (insertResult as any)?.data ?? null;
+      if (!insertResult?.error && insertedRow) {
+        const persistedEntry = {
+          id: insertedRow.id ?? qcEntry.id,
+          orderId: insertedRow.order_id ?? orderId,
+          operator: insertedRow.operator ?? qcEntry.operator,
+          result: insertedRow.result ?? result,
+          checklist: insertedRow.checklist ?? (checklist || {}),
+          timestamp: insertedRow.created_at ?? qcEntry.timestamp,
+        };
+        qcInspections.unshift(persistedEntry);
+        return ok({ qc: true, entry: persistedEntry });
+      }
+    }
+
     qcInspections.unshift(qcEntry);
     return ok({ qc: true, entry: qcEntry });
   }

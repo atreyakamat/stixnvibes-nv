@@ -4,6 +4,10 @@ import { NextResponse, type NextRequest } from "next/server";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
+function isProduction() {
+  return process.env.NODE_ENV === "production";
+}
+
 function isValidHttpUrl(url: string): boolean {
   try {
     if (!url || url.includes("YOUR_") || url.includes("PLACEHOLDER")) return false;
@@ -19,7 +23,14 @@ function isValidHttpUrl(url: string): boolean {
  * Wire from src/middleware.ts by calling this function.
  */
 export async function updateSession(request: NextRequest) {
+  const isProtectedApi = request.nextUrl.pathname.startsWith("/api/admin") && request.nextUrl.pathname !== "/api/admin/login";
   if (!isValidHttpUrl(supabaseUrl) || !supabaseAnonKey || supabaseAnonKey.includes("YOUR_")) {
+    if (isProtectedApi || isProduction()) {
+      return NextResponse.json(
+        { ok: false, error: "Server misconfigured: auth backend unavailable" },
+        { status: 500 }
+      );
+    }
     return NextResponse.next({ request });
   }
 

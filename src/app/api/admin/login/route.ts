@@ -3,6 +3,10 @@ import { NextResponse, type NextRequest } from "next/server";
 const STATIC_ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "admin@stixnvibes.com";
 const STATIC_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "stixnvibes123";
 
+function isProduction() {
+  return process.env.NODE_ENV === "production";
+}
+
 /**
  * Admin Login Route with Static Password Support & Supabase Fallback.
  * Allows login with static admin credentials (email: admin@stixnvibes.com, pass: stixnvibes123 or admin)
@@ -15,6 +19,17 @@ export async function POST(req: NextRequest) {
 
   if (!email || !password) {
     return NextResponse.json({ ok: false, error: "Missing email or password" }, { status: 400 });
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const authBackendConfigured = Boolean(supabaseUrl && serviceRoleKey && !supabaseUrl.includes("YOUR_"));
+
+  if (isProduction() && !authBackendConfigured) {
+    return NextResponse.json(
+      { ok: false, error: "Server misconfigured: auth backend unavailable" },
+      { status: 503 }
+    );
   }
 
   // 1. Static Admin Credentials Check
@@ -37,9 +52,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 2. Supabase password grant check (if configured)
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  if (supabaseUrl && serviceRoleKey && !supabaseUrl.includes("YOUR_")) {
+  if (authBackendConfigured) {
     try {
       const res = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
         method: "POST",

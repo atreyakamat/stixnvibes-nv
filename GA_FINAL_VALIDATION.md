@@ -36,6 +36,12 @@
 
 ## Remaining Owner Actions
 
-- Provide real Razorpay test credentials if online payment proof is required.
-- Provide or confirm Supabase production schema migration execution if the environment differs from the local schema.
-- Complete operator UAT and real shipping/production workflow validation once business workflows are available.
+- [ ] Rotate exposed Supabase service-role credential
+- [ ] Razorpay TEST credentials
+- [ ] Email provider credentials
+- [ ] Redis/Upstash production credentials
+- [ ] Courier production/test credentials
+- [ ] Sentry/APM DSN
+- [ ] Production domain/DNS
+
+Provide the missing configuration values in the deployment environment and keep them only in environment variables; do not commit secrets to the repository.

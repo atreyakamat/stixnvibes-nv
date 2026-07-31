@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic";
+import { randomUUID } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { createService } from "@/lib/supabase/service";
 import { requireAdminAuth } from "@/lib/auth-guard";
@@ -26,6 +27,29 @@ const inventoryLogs: Array<{
 export async function GET(req: NextRequest) {
   const authErr = await requireAdminAuth(req);
   if (authErr) return authErr;
+
+  const admin = createService();
+  if (admin) {
+    const { data, error } = await admin
+      .from("inventory_logs")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (!error && data) {
+      return ok({ logs: (data as any[]).map((row: any) => ({
+        id: row.id,
+        productId: row.product_id,
+        productName: row.product_name ?? "Product",
+        change: row.change,
+        reason: row.reason,
+        previousStock: row.previous_stock,
+        newStock: row.new_stock,
+        notes: row.notes,
+        timestamp: row.created_at,
+      })) });
+    }
+  }
 
   return ok({ logs: inventoryLogs });
 }
@@ -77,7 +101,39 @@ export async function POST(req: NextRequest) {
     notes: notes || null,
     timestamp: new Date().toISOString(),
   };
-  inventoryLogs.unshift(logEntry);
 
+  if (admin) {
+    const insertPayload = {
+      id: randomUUID(),
+      product_id: productId,
+      product_name: (prod as any).name ?? "Product",
+      change,
+      reason,
+      previous_stock: previousStock,
+      new_stock: newStock,
+      notes: notes || null,
+      operator: "admin",
+    };
+
+    const insertResult = await admin.from("inventory_logs").insert(insertPayload as never);
+    const insertedRow = (insertResult as any)?.data ?? null;
+    if (!insertResult?.error && insertedRow) {
+      const persistedLog = {
+        id: insertedRow.id ?? logEntry.id,
+        productId: insertedRow.product_id ?? productId,
+        productName: insertedRow.product_name ?? (prod as any).name ?? "Product",
+        change: insertedRow.change ?? change,
+        reason: insertedRow.reason ?? reason,
+        previousStock: insertedRow.previous_stock ?? previousStock,
+        newStock: insertedRow.new_stock ?? newStock,
+        notes: insertedRow.notes ?? null,
+        timestamp: insertedRow.created_at ?? new Date().toISOString(),
+      };
+      inventoryLogs.unshift(persistedLog);
+      return ok({ updated: true, newStock, log: persistedLog });
+    }
+  }
+
+  inventoryLogs.unshift(logEntry);
   return ok({ updated: true, newStock, log: logEntry });
 }
