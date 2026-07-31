@@ -1,7 +1,10 @@
 import { createBrowserClient } from "@supabase/ssr";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+function getEnv() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+  return { supabaseUrl, supabaseAnonKey };
+}
 
 function isValidHttpUrl(url: string): boolean {
   try {
@@ -13,19 +16,17 @@ function isValidHttpUrl(url: string): boolean {
   }
 }
 
-const configured = isValidHttpUrl(supabaseUrl) && Boolean(supabaseAnonKey);
-
-/** True when client env vars are available (returns a boolean — NOT a function). */
+/** True when client env vars are available. */
 export function isSupabaseConfigured(): boolean {
-  return configured;
+  const { supabaseUrl, supabaseAnonKey } = getEnv();
+  return isValidHttpUrl(supabaseUrl) && Boolean(supabaseAnonKey);
 }
 
 /**
  * Browser Supabase client. Safe to import in client components.
- * Returns null when env vars missing so feature code can gracefully degrade
- * (e.g. consult mock data instead of throwing).
  */
 export function createBrowser() {
-  if (!configured) return null;
+  const { supabaseUrl, supabaseAnonKey } = getEnv();
+  if (!isValidHttpUrl(supabaseUrl) || !supabaseAnonKey) return null;
   return createBrowserClient(supabaseUrl, supabaseAnonKey);
 }

@@ -12,7 +12,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: "http://localhost:3009",
     trace: "on-first-retry",
     headless: true,
   },
@@ -20,8 +20,8 @@ export default defineConfig({
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
   ],
   webServer: {
-    command: "node .next/standalone/server.js",
-    url: "http://localhost:3000",
+    command: 'cmd /c "set PORT=3009 && node .next/standalone/server.js"',
+    url: "http://localhost:3009",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

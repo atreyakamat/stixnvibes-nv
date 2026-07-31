@@ -559,7 +559,7 @@ begin
     p_order->>'address',
     p_order->>'pincode',
     (p_order->>'total_cents')::int,
-    coalesce(p_order->>'status', 'created'),
+    coalesce(p_order->>'status', 'created')::public.order_status,
     p_order->>'notes',
     p_order->>'whatsapp_url'
   );
