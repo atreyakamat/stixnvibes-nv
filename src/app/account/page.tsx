@@ -23,57 +23,12 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatPrice } from "@/lib/utils";
 
-const MOCK_ORDERS = [
-  {
-    id: "ORD-SNV-98421",
-    date: "2026-07-20",
-    status: "Delivered",
-    statusColor: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-    items: [
-      { name: "Holographic Cyberpunk Vinyl Sticker (3x3 in)", qty: 3, priceCents: 14900, image: "https://images.unsplash.com/photo-1572375992501-4b0892d50c69?w=300" },
-      { name: "Custom Spotify Acrylic Plaque (Neon Pink)", qty: 1, priceCents: 99900, image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300" },
-    ],
-    totalCents: 144600,
-    trackingNumber: "DLV-9842104-IN",
-  },
-  {
-    id: "ORD-SNV-87102",
-    date: "2026-07-24",
-    status: "In Transit",
-    statusColor: "bg-brand-yellow/10 text-brand-yellow border-brand-yellow/20",
-    items: [
-      { name: "Anime Vaporwave Die-Cut Sticker Pack (10 Pcs)", qty: 1, priceCents: 39900, image: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=300" },
-    ],
-    totalCents: 39900,
-    trackingNumber: "DLV-8710200-IN",
-  },
-];
-
-const MOCK_SAVED_DESIGNS = [
-  {
-    id: "DSGN-001",
-    name: "Cyber Neon Helmet Vinyl",
-    type: "Vinyl Sticker",
-    date: "2026-07-22",
-    thumbnail: "https://images.unsplash.com/photo-1572375992501-4b0892d50c69?w=300",
-    specs: "3x3 in · Holographic · Die-cut",
-  },
-  {
-    id: "DSGN-002",
-    name: "Starboy - The Weeknd Plaque",
-    type: "Spotify Plaque",
-    date: "2026-07-18",
-    thumbnail: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300",
-    specs: "Clear Acrylic · Neon Pink Glow · Scannable",
-  },
-];
-
 import { createBrowser } from "@/lib/supabase/client";
 
 export default function AccountPage() {
   const [activeTab, setActiveTab] = React.useState<"orders" | "designs" | "addresses" | "settings">("orders");
   const [userProfile, setUserProfile] = React.useState<{ name: string; email: string; phone?: string } | null>(null);
-  const [orders, setOrders] = React.useState(MOCK_ORDERS);
+  const [orders, setOrders] = React.useState<any[]>([]);
   const [loadingUser, setLoadingUser] = React.useState(true);
 
   React.useEffect(() => {
@@ -133,8 +88,8 @@ export default function AccountPage() {
     }
   };
 
-  const displayName = userProfile?.name || "Alex Rivera";
-  const displayEmail = userProfile?.email || "alex.rivera@example.com";
+  const displayName = userProfile?.name || "Customer";
+  const displayEmail = userProfile?.email || "Sign in to view your account";
   const initialLetter = displayName.charAt(0).toUpperCase();
 
   return (
@@ -152,7 +107,7 @@ export default function AccountPage() {
               <div>
                 <div className="flex items-center gap-3">
                   <h1 className="font-display text-2xl sm:text-3xl font-bold text-white">{displayName}</h1>
-                  <Badge variant="brand" className="text-xs uppercase tracking-wider">VIP Member</Badge>
+                  <Badge variant="outline" className="text-xs uppercase tracking-wider">Account</Badge>
                 </div>
                 <p className="text-slate-400 text-sm mt-0.5">{displayEmail} {userProfile?.phone && `· ${userProfile.phone}`}</p>
               </div>
@@ -165,8 +120,8 @@ export default function AccountPage() {
                 <p className="font-display font-bold text-xl text-white mt-0.5">{orders.length}</p>
               </div>
               <div className="bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-center min-w-[100px]">
-                <p className="text-xs text-slate-400 uppercase tracking-wider">Vibes Points</p>
-                <p className="font-display font-bold text-xl text-brand-yellow mt-0.5">350 pts</p>
+                <p className="text-xs text-slate-400 uppercase tracking-wider">Status</p>
+                <p className="font-display font-bold text-xl text-brand-yellow mt-0.5">Live</p>
               </div>
               {userProfile && (
                 <Button variant="outline" size="sm" onClick={handleSignOut} className="border-slate-800 text-slate-400 hover:text-white">
@@ -216,8 +171,12 @@ export default function AccountPage() {
         {/* Orders Tab */}
         {activeTab === "orders" && (
           <div className="space-y-6">
-            <h2 className="font-display text-xl font-bold text-white mb-4">Order History ({MOCK_ORDERS.length})</h2>
-            {MOCK_ORDERS.map((order) => (
+            <h2 className="font-display text-xl font-bold text-white mb-4">Order History ({orders.length})</h2>
+            {orders.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center text-sm text-slate-400">
+                No orders yet. Your completed purchases will appear here after checkout.
+              </div>
+            ) : orders.map((order) => (
               <Card key={order.id} className="bg-slate-900/60 border-slate-800 rounded-3xl overflow-hidden">
                 <CardHeader className="bg-slate-950/60 border-b border-slate-800/80 pb-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -235,7 +194,7 @@ export default function AccountPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="pt-6 space-y-4">
-                  {order.items.map((item, idx) => (
+                  {order.items.map((item: { name: string; image?: string; qty: number; priceCents: number }, idx: number) => (
                     <div key={idx} className="flex items-center gap-4 py-2">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={item.image} alt={item.name} className="w-14 h-14 rounded-xl object-cover border border-slate-800 bg-slate-950" />
@@ -258,23 +217,8 @@ export default function AccountPage() {
         {activeTab === "designs" && (
           <div className="space-y-6">
             <h2 className="font-display text-xl font-bold text-white mb-4">Your Studio Drafts</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {MOCK_SAVED_DESIGNS.map((design) => (
-                <div key={design.id} className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 flex gap-5 items-center">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={design.thumbnail} alt={design.name} className="w-20 h-20 rounded-2xl object-cover border border-slate-800 bg-slate-950" />
-                  <div className="flex-1 min-w-0">
-                    <Badge variant="outline" className="text-xs border-brand-yellow/30 text-brand-yellow mb-1">{design.type}</Badge>
-                    <h3 className="font-display font-bold text-white text-base truncate">{design.name}</h3>
-                    <p className="text-xs text-slate-400 mt-1">{design.specs}</p>
-                    <div className="flex gap-2 mt-4">
-                      <Button variant="gradient" size="sm" asChild>
-                        <Link href="/customize/sticker-builder">Open in Studio</Link>
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div className="rounded-3xl border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center text-sm text-slate-400">
+              Saved customizer drafts will appear here after you start a design.
             </div>
           </div>
         )}
@@ -283,20 +227,8 @@ export default function AccountPage() {
         {activeTab === "addresses" && (
           <div className="space-y-6">
             <h2 className="font-display text-xl font-bold text-white mb-4">Saved Shipping Addresses</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-slate-900/60 border border-brand-yellow/40 rounded-3xl p-6 space-y-3 relative">
-                <Badge className="bg-brand-yellow text-slate-950 font-bold text-xs uppercase">Default Shipping</Badge>
-                <h3 className="font-bold text-white text-lg">Home Address</h3>
-                <p className="text-slate-400 text-sm leading-relaxed">
-                  Alex Rivera<br />
-                  #42, 10th Main, Indiranagar<br />
-                  Bengaluru, Karnataka — 560038<br />
-                  Phone: +91 98765 43210
-                </p>
-                <div className="pt-2">
-                  <Button variant="outline" size="sm" className="border-slate-700">Edit Address</Button>
-                </div>
-              </div>
+            <div className="rounded-3xl border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center text-sm text-slate-400">
+              Add your first shipping address during checkout and it will appear here for faster orders.
             </div>
           </div>
         )}

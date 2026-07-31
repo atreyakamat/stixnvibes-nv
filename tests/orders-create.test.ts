@@ -110,4 +110,63 @@ describe("POST /api/orders/create", () => {
     expect(decoded).toContain("₹598");
     expect(r.json?.persisted).toBe(false);
   });
+
+  it("includes explicit ids for persisted orders and order-items", async () => {
+    const insertedOrders: any[] = [];
+    const insertedItems: any[] = [];
+    const fakeClient = {
+      from(table: string) {
+        if (table === "orders") {
+          return {
+            insert(payload: any) {
+              insertedOrders.push(payload);
+              return {
+                select: () => ({
+                  single: async () => ({ data: { id: payload.id }, error: null }),
+                }),
+              };
+            },
+          };
+        }
+        if (table === "order_items") {
+          return {
+            insert(payload: any) {
+              insertedItems.push(payload);
+              return Promise.resolve({ data: null, error: null });
+            },
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    vi.resetModules();
+    vi.doMock("@/lib/supabase/service", () => ({
+      createService: () => fakeClient,
+      isServiceConfigured: () => true,
+    }));
+    vi.doMock("@/lib/supabase/client", () => ({
+      createBrowser: () => fakeClient,
+      isSupabaseConfigured: () => true,
+    }));
+
+    const mod = await import("@/app/api/orders/create/route");
+    const req = makeRequest({
+      customer_name: "Aarav",
+      customer_phone: "+919999999999",
+      address: "Somewhere",
+      pincode: "560001",
+      items: [{ name: "Sticker", price_cents: 1000, quantity: 1 }],
+    });
+
+    const res = (await (mod as any).POST(req)) as any;
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.ok).toBe(true);
+    expect(json.persisted).toBe(true);
+    expect(insertedOrders).toHaveLength(1);
+    expect(insertedOrders[0]).toMatchObject({ id: expect.any(String) });
+    expect(insertedItems).toHaveLength(1);
+    expect(insertedItems[0]).toEqual(expect.arrayContaining([expect.objectContaining({ id: expect.any(String) })]));
+  });
 });

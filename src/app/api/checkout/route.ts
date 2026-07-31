@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { createService } from "@/lib/supabase/service";
 import { createRazorpayOrder, isRazorpayConfigured, RAZORPAY_KEY_ID } from "@/lib/payment/razorpay";
@@ -145,6 +146,7 @@ export async function POST(req: NextRequest) {
     // 3. Database Order Creation & Stock Decrement
     if (svc) {
       const orderInsert: Insert<"orders"> = {
+        id: randomUUID(),
         customer_name: cleanName,
         customer_phone: cleanPhone,
         customer_email: cleanEmail,
@@ -166,6 +168,7 @@ export async function POST(req: NextRequest) {
 
         // Insert order items
         const itemInserts: Insert<"order_items">[] = verifiedItems.map((it) => ({
+          id: randomUUID(),
           order_id: dbOrderId,
           product_id: it.productId ?? null,
           variant_id: it.variantId ?? null,

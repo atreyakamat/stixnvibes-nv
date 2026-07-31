@@ -42,38 +42,13 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Known sample tracking IDs for demo / test mode
-  const cleanQ = query.toUpperCase();
-  if (cleanQ.includes("98421") || cleanQ.includes("9876543210") || cleanQ.includes("SAMPLE")) {
-    return NextResponse.json({
-      ok: true,
-      found: true,
-      data: {
-        orderId: "ORD-SNV-98421",
-        customerName: "Alex Rivera",
-        placedDate: "July 24, 2026",
-        estimatedDelivery: "July 26, 2026 (Tomorrow by 7 PM)",
-        courier: "Delhivery Surface Express",
-        awb: "DLV9842104IN",
-        currentStatus: "In Transit",
-        destination: "Bengaluru, Karnataka (560038)",
-        steps: [
-          { title: "Order Confirmed & Placed", date: "Jul 24, 10:30 AM", status: "completed", desc: "Payment verified via Razorpay UPI" },
-          { title: "300 DPI Print Inspection Pass", date: "Jul 24, 02:15 PM", status: "completed", desc: "Vinyl die-cut precision verified by print engineer" },
-          { title: "Packed in Eco-Solvent Kraft Mailer", date: "Jul 24, 05:40 PM", status: "completed", desc: "Hand-checked and sealed with water-resistant coating" },
-          { title: "Handed over to Courier Hub", date: "Jul 25, 08:30 AM", status: "in-progress", desc: "In transit from Bengaluru Sorting Facility" },
-          { title: "Out for Local Delivery", date: "Pending", status: "upcoming", desc: "Assigned to local delivery partner" },
-        ],
-      },
-    });
-  }
-
-  // Not Found Response for unknown query
+  // Do not fabricate tracking state. If we cannot resolve the order from
+  // persistent storage, return an honest not-found response.
   return NextResponse.json(
     {
       ok: false,
       found: false,
-      error: `No order found matching "${query}". Please check your Order ID or registered mobile number.`,
+      error: `No order found matching "${query}". Please check your Order ID or registered mobile number. Tracking becomes available after the order is saved in the live system.`,
     },
     { status: 404 }
   );

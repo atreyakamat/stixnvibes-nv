@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "@/lib/zod-lite";
 import { createService } from "@/lib/supabase/service";
@@ -119,6 +120,7 @@ export async function POST(req: NextRequest) {
       const { data, error: dbError } = await client
         .from("orders")
         .insert({
+          id: randomUUID(),
           customer_name: cleanName,
           customer_phone: cleanPhone,
           customer_email: cleanEmail,
@@ -138,6 +140,7 @@ export async function POST(req: NextRequest) {
         if (data?.id) {
           await client.from("order_items").insert(
             verifiedItems.map((i) => ({
+              id: randomUUID(),
               order_id: data!.id,
               product_id: i.product_id ?? null,
               variant_id: i.variant_id ?? null,

@@ -34,8 +34,9 @@ export function ProductDetail({ product, related }: { product: Product; related:
   const discount = product.compareAt
     ? Math.round(((product.compareAt - product.price) / product.compareAt) * 100)
     : 0;
-  const inStock = true; // mock
-  const stockLimited = (product.stock ?? 0) > 0 && (product.stock ?? 0) <= 5;
+  const availableStock = product.stock ?? 6;
+  const inStock = availableStock > 0;
+  const stockLimited = availableStock > 0 && availableStock <= 5;
   const isBundle = Boolean(product.isBundle);
 
   function handleAddToCart() {
@@ -363,8 +364,8 @@ export function ProductDetail({ product, related }: { product: Product; related:
               <span className="text-xs text-slate-400">({product.reviewCount} verified reviews)</span>
             </div>
           </div>
-          <Button variant="outline" onClick={() => alert("Review submission form submitted successfully!")}>
-            Write a Review
+          <Button variant="outline" asChild>
+            <Link href="/contact">Contact the team</Link>
           </Button>
         </div>
 
