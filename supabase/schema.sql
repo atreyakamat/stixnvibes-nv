@@ -386,4 +386,249 @@ drop policy if exists "Auth users can upload to stixnvibes bucket" on storage.ob
 create policy "Auth users can upload to stixnvibes bucket" on storage.objects
   for insert with check (bucket_id = 'stixnvibes' and auth.role() = 'authenticated');
 
+-- ============================================================
+-- 10. inventory_logs
+-- ============================================================
+create table if not exists public.inventory_logs (
+  id             uuid primary key default gen_random_uuid(),
+  product_id     uuid references public.products(id) on delete cascade,
+  change         int not null,
+  reason         text not null,
+  previous_stock int not null,
+  new_stock      int not null,
+  notes          text,
+  operator       text not null default 'admin',
+  created_at     timestamptz not null default now()
+);
+create index if not exists inventory_logs_product_id_idx on public.inventory_logs(product_id);
+create index if not exists inventory_logs_created_at_idx on public.inventory_logs(created_at desc);
+
+-- ============================================================
+-- 11. print_batches
+-- ============================================================
+create table if not exists public.print_batches (
+  id            uuid primary key default gen_random_uuid(),
+  batch_number  text not null unique,
+  material      text not null,
+  finish        text not null,
+  size          text not null,
+  printer_id    text not null default 'Printer-01',
+  order_count   int not null default 0,
+  status        text not null default 'queued',
+  est_time_mins int not null default 30,
+  operator      text not null default 'operator_1',
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+create index if not exists print_batches_status_idx on public.print_batches(status);
+create index if not exists print_batches_material_idx on public.print_batches(material);
+drop trigger if exists print_batches_updated_at on public.print_batches;
+create trigger print_batches_updated_at before update on public.print_batches
+  for each row execute function public.set_updated_at();
+
+-- ============================================================
+-- 12. production_jobs
+-- ============================================================
+create table if not exists public.production_jobs (
+  id             uuid primary key default gen_random_uuid(),
+  order_item_id  uuid not null references public.order_items(id) on delete cascade,
+  print_batch_id uuid references public.print_batches(id) on delete set null,
+  status         text not null default 'queued',
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now()
+);
+create index if not exists production_jobs_order_item_id_idx on public.production_jobs(order_item_id);
+create index if not exists production_jobs_print_batch_id_idx on public.production_jobs(print_batch_id);
+create index if not exists production_jobs_status_idx on public.production_jobs(status);
+drop trigger if exists production_jobs_updated_at on public.production_jobs;
+create trigger production_jobs_updated_at before update on public.production_jobs
+  for each row execute function public.set_updated_at();
+
+-- ============================================================
+-- 13. quality_checks
+-- ============================================================
+create table if not exists public.quality_checks (
+  id                uuid primary key default gen_random_uuid(),
+  production_job_id uuid not null references public.production_jobs(id) on delete cascade,
+  operator          text not null,
+  result            text not null,
+  failure_reason    text,
+  checklist         jsonb not null default '{}'::jsonb,
+  created_at        timestamptz not null default now()
+);
+create index if not exists quality_checks_production_job_id_idx on public.quality_checks(production_job_id);
+create index if not exists quality_checks_result_idx on public.quality_checks(result);
+
+-- ============================================================
+-- 14. customization_snapshots
+-- ============================================================
+create table if not exists public.customization_snapshots (
+  id            uuid primary key default gen_random_uuid(),
+  order_item_id uuid not null references public.order_items(id) on delete cascade,
+  data          jsonb not null,
+  image_url     text,
+  created_at    timestamptz not null default now()
+);
+create index if not exists customization_snapshots_order_item_id_idx on public.customization_snapshots(order_item_id);
+
+-- ============================================================
+-- 15. shipments
+-- ============================================================
+create table if not exists public.shipments (
+  id         uuid primary key default gen_random_uuid(),
+  order_id   uuid not null unique references public.orders(id) on delete cascade,
+  courier    text not null,
+  awb        text not null unique,
+  status     text not null default 'manifested',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+drop trigger if exists shipments_updated_at on public.shipments;
+create trigger shipments_updated_at before update on public.shipments
+  for each row execute function public.set_updated_at();
+
+-- ============================================================
+-- 16. shipment_events
+-- ============================================================
+create table if not exists public.shipment_events (
+  id          uuid primary key default gen_random_uuid(),
+  shipment_id uuid not null references public.shipments(id) on delete cascade,
+  status      text not null,
+  location    text,
+  timestamp   timestamptz not null,
+  description text
+);
+create index if not exists shipment_events_shipment_id_idx on public.shipment_events(shipment_id);
+
+-- ============================================================
+-- 17. Atomic Inventory decrement RPC
+-- ============================================================
+create or replace function public.decrement_stock(
+  p_id uuid,
+  qty int,
+  operator_name text,
+  reason_text text
+) returns jsonb language plpgsql security definer as $$
+declare
+  current_stock int;
+  result jsonb;
+begin
+  -- Use a row-level lock
+  select stock into current_stock from public.products where id = p_id for update;
+  if not found then
+    return jsonb_build_object('success', false, 'error', 'product_not_found');
+  end if;
+
+  if current_stock < qty then
+    return jsonb_build_object('success', false, 'error', 'insufficient_stock', 'current_stock', current_stock);
+  end if;
+
+  update public.products
+  set stock = stock - qty, updated_at = now()
+  where id = p_id;
+
+  insert into public.inventory_logs(product_id, change, reason, previous_stock, new_stock, operator)
+  values (p_id, -qty, reason_text, current_stock, current_stock - qty, operator_name);
+
+  return jsonb_build_object('success', true, 'new_stock', current_stock - qty);
+end;
+$$;
+
+-- ============================================================
+-- 18. Atomic Checkout Transaction
+-- ============================================================
+create or replace function public.create_checkout_transaction(
+  p_order jsonb,
+  p_items jsonb
+) returns jsonb language plpgsql security definer as $$
+declare
+  item record;
+  current_stock int;
+  order_id uuid;
+begin
+  order_id := (p_order->>'id')::uuid;
+
+  -- 1. Insert order
+  insert into public.orders (
+    id, customer_name, customer_phone, customer_email, address, pincode, total_cents, status, notes, whatsapp_url
+  ) values (
+    order_id,
+    p_order->>'customer_name',
+    p_order->>'customer_phone',
+    p_order->>'customer_email',
+    p_order->>'address',
+    p_order->>'pincode',
+    (p_order->>'total_cents')::int,
+    coalesce(p_order->>'status', 'created'),
+    p_order->>'notes',
+    p_order->>'whatsapp_url'
+  );
+
+  -- 2. Process items
+  for item in select * from jsonb_array_elements(p_items) loop
+    if (item.value->>'product_id') is not null then
+      -- decrement stock
+      select stock into current_stock from public.products where id = (item.value->>'product_id')::uuid for update;
+      
+      if not found then
+        raise exception 'product_not_found:%', item.value->>'product_id';
+      end if;
+      if current_stock < (item.value->>'quantity')::int then
+        raise exception 'insufficient_stock:%:%', item.value->>'product_id', current_stock;
+      end if;
+      
+      update public.products
+      set stock = stock - (item.value->>'quantity')::int, updated_at = now()
+      where id = (item.value->>'product_id')::uuid;
+      
+      insert into public.inventory_logs(product_id, change, reason, previous_stock, new_stock, operator)
+      values (
+        (item.value->>'product_id')::uuid, 
+        -((item.value->>'quantity')::int), 
+        'checkout', 
+        current_stock, 
+        current_stock - (item.value->>'quantity')::int, 
+        'system'
+      );
+    end if;
+
+    -- insert order item
+    insert into public.order_items (
+      id, order_id, product_id, variant_id, name, quantity, price_cents, image_url
+    ) values (
+      (item.value->>'id')::uuid,
+      order_id,
+      case when (item.value->>'product_id') is not null then (item.value->>'product_id')::uuid else null end,
+      case when (item.value->>'variant_id') is not null then (item.value->>'variant_id')::uuid else null end,
+      item.value->>'name',
+      (item.value->>'quantity')::int,
+      (item.value->>'price_cents')::int,
+      item.value->>'image_url'
+    );
+
+    if (item.value->>'customization_data') is not null then
+      insert into public.customization_snapshots (
+        order_item_id, data, image_url
+      ) values (
+        (item.value->>'id')::uuid,
+        (item.value->'customization_data'),
+        item.value->>'image_url'
+      );
+    end if;
+
+    -- create a production job for the item
+    insert into public.production_jobs (
+      order_item_id, status
+    ) values (
+      (item.value->>'id')::uuid,
+      'queued'
+    );
+  end loop;
+
+  return jsonb_build_object('success', true, 'order_id', order_id);
+exception when others then
+  return jsonb_build_object('success', false, 'error', sqlerrm);
+end;
+$$;
+
 -- Done. ✅

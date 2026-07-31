@@ -115,28 +115,13 @@ describe("POST /api/orders/create", () => {
     const insertedOrders: any[] = [];
     const insertedItems: any[] = [];
     const fakeClient = {
-      from(table: string) {
-        if (table === "orders") {
-          return {
-            insert(payload: any) {
-              insertedOrders.push(payload);
-              return {
-                select: () => ({
-                  single: async () => ({ data: { id: payload.id }, error: null }),
-                }),
-              };
-            },
-          };
+      rpc(fn: string, payload: any) {
+        if (fn === "create_checkout_transaction") {
+          insertedOrders.push(payload.p_order);
+          insertedItems.push(payload.p_items);
+          return Promise.resolve({ data: { success: true, order_id: payload.p_order.id }, error: null });
         }
-        if (table === "order_items") {
-          return {
-            insert(payload: any) {
-              insertedItems.push(payload);
-              return Promise.resolve({ data: null, error: null });
-            },
-          };
-        }
-        throw new Error(`Unexpected table ${table}`);
+        throw new Error(`Unexpected rpc ${fn}`);
       },
     };
 

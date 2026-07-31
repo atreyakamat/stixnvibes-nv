@@ -142,9 +142,25 @@ describe("admin workflow persistence", () => {
           return {
             insert(payload: any) {
               state.qualityChecks.push(payload);
-              return Promise.resolve({ data: payload, error: null });
+              return {
+                select: () => ({
+                  single: async () => ({ data: payload, error: null }),
+                })
+              };
             },
           };
+        }
+
+        if (table === "production_jobs") {
+           return {
+             update(payload: any) {
+                return {
+                   eq(_field: string, value: string) {
+                      return Promise.resolve({ error: null });
+                   }
+                }
+             }
+           }
         }
 
         throw new Error(`Unexpected table ${table}`);
@@ -173,7 +189,7 @@ describe("admin workflow persistence", () => {
 
     const qcResponse = await (operations as any).POST(makeRequest({
       action: "qc_inspection",
-      orderId: "order-123",
+      productionJobId: "job-123",
       result: "pass",
       checklist: { color: true },
     }));
@@ -182,7 +198,7 @@ describe("admin workflow persistence", () => {
     expect(qcJson.ok).toBe(true);
     expect(state.qualityChecks).toHaveLength(1);
     expect(state.qualityChecks[0]).toEqual(expect.objectContaining({
-      order_id: "order-123",
+      production_job_id: "job-123",
       result: "pass",
       checklist: { color: true },
     }));

@@ -155,7 +155,7 @@ model Order {
   createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   items         OrderItem[]
-  qcInspections QualityCheck[]
+  shipment      Shipment?
 
   @@index([customerPhone])
   @@index([status])
@@ -177,6 +177,8 @@ model OrderItem {
   priceCents Int      @map("price_cents")
   imageUrl   String?  @map("image_url")
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  customizationSnapshots CustomizationSnapshot[]
+  productionJobs ProductionJob[]
 
   @@index([orderId])
   @@map("order_items")
@@ -195,6 +197,7 @@ model PrintBatch {
   operator      String   @default("operator_1")
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  productionJobs ProductionJob[]
 
   @@index([status])
   @@index([material])
@@ -202,18 +205,74 @@ model PrintBatch {
 }
 
 model QualityCheck {
-  id            String   @id @default(uuid()) @db.Uuid
-  orderId       String   @map("order_id") @db.Uuid
-  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  operator      String
-  result        String   // pass, reprint, reject
-  failureReason String?  @map("failure_reason")
-  checklist     Json     @default("{}")
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id               String        @id @default(uuid()) @db.Uuid
+  productionJobId  String        @map("production_job_id") @db.Uuid
+  productionJob    ProductionJob @relation(fields: [productionJobId], references: [id], onDelete: Cascade)
+  operator         String
+  result           String   // pass, reprint, reject
+  failureReason    String?  @map("failure_reason")
+  checklist        Json     @default("{}")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  @@index([orderId])
+  @@index([productionJobId])
   @@index([result])
   @@map("quality_checks")
+}
+
+model ProductionJob {
+  id           String      @id @default(uuid()) @db.Uuid
+  orderItemId  String      @map("order_item_id") @db.Uuid
+  orderItem    OrderItem   @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  printBatchId String?     @map("print_batch_id") @db.Uuid
+  printBatch   PrintBatch? @relation(fields: [printBatchId], references: [id], onDelete: SetNull)
+  status       String      @default("queued")
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  qcInspections QualityCheck[]
+
+  @@index([orderItemId])
+  @@index([printBatchId])
+  @@index([status])
+  @@map("production_jobs")
+}
+
+model CustomizationSnapshot {
+  id          String    @id @default(uuid()) @db.Uuid
+  orderItemId String    @map("order_item_id") @db.Uuid
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  data        Json
+  imageUrl    String?   @map("image_url")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([orderItemId])
+  @@map("customization_snapshots")
+}
+
+model Shipment {
+  id              String          @id @default(uuid()) @db.Uuid
+  orderId         String          @unique @map("order_id") @db.Uuid
+  order           Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  courier         String
+  awb             String          @unique
+  status          String          @default("manifested")
+  events          ShipmentEvent[]
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("shipments")
+}
+
+model ShipmentEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  shipmentId String   @map("shipment_id") @db.Uuid
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  status     String
+  location   String?
+  timestamp  DateTime @db.Timestamptz
+  description String?
+
+  @@index([shipmentId])
+  @@map("shipment_events")
 }
 
 model Customization {

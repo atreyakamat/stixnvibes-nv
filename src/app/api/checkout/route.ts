@@ -143,9 +143,9 @@ export async function POST(req: NextRequest) {
     const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 899 + 100)}`;
     let dbOrderId = orderNumber;
 
-    // 3. Database Order Creation & Stock Decrement
+    // 3. Database Order Creation & Stock Decrement via RPC
     if (svc) {
-      const orderInsert: Insert<"orders"> = {
+      const orderInsert = {
         id: randomUUID(),
         customer_name: cleanName,
         customer_phone: cleanPhone,
@@ -153,54 +153,33 @@ export async function POST(req: NextRequest) {
         address: cleanAddress,
         pincode: cleanPincode,
         total_cents: totalCents,
-        status: "created",
         notes: cleanNotes,
       };
 
-      const { data, error } = await (svc as any)
-        .from("orders")
-        .insert(orderInsert)
-        .select("id")
-        .single();
+      const itemInserts = verifiedItems.map((it) => ({
+        id: randomUUID(),
+        product_id: it.productId ?? null,
+        variant_id: it.variantId ?? null,
+        name: it.name,
+        quantity: it.quantity,
+        price_cents: it.price_cents,
+        image_url: it.image ?? null,
+      }));
 
-      if (!error && data?.id) {
-        dbOrderId = data.id;
+      const { data: rpcResult, error: rpcErr } = await (svc as any).rpc("create_checkout_transaction", {
+        p_order: orderInsert,
+        p_items: itemInserts,
+      });
 
-        // Insert order items
-        const itemInserts: Insert<"order_items">[] = verifiedItems.map((it) => ({
-          id: randomUUID(),
-          order_id: dbOrderId,
-          product_id: it.productId ?? null,
-          variant_id: it.variantId ?? null,
-          name: it.name,
-          quantity: it.quantity,
-          price_cents: it.price_cents,
-          image_url: it.image ?? null,
-        }));
-        await (svc as any).from("order_items").insert(itemInserts);
-
-        // Decrement product stock safely
-        for (const it of verifiedItems) {
-          if (it.productId) {
-            try {
-              const { data: current } = await (svc as any)
-                .from("products")
-                .select("stock")
-                .eq("id", it.productId)
-                .single();
-              if (current && typeof current.stock === "number") {
-                const newStock = Math.max(0, current.stock - it.quantity);
-                await (svc as any)
-                  .from("products")
-                  .update({ stock: newStock })
-                  .eq("id", it.productId);
-              }
-            } catch {
-              // Stock update fallback
-            }
-          }
-        }
+      if (rpcErr) {
+        return NextResponse.json({ ok: false, error: "Failed to create order: " + rpcErr.message }, { status: 500 });
       }
+
+      if (rpcResult && rpcResult.success === false) {
+        return NextResponse.json({ ok: false, error: "Order failed: " + rpcResult.error }, { status: 400 });
+      }
+
+      dbOrderId = orderInsert.id;
     }
 
     // 4. Payment Gateway Initialization

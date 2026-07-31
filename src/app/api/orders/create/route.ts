@@ -117,40 +117,39 @@ export async function POST(req: NextRequest) {
     const { createBrowser } = await import("@/lib/supabase/client");
     const client = createService() ?? createBrowser();
     if (client) {
-      const { data, error: dbError } = await client
-        .from("orders")
-        .insert({
-          id: randomUUID(),
-          customer_name: cleanName,
-          customer_phone: cleanPhone,
-          customer_email: cleanEmail,
-          address: cleanAddress,
-          pincode: cleanPincode,
-          total_cents: totalCents,
-          status: "sent",
-          whatsapp_url: waUrl,
-          notes: cleanNotes ?? null,
-        })
-        .select()
-        .single();
+      const orderInsert = {
+        id: randomUUID(),
+        customer_name: cleanName,
+        customer_phone: cleanPhone,
+        customer_email: cleanEmail,
+        address: cleanAddress,
+        pincode: cleanPincode,
+        total_cents: totalCents,
+        status: "sent",
+        whatsapp_url: waUrl,
+        notes: cleanNotes ?? null,
+      };
+      const itemInserts = verifiedItems.map((i) => ({
+        id: randomUUID(),
+        product_id: i.product_id ?? null,
+        variant_id: i.variant_id ?? null,
+        name: i.name,
+        quantity: i.quantity,
+        price_cents: i.price_cents,
+        image_url: i.image_url ?? null,
+      }));
+      
+      const { data, error: dbError } = await client.rpc("create_checkout_transaction", {
+        p_order: orderInsert,
+        p_items: itemInserts,
+      });
+
       if (dbError) {
         console.error("[api/orders/create] insert failed:", dbError.message);
+      } else if (data && data.success === false) {
+        console.error("[api/orders/create] RPC failed:", data.error);
       } else {
-        orderId = (data as { id: string }).id;
-        if (data?.id) {
-          await client.from("order_items").insert(
-            verifiedItems.map((i) => ({
-              id: randomUUID(),
-              order_id: data!.id,
-              product_id: i.product_id ?? null,
-              variant_id: i.variant_id ?? null,
-              name: i.name,
-              quantity: i.quantity,
-              price_cents: i.price_cents,
-              image_url: i.image_url ?? null,
-            }))
-          );
-        }
+        orderId = orderInsert.id;
       }
     }
   } catch (e) {

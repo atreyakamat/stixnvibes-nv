@@ -12,15 +12,18 @@ export async function GET(req: NextRequest) {
   const admin = createService();
   if (admin) {
     try {
+      // Need to query shipments separately if the relation isn't recognized or just use a joined query
       const { data, error } = await (admin as any)
         .from("orders")
-        .select("id, created_at, customer_name, customer_phone, total_cents, status, address, pincode, whatsapp_url, order_items(*)")
+        .select("id, created_at, customer_name, customer_phone, total_cents, status, address, pincode, whatsapp_url, order_items(*), shipments(*)")
         .or(`id.eq.${query},customer_phone.eq.${query}`)
         .order("created_at", { ascending: false })
         .limit(5);
 
       if (!error && data && data.length > 0) {
         const primary = data[0];
+        const shipment = primary.shipments && primary.shipments.length > 0 ? primary.shipments[0] : null;
+
         return NextResponse.json({
           ok: true,
           found: true,
@@ -28,10 +31,10 @@ export async function GET(req: NextRequest) {
             orderId: primary.id,
             customerName: primary.customer_name,
             placedDate: new Date(primary.created_at).toLocaleDateString("en-IN", { dateStyle: "medium" }),
-            estimatedDelivery: "2-4 Business Days",
-            courier: "Delhivery Surface Express",
-            awb: `DLV-${primary.id.substring(0, 8).toUpperCase()}`,
-            currentStatus: primary.status === "sent" ? "In Transit" : primary.status,
+            estimatedDelivery: shipment ? "2-4 Business Days" : "Pending Dispatch",
+            courier: shipment ? shipment.courier : "TBD",
+            awb: shipment ? shipment.awb : "TBD",
+            currentStatus: shipment ? shipment.status : primary.status,
             destination: `${primary.address} (${primary.pincode})`,
             items: primary.order_items || [],
           },

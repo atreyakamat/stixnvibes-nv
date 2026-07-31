@@ -41,7 +41,19 @@ export async function POST(req: NextRequest) {
   if (!id) return bad("Missing required order id");
 
   const updatePayload: Record<string, any> = {};
-  if (status) updatePayload.status = status;
+  if (status) {
+    const { data: existing, error: fetchErr } = await admin.from("orders").select("status").eq("id", id).single();
+    if (fetchErr || !existing) return bad("Order not found", 404);
+    
+    const { validateStateTransition } = await import("@/lib/orders/state-machine");
+    try {
+      validateStateTransition((existing as any).status, status as any);
+      updatePayload.status = status;
+    } catch (e: any) {
+      return bad(e.message, 400);
+    }
+  }
+
   if (priority) updatePayload.priority = priority;
   if (assignedTo !== undefined) updatePayload.assigned_to = assignedTo;
   if (notes !== undefined) updatePayload.notes = notes;

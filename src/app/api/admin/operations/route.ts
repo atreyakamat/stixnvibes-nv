@@ -128,115 +128,124 @@ export async function POST(req: NextRequest) {
 
   // 1. Generate New Print Batch
   if (action === "create_batch") {
+    const admin = createService();
+    if (!admin) return bad("DB not connected", 503);
+
     const newBatch = {
-      id: `batch_${Date.now()}`,
-      batchNumber: `BATCH-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: randomUUID(),
+      batch_number: `BATCH-${Math.floor(1000 + Math.random() * 9000)}`,
       material: material || "Vinyl",
       finish: finish || "Glossy Finish",
       size: size || '3" x 3"',
-      orderCount: Math.floor(10 + Math.random() * 20),
-      status: "queued" as const,
-      estTimeMins: 30,
+      order_count: 0,
+      status: "queued",
+      est_time_mins: 30,
       operator: "Operator-01",
-      created_at: new Date().toISOString(),
     };
 
-    const admin = createService();
-    if (admin) {
-      const insertPayload = {
-        id: randomUUID(),
-        batch_number: newBatch.batchNumber,
-        material: newBatch.material,
-        finish: newBatch.finish,
-        size: newBatch.size,
-        order_count: newBatch.orderCount,
-        status: newBatch.status,
-        est_time_mins: newBatch.estTimeMins,
-        operator: newBatch.operator,
-      };
-
-      const insertResult = await admin.from("print_batches").insert(insertPayload as never);
-      const insertedRow = (insertResult as any)?.data ?? null;
-      if (!insertResult?.error && insertedRow) {
-        const persistedBatch = {
-          id: insertedRow.id ?? newBatch.id,
-          batchNumber: insertedRow.batch_number ?? newBatch.batchNumber,
-          material: insertedRow.material ?? newBatch.material,
-          finish: insertedRow.finish ?? newBatch.finish,
-          size: insertedRow.size ?? newBatch.size,
-          orderCount: insertedRow.order_count ?? newBatch.orderCount,
-          status: insertedRow.status ?? newBatch.status,
-          estTimeMins: insertedRow.est_time_mins ?? newBatch.estTimeMins,
-          operator: insertedRow.operator ?? newBatch.operator,
-          created_at: insertedRow.created_at ?? newBatch.created_at,
-        };
-        printBatches.unshift(persistedBatch);
-        return ok({ created: true, batch: persistedBatch });
-      }
-    }
-
-    printBatches.unshift(newBatch);
-    return ok({ created: true, batch: newBatch });
+    const { data, error } = await admin.from("print_batches").insert(newBatch as any).select().single();
+    if (error) return bad(error.message, 500);
+    return ok({ created: true, batch: data });
   }
 
   // 2. Advance Batch Status
   if (action === "update_batch_status" && batchId) {
-    const batch = printBatches.find((b) => b.id === batchId);
-    if (batch) {
-      batch.status = body.status || "printing";
-      return ok({ updated: true, batch });
-    }
+    const admin = createService();
+    if (!admin) return bad("DB not connected", 503);
+
+    const { data, error } = await admin
+      .from("print_batches")
+      .update({ status: body.status || "printing", updated_at: new Date().toISOString() } as never)
+      .eq("id", batchId)
+      .select()
+      .single();
+
+    if (error) return bad(error.message, 500);
+    return ok({ updated: true, batch: data });
   }
 
   // 3. Record QC Inspection
-  if (action === "qc_inspection" && orderId && result) {
+  if (action === "qc_inspection" && body.productionJobId && result) {
+    const admin = createService();
+    if (!admin) return bad("DB not connected", 503);
+
     const qcEntry = {
-      id: `qc_${Date.now()}`,
-      orderId,
+      id: randomUUID(),
+      production_job_id: body.productionJobId,
       operator: "QC-Inspector-1",
-      result,
+      result: result,
+      failure_reason: body.failureReason ?? null,
       checklist: checklist || {},
-      timestamp: new Date().toISOString(),
     };
 
-    const admin = createService();
-    if (admin) {
-      const insertPayload = {
-        id: randomUUID(),
-        order_id: orderId,
-        operator: qcEntry.operator,
-        result,
-        checklist: checklist || {},
-      };
+    const { data, error } = await admin.from("quality_checks").insert(qcEntry as never).select().single();
+    if (error) return bad(error.message, 500);
+    
+    // Also update production job status
+    await admin.from("production_jobs").update({ 
+      status: result === 'pass' ? 'completed' : 'failed',
+      updated_at: new Date().toISOString()
+    } as never).eq("id", body.productionJobId);
 
-      const insertResult = await admin.from("quality_checks").insert(insertPayload as never);
-      const insertedRow = (insertResult as any)?.data ?? null;
-      if (!insertResult?.error && insertedRow) {
-        const persistedEntry = {
-          id: insertedRow.id ?? qcEntry.id,
-          orderId: insertedRow.order_id ?? orderId,
-          operator: insertedRow.operator ?? qcEntry.operator,
-          result: insertedRow.result ?? result,
-          checklist: insertedRow.checklist ?? (checklist || {}),
-          timestamp: insertedRow.created_at ?? qcEntry.timestamp,
-        };
-        qcInspections.unshift(persistedEntry);
-        return ok({ qc: true, entry: persistedEntry });
-      }
-    }
-
-    qcInspections.unshift(qcEntry);
-    return ok({ qc: true, entry: qcEntry });
+    return ok({ qc: true, entry: data });
   }
 
-  // 4. Generate Shipping AWB Number
-  if (action === "generate_awb" && orderId) {
-    const provider = courier || "Delhivery";
-    const awbNumber = `${provider.slice(0, 3).toUpperCase()}${Date.now().toString().slice(-8)}`;
-    return ok({
-      awb: true,
-      awbNumber,
+  // 4. Pack Order & Generate Shipment
+  if (action === "pack_order" && orderId) {
+    const admin = createService();
+    if (!admin) return bad("DB not connected", 503);
+
+    // Verify order state
+    const { data: orderData, error: orderErr } = await admin.from("orders").select("status").eq("id", orderId).single();
+    if (orderErr || !orderData) return bad("Order not found", 404);
+    
+    const orderStatus = (orderData as any).status;
+    if (orderStatus !== 'packing') {
+       // Is it paid/verified? Let's assume we require 'packing' state.
+       if (orderStatus === 'cancelled' || orderStatus === 'created') {
+         return bad(`Cannot pack order in state ${orderStatus}`, 400);
+       }
+    }
+
+    // Verify all production jobs passed QC
+    const { data: items } = await admin.from("order_items").select("id").eq("order_id", orderId);
+    if (!items || (items as any[]).length === 0) return bad("Order has no items", 400);
+    
+    const itemIds = (items as any[]).map(i => i.id);
+    const { data: jobs } = await admin.from("production_jobs").select("id, status").in("order_item_id", itemIds);
+    
+    if (!jobs || (jobs as any[]).length === 0) return bad("No production jobs found for order", 400);
+    const incomplete = (jobs as any[]).filter(j => j.status !== 'completed');
+    if (incomplete.length > 0) return bad("Not all items have passed QC", 400);
+
+    const provider = courier || "TEST_COURIER";
+    const awbNumber = provider === "TEST_COURIER" ? "TEST-AWB-RCOD-001" : `${provider.slice(0, 3).toUpperCase()}${Date.now().toString().slice(-8)}`;
+
+    const shipment = {
+      id: randomUUID(),
+      order_id: orderId,
       courier: provider,
+      awb: awbNumber,
+      status: "manifested",
+    };
+
+    const { data: shipData, error: shipErr } = await admin.from("shipments").insert(shipment as never).select().single();
+    if (shipErr) {
+       // if duplicate
+       return bad("Shipment creation failed: " + shipErr.message, 500);
+    }
+
+    const { validateStateTransition } = await import("@/lib/orders/state-machine");
+    try {
+      validateStateTransition(orderStatus as any, "ready_for_dispatch");
+      await admin.from("orders").update({ status: "ready_for_dispatch" } as never).eq("id", orderId);
+    } catch (e) {
+      // ignore transition failure if already dispatched
+    }
+
+    return ok({
+      packed: true,
+      shipment: shipData,
       trackingUrl: `https://track.stixnvibes.com/?awb=${awbNumber}`,
     });
   }
