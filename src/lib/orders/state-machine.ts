@@ -1,17 +1,18 @@
 import { OrderStatus } from "@prisma/client";
 
-// Define the valid next states for each order status.
-export const ORDER_STATE_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  created: ["pending", "payment_pending", "cancelled"],
+// Define the valid next states for each order status matching Prisma OrderStatus enum.
+export const ORDER_STATE_TRANSITIONS: Record<string, string[]> = {
+  created: ["sent", "confirmed", "pending", "payment_pending", "paid", "cancelled"],
+  sent: ["confirmed", "paid", "fulfilled", "cancelled"],
   pending: ["payment_pending", "verified", "cancelled"],
-  payment_pending: ["paid", "cancelled", "failed_delivery"], // failed_delivery? No, just failed payment probably. We'll allow cancelled.
-  paid: ["processing", "verified", "refunded", "cancelled"],
+  payment_pending: ["paid", "cancelled", "failed_delivery"],
+  paid: ["processing", "verified", "fulfilled", "refunded", "cancelled"],
   processing: ["verified", "print_queue", "cancelled"],
   verified: ["print_queue", "cancelled"],
   print_queue: ["printing", "cancelled"],
   printing: ["quality_check", "cancelled"],
-  quality_check: ["packing", "print_queue", "cancelled"], // print_queue for reprint
-  packing: ["ready_for_dispatch", "cancelled"],
+  quality_check: ["packing", "print_queue", "cancelled"],
+  packing: ["ready_for_dispatch", "fulfilled", "cancelled"],
   ready_for_dispatch: ["shipped", "cancelled"],
   shipped: ["delivered", "failed_delivery", "lost_shipment", "returned"],
   delivered: ["completed", "returned", "replacement"],
@@ -25,24 +26,22 @@ export const ORDER_STATE_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 };
 
 export class InvalidStateTransitionError extends Error {
-  constructor(from: OrderStatus, to: OrderStatus) {
+  constructor(from: string, to: string) {
     super(`Invalid order state transition: ${from} -> ${to}`);
     this.name = "InvalidStateTransitionError";
   }
 }
 
-export function validateStateTransition(current: OrderStatus, next: OrderStatus): void {
-  // Same state is always allowed (no-op)
+export function validateStateTransition(current: string, next: string): void {
   if (current === next) return;
-  
-  const allowed = ORDER_STATE_TRANSITIONS[current];
-  if (!allowed || !allowed.includes(next)) {
+  const allowed = ORDER_STATE_TRANSITIONS[current] || ["confirmed", "paid", "fulfilled", "cancelled"];
+  if (!allowed.includes(next)) {
     throw new InvalidStateTransitionError(current, next);
   }
 }
 
-export function canTransition(current: OrderStatus, next: OrderStatus): boolean {
+export function canTransition(current: string, next: string): boolean {
   if (current === next) return true;
-  const allowed = ORDER_STATE_TRANSITIONS[current];
+  const allowed = ORDER_STATE_TRANSITIONS[current] || ["confirmed", "paid", "fulfilled", "cancelled"];
   return allowed ? allowed.includes(next) : false;
 }
