@@ -6,7 +6,8 @@
 - shadcn/ui-style primitives under `src/components/ui/`
 - Framer Motion for animation (`src/components/motion/`)
 - next-themes for dark/light
-- Examples: Supabase (`@supabase/ssr`), Cloudinary, Razorpay (stubs with env placeholders)
+- Direct WhatsApp Checkout Integration (`NEXT_PUBLIC_WHATSAPP_NUMBER`) — No payment gateway (Razorpay) required or used.
+- Supabase (`@supabase/ssr`), Cloudinary integration.
 
 ## Commands
 - `npm run dev` — start dev server on :3000

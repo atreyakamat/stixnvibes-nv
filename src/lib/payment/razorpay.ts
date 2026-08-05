@@ -1,11 +1,9 @@
 import crypto from "crypto";
 
 /**
- * Razorpay integration helpers.
- * Client-side: Razorpay Checkout SDK loaded via script tag.
- * Server-side: order creation + signature verification.
- *
- * Docs: https://razorpay.com/docs/payments/
+ * NOTE: Stix N Vibes uses direct WhatsApp Checkout Integration (`src/lib/whatsapp.ts`).
+ * Razorpay is NOT used for order placement or payment processing on Stix N Vibes.
+ * All orders are created via `/api/orders/create` and placed directly via WhatsApp.
  */
 
 export const RAZORPAY_KEY_ID = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ?? "";

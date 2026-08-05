@@ -1,13 +1,14 @@
 /**
  * Builds a WhatsApp deep-link URL pre-filled with the customer's order details.
- * Used as the primary checkout flow — no payment gateway required.
+ * Used as the primary checkout flow — Database is source of truth first,
+ * then WhatsApp opens with pre-filled Order ID for admin confirmation.
  *
  * Env: NEXT_PUBLIC_WHATSAPP_NUMBER (country code + number, digits only).
  */
 
 export type WhatsAppCartItem = {
-  id: string;
-  productId: string;
+  id?: string;
+  productId?: string;
   name: string;
   price_cents: number;
   quantity: number;
@@ -16,6 +17,8 @@ export type WhatsAppCartItem = {
 };
 
 export interface WhatsAppParams {
+  orderId?: string;
+  orderNumber?: string;
   name: string;
   address: string;
   pincode: string;
@@ -43,26 +46,41 @@ export function buildWhatsAppUrl(params: WhatsAppParams): string {
     );
   }
 
+  const orderRef = params.orderNumber || (params.orderId ? `#ORD-${params.orderId.slice(0, 8).toUpperCase()}` : undefined);
+
   const lines: string[] = [];
-  lines.push("Hello Stix N Vibes! I'd like to place an order:");
+  lines.push("Hi Stix N Vibes 👋");
   lines.push("");
-  lines.push(`*Name:* ${params.name}`);
-  lines.push(`*Address:* ${params.address}`);
-  lines.push(`*Pincode:* ${params.pincode}`);
-  lines.push(`*Phone:* ${params.phone}`);
-  if (params.notes) lines.push(`*Notes:* ${params.notes}`);
+  lines.push("I'd like to confirm my order.");
   lines.push("");
-  lines.push("*Items:*");
+  if (orderRef) {
+    lines.push("Order ID:");
+    lines.push(orderRef);
+    lines.push("");
+  }
+  lines.push("Name:");
+  lines.push(params.name);
+  lines.push("");
+  lines.push("Phone:");
+  lines.push(params.phone);
+  lines.push("");
+  lines.push("Items:");
   params.items.forEach((item) => {
-    const price = formatRupees(item.price_cents / 100);
+    const price = formatRupees((item.price_cents * item.quantity) / 100);
     const variant = item.variantName ? ` (${item.variantName})` : "";
     lines.push(`• ${item.name}${variant} ×${item.quantity} — ${price}`);
   });
   lines.push("");
-  const total = formatRupees(params.totalRupees);
-  lines.push(`*Total:* ${total}`);
+  lines.push("Delivery:");
+  lines.push(`${params.address} (Pincode: ${params.pincode})`);
+  if (params.notes) {
+    lines.push(`Notes: ${params.notes}`);
+  }
   lines.push("");
-  lines.push("Sent via stixnvibes.com");
+  lines.push("Total:");
+  lines.push(formatRupees(params.totalRupees));
+  lines.push("");
+  lines.push("Thank you!");
 
   const message = encodeURIComponent(lines.join("\n"));
   return `https://wa.me/${BUSINESS_NUMBER}?text=${message}`;

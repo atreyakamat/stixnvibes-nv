@@ -128,6 +128,8 @@ exception when duplicate_object then null; end $$;
 create table if not exists public.orders (
   id                uuid primary key default gen_random_uuid(),
   user_id           uuid references auth.users(id) on delete set null,
+  order_number      text unique,
+  whatsapp_status   text not null default 'NOT_SENT', -- 'NOT_SENT', 'OPENED', 'SENT', 'CUSTOMER_REPLIED', 'ADMIN_REVIEWED'
   razorpay_order_id text,
   whatsapp_url      text,
   customer_name     text not null,
@@ -142,9 +144,11 @@ create table if not exists public.orders (
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()
 );
-create index if not exists orders_user_id_idx    on public.orders(user_id);
-create index if not exists orders_status_idx     on public.orders(status);
-create index if not exists orders_created_at_idx on public.orders(created_at desc);
+create index if not exists orders_user_id_idx        on public.orders(user_id);
+create index if not exists orders_order_number_idx   on public.orders(order_number);
+create index if not exists orders_whatsapp_status_idx on public.orders(whatsapp_status);
+create index if not exists orders_status_idx         on public.orders(status);
+create index if not exists orders_created_at_idx     on public.orders(created_at desc);
 drop trigger if exists orders_updated_at on public.orders;
 create trigger orders_updated_at before update on public.orders
   for each row execute function public.set_updated_at();
@@ -630,5 +634,51 @@ exception when others then
   return jsonb_build_object('success', false, 'error', sqlerrm);
 end;
 $$;
+
+-- ============================================================
+-- 18. payments — dedicated payment transaction records
+-- ============================================================
+create table if not exists public.payments (
+  id              uuid primary key default gen_random_uuid(),
+  order_id        uuid not null references public.orders(id) on delete cascade,
+  payment_method  text not null default 'whatsapp_cod', -- 'razorpay', 'whatsapp_cod', 'upi'
+  transaction_id  text,
+  amount_cents    int not null check (amount_cents >= 0),
+  currency        text not null default 'INR',
+  status          text not null default 'pending', -- 'pending', 'authorized', 'captured', 'failed', 'refunded'
+  raw_response    jsonb default '{}'::jsonb,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+create index if not exists payments_order_id_idx on public.payments(order_id);
+create index if not exists payments_status_idx   on public.payments(status);
+
+-- ============================================================
+-- 19. shipment_events — tracking timeline history
+-- ============================================================
+create table if not exists public.shipment_events (
+  id            uuid primary key default gen_random_uuid(),
+  shipment_id   uuid not null references public.shipments(id) on delete cascade,
+  event_status  text not null, -- 'CREATED', 'PICKED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED', 'FAILED'
+  location      text,
+  description   text,
+  created_at    timestamptz not null default now()
+);
+create index if not exists shipment_events_shipment_id_idx on public.shipment_events(shipment_id);
+
+-- ============================================================
+-- 20. job_queue — background async task retries
+-- ============================================================
+create table if not exists public.job_queue (
+  id           uuid primary key default gen_random_uuid(),
+  job_type     text not null, -- 'SEND_WHATSAPP', 'SEND_EMAIL', 'GENERATE_AWB', 'SYNC_SHIPMENT'
+  payload      jsonb not null default '{}'::jsonb,
+  status       text not null default 'pending', -- 'pending', 'processing', 'completed', 'failed'
+  attempts     int not null default 0,
+  error        text,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+create index if not exists job_queue_status_type_idx on public.job_queue(status, job_type);
 
 -- Done. ✅

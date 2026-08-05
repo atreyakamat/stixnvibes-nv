@@ -71,6 +71,8 @@ import {
 // Types
 type OrderRow = {
   id: string;
+  order_number?: string;
+  whatsapp_status?: string;
   created_at: string;
   customer_name: string;
   customer_phone?: string;
@@ -151,20 +153,17 @@ type QCInspection = {
 };
 
 const ORDER_LIFECYCLE_STAGES = [
-  { key: "pending", label: "Pending" },
-  { key: "payment_pending", label: "Payment Pending" },
+  { key: "sent", label: "🟡 Awaiting WhatsApp Confirmation" },
+  { key: "confirmed", label: "🟢 Confirmed" },
   { key: "paid", label: "Paid" },
-  { key: "verified", label: "Verified" },
-  { key: "print_queue", label: "Print Queue" },
+  { key: "print_queue", label: "🔵 Print Queue" },
   { key: "printing", label: "Printing" },
-  { key: "quality_check", label: "Quality Check" },
-  { key: "packing", label: "Packing Station" },
+  { key: "quality_check", label: "🟣 Quality Check" },
+  { key: "packing", label: "🟤 Packing Station" },
   { key: "ready_for_dispatch", label: "Ready for Dispatch" },
-  { key: "shipped", label: "Shipped" },
-  { key: "delivered", label: "Delivered" },
-  { key: "completed", label: "Completed" },
+  { key: "shipped", label: "🚚 Shipped" },
+  { key: "delivered", label: "✅ Delivered" },
   { key: "cancelled", label: "Cancelled" },
-  { key: "refunded", label: "Refunded" },
 ];
 
 const OPERATORS = ["Unassigned", "Operator John (Print)", "Operator Sarah (Packing)", "QC Inspector Mike", "Dispatch Supervisor Raj"];

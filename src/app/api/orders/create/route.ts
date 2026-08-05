@@ -38,6 +38,12 @@ function sanitize(str: string): string {
     .replace(/'/g, "&#x27;");
 }
 
+function generateOrderNumber(): string {
+  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const seq = Math.floor(100000 + Math.random() * 900000);
+  return `ORD-${dateStr}-${seq}`;
+}
+
 function validate(payload: any): payload is CreateOrderPayload {
   if (typeof payload !== "object" || payload === null) return false;
   if (typeof payload.customer_name !== "string" || payload.customer_name.trim().length < 2) return false;
@@ -75,7 +81,11 @@ export async function POST(req: NextRequest) {
   const cleanNotes = payload.notes ? sanitize(payload.notes) : undefined;
   const cleanEmail = payload.customer_email ? sanitize(payload.customer_email) : null;
 
-  // Verify prices server-side
+  // 1. Generate unique Order ID and Human Readable Order Number
+  const generatedId = randomUUID();
+  const orderNumber = generateOrderNumber();
+
+  // 2. Validate prices server-side
   const items = payload.items;
   const quantities = items.map((i) => (typeof i.quantity === "number" ? i.quantity : 1));
 
@@ -102,7 +112,10 @@ export async function POST(req: NextRequest) {
     variantName: item.variant_name,
   }));
 
+  // 3. Build formatted WhatsApp URL with Order Number
   const waUrl = buildWhatsAppUrl({
+    orderId: generatedId,
+    orderNumber,
     name: cleanName,
     address: cleanAddress,
     pincode: cleanPincode,
@@ -112,13 +125,16 @@ export async function POST(req: NextRequest) {
     notes: cleanNotes,
   });
 
+  // 4. Save Order in PostgreSQL FIRST (Source of Truth) before WhatsApp opens
   let orderId: string | null = null;
   try {
     const { createBrowser } = await import("@/lib/supabase/client");
     const client = createService() ?? createBrowser();
     if (client) {
       const orderInsert = {
-        id: randomUUID(),
+        id: generatedId,
+        order_number: orderNumber,
+        whatsapp_status: "SENT",
         customer_name: cleanName,
         customer_phone: cleanPhone,
         customer_email: cleanEmail,
@@ -128,6 +144,11 @@ export async function POST(req: NextRequest) {
         status: "sent",
         whatsapp_url: waUrl,
         notes: cleanNotes ?? null,
+        metadata: {
+          order_number: orderNumber,
+          whatsapp_status: "SENT",
+          order_status: "WAITING_FOR_CONFIRMATION",
+        },
       };
       const itemInserts = verifiedItems.map((i) => ({
         id: randomUUID(),
@@ -149,7 +170,7 @@ export async function POST(req: NextRequest) {
       } else if (data && data.success === false) {
         console.error("[api/orders/create] RPC failed:", data.error);
       } else {
-        orderId = orderInsert.id;
+        orderId = generatedId;
       }
     }
   } catch (e) {
@@ -159,7 +180,8 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     whatsappUrl: waUrl,
-    orderId,
+    orderId: generatedId,
+    orderNumber,
     persisted: Boolean(orderId),
   });
 }
