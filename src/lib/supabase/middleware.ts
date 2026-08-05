@@ -1,10 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-function isProduction() {
-  return process.env.NODE_ENV === "production";
-}
-
 function isValidHttpUrl(url: string): boolean {
   try {
     if (!url || url.includes("YOUR_") || url.includes("PLACEHOLDER")) return false;
@@ -18,14 +14,28 @@ function isValidHttpUrl(url: string): boolean {
 export async function updateSession(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+  const isApiRoute = request.nextUrl.pathname.startsWith("/api/");
   const isProtectedApi = request.nextUrl.pathname.startsWith("/api/admin") && request.nextUrl.pathname !== "/api/admin/login";
-  if (!isValidHttpUrl(supabaseUrl) || !supabaseAnonKey || supabaseAnonKey.includes("YOUR_")) {
-    if (isProtectedApi || isProduction()) {
+  const supabaseConfigured = isValidHttpUrl(supabaseUrl) && Boolean(supabaseAnonKey) && !supabaseAnonKey.includes("YOUR_");
+
+  // Check for static admin authentication token in cookies or headers
+  const adminCookie = request.cookies.get("snv_admin_token");
+  const authHeader = request.headers.get("authorization");
+  const isStaticAdmin =
+    adminCookie?.value === "snv_admin_token_static_dev" ||
+    adminCookie?.value === (process.env.ADMIN_STATIC_ACCESS_TOKEN ?? "") ||
+    authHeader === "Bearer snv_admin_token_static_dev" ||
+    authHeader === `Bearer ${process.env.ADMIN_STATIC_ACCESS_TOKEN ?? ""}`;
+
+  // If Supabase is unconfigured:
+  if (!supabaseConfigured) {
+    if (isProtectedApi) {
       return NextResponse.json(
         { ok: false, error: "Server misconfigured: auth backend unavailable" },
         { status: 500 }
       );
     }
+    // For page requests, allow page to render so client-side /login and /admin UI can load
     return NextResponse.next({ request });
   }
 
@@ -57,13 +67,7 @@ export async function updateSession(request: NextRequest) {
     const protectedPaths = ["/admin", "/account"];
     const isProtected = protectedPaths.some((p) => path.startsWith(p));
 
-    const adminCookie = request.cookies.get("snv_admin_token");
-    const authHeader = request.headers.get("authorization");
-    const isStaticAdmin =
-      adminCookie?.value === "snv_admin_token_static_dev" ||
-      authHeader === "Bearer snv_admin_token_static_dev";
-
-    if (path.startsWith("/api/admin") && path !== "/api/admin/login") {
+    if (isProtectedApi) {
       if (!user && !isStaticAdmin) {
         return NextResponse.json(
           { ok: false, error: "Unauthorized: Admin API authentication required" },

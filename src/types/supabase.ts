@@ -81,6 +81,14 @@ export type Database = {
           rating: number;
           review_count: number;
           metadata: Json;
+          status: string;
+          visibility: string;
+          sku: string | null;
+          barcode: string | null;
+          cost_cents: number;
+          weight_grams: number | null;
+          seo_title: string | null;
+          seo_description: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -108,6 +116,14 @@ export type Database = {
           rating?: number;
           review_count?: number;
           metadata?: Json;
+          status?: string;
+          visibility?: string;
+          sku?: string | null;
+          barcode?: string | null;
+          cost_cents?: number;
+          weight_grams?: number | null;
+          seo_title?: string | null;
+          seo_description?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["products"]["Insert"]>;
       };
@@ -289,8 +305,171 @@ export type Database = {
         Insert: { user_id: string; email: string };
         Update: Partial<Database["public"]["Tables"]["admin_users"]["Insert"]>;
       };
+      materials: {
+        Row: {
+          id: string;
+          name: string;
+          slug: string;
+          description: string | null;
+          properties: Json;
+          cost_per_unit_cents: number;
+          is_active: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          slug: string;
+          description?: string | null;
+          properties?: Json;
+          cost_per_unit_cents?: number;
+          is_active?: boolean;
+          sort_order?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["materials"]["Insert"]>;
+      };
+      sizes: {
+        Row: {
+          id: string;
+          name: string;
+          slug: string;
+          width_mm: number | null;
+          height_mm: number | null;
+          category: string | null;
+          is_active: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          slug: string;
+          width_mm?: number | null;
+          height_mm?: number | null;
+          category?: string | null;
+          is_active?: boolean;
+          sort_order?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["sizes"]["Insert"]>;
+      };
+      product_materials: {
+        Row: {
+          product_id: string;
+          material_id: string;
+        };
+        Insert: {
+          product_id: string;
+          material_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["product_materials"]["Insert"]>;
+      };
+      product_sizes: {
+        Row: {
+          product_id: string;
+          size_id: string;
+          price_modifier_cents: number;
+        };
+        Insert: {
+          product_id: string;
+          size_id: string;
+          price_modifier_cents?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["product_sizes"]["Insert"]>;
+      };
+      collections: {
+        Row: {
+          id: string;
+          name: string;
+          slug: string;
+          description: string | null;
+          image_url: string | null;
+          is_active: boolean;
+          sort_order: number;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          slug: string;
+          description?: string | null;
+          image_url?: string | null;
+          is_active?: boolean;
+          sort_order?: number;
+          metadata?: Json;
+        };
+        Update: Partial<Database["public"]["Tables"]["collections"]["Insert"]>;
+      };
+      product_collections: {
+        Row: {
+          product_id: string;
+          collection_id: string;
+          sort_order: number;
+        };
+        Insert: {
+          product_id: string;
+          collection_id: string;
+          sort_order?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["product_collections"]["Insert"]>;
+      };
+      settings: {
+        Row: {
+          key: string;
+          value: Json;
+          category: string;
+          description: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          key: string;
+          value?: Json;
+          category?: string;
+          description?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["settings"]["Insert"]>;
+      };
+      pages: {
+        Row: {
+          id: string;
+          title: string;
+          slug: string;
+          content: Json;
+          is_published: boolean;
+          seo_title: string | null;
+          seo_description: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          slug: string;
+          content?: Json;
+          is_published?: boolean;
+          seo_title?: string | null;
+          seo_description?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["pages"]["Insert"]>;
+      };
     };
-    Views: Record<string, never>;
+    Views: {
+      customer_summary: {
+        Row: {
+          customer_phone: string;
+          customer_name: string | null;
+          customer_email: string | null;
+          total_orders: number;
+          total_spent: number;
+          last_order_at: string | null;
+          first_order_at: string | null;
+        };
+      };
+    };
     Functions: {
       is_admin: { Args: Record<string, never>; Returns: boolean };
       set_updated_at: { Args: Record<string, never>; Returns: unknown };

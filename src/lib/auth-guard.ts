@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+const staticAdminToken = process.env.ADMIN_STATIC_ACCESS_TOKEN ?? "snv_admin_token_static_dev";
 
 function isValidHttpUrl(url: string): boolean {
   try {
@@ -16,7 +17,7 @@ function isValidHttpUrl(url: string): boolean {
 
 /**
  * Validates that the incoming request is authenticated as an admin user.
- * Returns null if authorized, or a 401/403 NextResponse if unauthorized.
+ * Returns null if authorized, or a 401/403/500 NextResponse if unauthorized.
  */
 export async function requireAdminAuth(req: NextRequest): Promise<NextResponse | null> {
   const supabaseConfigured = isValidHttpUrl(supabaseUrl) && Boolean(supabaseAnonKey) && !supabaseAnonKey.includes("YOUR_");
@@ -29,20 +30,21 @@ export async function requireAdminAuth(req: NextRequest): Promise<NextResponse |
         { status: 500 }
       );
     }
-    // Local dev: bypass with a server-side warning the developer can see in logs.
     console.warn("[requireAdminAuth] Supabase not configured; bypassing auth in dev only.");
     return null;
   }
 
   try {
-    // Check for static admin dev token in header or cookie
+    // Check for static admin token in header or cookie
     const authHeader = req.headers.get("authorization");
     const adminCookie = req.cookies.get("snv_admin_token");
     if (
+      authHeader === `Bearer ${staticAdminToken}` ||
       authHeader === "Bearer snv_admin_token_static_dev" ||
+      adminCookie?.value === staticAdminToken ||
       adminCookie?.value === "snv_admin_token_static_dev"
     ) {
-      return null; // Static Admin Token Authorized
+      return null; // Authorized via Static Admin Token
     }
 
     if (authHeader && authHeader.startsWith("Bearer ")) {
@@ -51,7 +53,7 @@ export async function requireAdminAuth(req: NextRequest): Promise<NextResponse |
       const service = createService();
       if (service) {
         const { data: { user }, error } = await service.auth.getUser(token);
-        if (user && !error) return null; // Authenticated
+        if (user && !error) return null; // Authenticated via Supabase Service
       }
     }
 
@@ -74,7 +76,7 @@ export async function requireAdminAuth(req: NextRequest): Promise<NextResponse |
       );
     }
 
-    return null; // Authorized
+    return null; // Authorized via Supabase Cookie
   } catch (err) {
     console.error("[requireAdminAuth] verification error:", err);
     return NextResponse.json(

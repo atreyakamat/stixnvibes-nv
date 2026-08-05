@@ -1,11 +1,20 @@
+"use client";
+
 import * as React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Sparkles, Instagram, Twitter, Youtube, Mail, MapPin, MessageCircle } from "lucide-react";
 import { siteConfig } from "@/lib/site-config";
 import { SustainabilityBadge } from "@/components/ui/sustainability-badge";
 
 export function Footer() {
+  const pathname = usePathname();
   const year = new Date().getFullYear();
+
+  if (pathname?.startsWith("/admin")) {
+    return null;
+  }
+
   return (
     <footer className="relative mt-24 overflow-hidden border-t border-border">
       <div className="pointer-events-none absolute -top-32 left-1/2 h-64 w-[140%] -translate-x-1/2 bg-brand-mesh opacity-60 blur-3xl" />

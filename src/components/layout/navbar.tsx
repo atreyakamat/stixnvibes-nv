@@ -13,6 +13,7 @@ import {
   Sparkles,
   ChevronDown,
 } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { navStructure, siteConfig } from "@/lib/site-config";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ import { openCartDrawer } from "@/components/cart/cart-drawer";
 import { useCart } from "@/context/cart-context";
 
 export function Navbar() {
+  const pathname = usePathname();
   const [scrolled, setScrolled] = React.useState(false);
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [searchOpen, setSearchOpen] = React.useState(false);
@@ -38,6 +40,10 @@ export function Navbar() {
       window.removeEventListener("snv:cart:add", onAdd);
     };
   }, []);
+
+  if (pathname?.startsWith("/admin")) {
+    return null;
+  }
 
   return (
     <header

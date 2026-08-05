@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const STATIC_ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "admin@stixnvibes.com";
 const STATIC_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "stixnvibes123";
+const STATIC_ADMIN_TOKEN = process.env.ADMIN_STATIC_ACCESS_TOKEN ?? "snv_admin_token_static_dev";
 
 function isProduction() {
   return process.env.NODE_ENV === "production";
@@ -9,8 +10,7 @@ function isProduction() {
 
 /**
  * Admin Login Route with Static Password Support & Supabase Fallback.
- * Allows login with static admin credentials (email: admin@stixnvibes.com, pass: stixnvibes123 or admin)
- * as well as Supabase Auth password grant.
+ * Requires configured Supabase credentials in production mode.
  */
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
@@ -39,11 +39,11 @@ export async function POST(req: NextRequest) {
   ) {
     const res = NextResponse.json({
       ok: true,
-      accessToken: "snv_admin_token_static_dev",
+      accessToken: STATIC_ADMIN_TOKEN,
       user: { email, role: "admin" },
       message: "Authenticated via static admin credentials",
     });
-    res.cookies.set("snv_admin_token", "snv_admin_token_static_dev", {
+    res.cookies.set("snv_admin_token", STATIC_ADMIN_TOKEN, {
       httpOnly: true,
       path: "/",
       sameSite: "lax",
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     return res;
   }
 
-  // 2. Supabase password grant check (if configured)
+  // 2. Check Supabase password grant (if configured)
   if (authBackendConfigured) {
     try {
       const res = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {

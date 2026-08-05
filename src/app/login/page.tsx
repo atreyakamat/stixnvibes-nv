@@ -42,7 +42,9 @@ function LoginForm() {
       if (typeof window !== "undefined") {
         localStorage.setItem("snv.admin.accessToken", json.accessToken);
       }
-      const next = searchParams.get("redirect") ?? "/admin";
+      let next = searchParams.get("redirect") ?? "/admin";
+      next = next.trim().replace(/[\.\s]+$/, "");
+      if (!next.startsWith("/")) next = "/admin";
       router.push(next);
     } finally {
       setLoading(false);

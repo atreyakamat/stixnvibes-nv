@@ -1,71 +1,27 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Container } from "@/components/layout/container";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  Package,
-  ShoppingCart,
-  Tag,
-  LogOut,
-  Sparkles,
   RefreshCw,
   Loader2,
-  Download,
-  Upload,
-  AlertTriangle,
-  Layers,
-  Plus,
-  Trash2,
-  X,
-  Check,
   Search,
-  Image as ImageIcon,
-  Star,
-  FileSpreadsheet,
-  Edit2,
-  Filter,
-  Eye,
-  Copy,
-  BarChart3,
-  Sliders,
-  Box,
-  FolderTree,
-  Tags as TagsIcon,
-  Grid,
-  History,
-  MoreVertical,
-  CheckSquare,
-  Square,
-  ChevronRight,
-  ChevronLeft,
-  Warehouse,
-  ShoppingBag,
-  Command,
-  Zap,
-  Menu,
-  RotateCcw,
-  LayoutGrid,
-  List,
-  Printer,
-  Truck,
-  Users,
-  QrCode,
-  CheckCircle2,
-  XCircle,
+  Check,
   Clock,
   Play,
-  Pause,
-  FileText,
+  Printer,
   ShieldCheck,
+  QrCode,
+  Truck,
   Activity,
-  Calendar,
-  UserCheck,
+  CheckCircle2,
+  XCircle,
+  RotateCcw,
 } from "lucide-react";
 
 // Types
@@ -176,9 +132,10 @@ function fmt(cents: number) {
   }).format((cents || 0) / 100);
 }
 
-export default function AdminPage() {
-  const router = useRouter();
-  const [authed, setAuthed] = React.useState(false);
+function AdminPageContent() {
+  const searchParams = useSearchParams();
+  const activeModule = searchParams.get("module") || "ops_kanban";
+
   const [loading, setLoading] = React.useState(true);
   const [orders, setOrders] = React.useState<OrderRow[]>([]);
   const [products, setProducts] = React.useState<ProductRow[]>([]);
@@ -186,15 +143,6 @@ export default function AdminPage() {
   const [printBatches, setPrintBatches] = React.useState<PrintBatch[]>([]);
   const [qcLogs, setQcLogs] = React.useState<QCInspection[]>([]);
   const [fetching, setFetching] = React.useState(false);
-  const [sidebarOpen, setSidebarOpen] = React.useState(true);
-
-  // Active Operations Module Router
-  const [activeModule, setActiveModule] = React.useState<
-    "ops_dashboard" | "ops_kanban" | "ops_print_queue" | "ops_qc" | "ops_packing" | "ops_shipping" | "ops_analytics" | "pim_catalog"
-  >("ops_kanban");
-
-  // Command Palette State
-  const [commandOpen, setCommandOpen] = React.useState(false);
 
   // Filters & Order Selection State
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -229,18 +177,10 @@ export default function AdminPage() {
   const [selectedCourier, setSelectedCourier] = React.useState("Delhivery");
   const [generatedAWB, setGeneratedAWB] = React.useState<{ awbNumber: string; trackingUrl: string } | null>(null);
 
-  const searchInputRef = React.useRef<HTMLInputElement | null>(null);
-
   React.useEffect(() => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("snv.admin.accessToken") : null;
-    if (!token) {
-      router.replace("/login?redirect=/admin");
-      return;
-    }
-    setAuthed(true);
     setLoading(false);
     void loadAll();
-  }, [router]);
+  }, []);
 
   async function loadAll() {
     setFetching(true);
@@ -261,11 +201,6 @@ export default function AdminPage() {
     } finally {
       setFetching(false);
     }
-  }
-
-  function logout() {
-    localStorage.removeItem("snv.admin.accessToken");
-    router.replace("/login");
   }
 
   // 1. Order Lifecycle Transition Handler
@@ -458,489 +393,410 @@ export default function AdminPage() {
       </Container>
     );
   }
-  if (!authed) return null;
 
   return (
-    <div className="flex min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-brand-yellow selection:text-slate-950">
-      {/* SIDEBAR NAVIGATION */}
-      <aside
-        className={`${
-          sidebarOpen ? "w-64" : "w-16"
-        } shrink-0 border-r border-border/80 bg-slate-900/90 transition-all duration-200 flex flex-col justify-between p-3 z-30`}
-      >
-        <div>
-          <div className="flex items-center justify-between px-2 py-3 border-b border-border/60">
-            <Link href="/admin" className="flex items-center gap-2.5 overflow-hidden">
-              <div className="grid size-8 shrink-0 place-items-center rounded-xl bg-brand-yellow font-black text-slate-950 shadow-glow">
-                OPS
-              </div>
-              {sidebarOpen && (
-                <div>
-                  <p className="font-display font-bold text-sm leading-none">Operations Engine</p>
-                  <p className="text-[10px] text-muted-foreground font-mono mt-0.5">Stix N Vibes v4.0</p>
-                </div>
-              )}
-            </Link>
+    <div className="p-6 lg:p-8 space-y-6">
+      {/* Top Operational Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/80 pb-4">
+        <h1 className="font-display text-2xl font-bold tracking-tight capitalize">
+          {activeModule === "ops_dashboard" && "Production Real-Time Dashboard"}
+          {activeModule === "ops_kanban" && "Order Management Engine (OMS)"}
+          {activeModule === "ops_print_queue" && "Automated Print Queue Engine"}
+          {activeModule === "ops_qc" && "Quality Control Inspection Station"}
+          {activeModule === "ops_packing" && "Dispatch Packing Station"}
+          {activeModule === "ops_shipping" && "Shipping & Courier Integration"}
+          {activeModule === "ops_analytics" && "Operations Analytics & SLA KPIs"}
+        </h1>
 
-            <button
-              type="button"
-              onClick={() => setSidebarOpen((v) => !v)}
-              className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-secondary"
-            >
-              <Menu className="size-4" />
-            </button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => void loadAll()} disabled={fetching}>
+            {fetching ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+          </Button>
+        </div>
+      </div>
+
+      {/* ============================================================ */}
+      {/* MODULE 1: ORDER MANAGEMENT ENGINE (KANBAN WORKFLOW) */}
+      {/* ============================================================ */}
+      {activeModule === "ops_kanban" && (
+        <div className="space-y-6">
+          {/* Filter Matrix */}
+          <div className="rounded-2xl border border-border bg-slate-900/60 p-4 space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative min-w-[280px] flex-1">
+                <Search className="absolute left-3.5 top-2.5 size-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search Orders by Customer Name, Phone, or ID..."
+                  className="pl-10 h-9 text-xs"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              <select
+                className="h-9 rounded-xl border border-border bg-background px-3 text-xs font-semibold"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="all">All Stages ({orders.length})</option>
+                {ORDER_LIFECYCLE_STAGES.map((s) => (
+                  <option key={s.key} value={s.key}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          <nav className="mt-4 space-y-4 text-xs font-semibold">
-            <div>
-              {sidebarOpen && <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 mb-1">Operations Platform</p>}
-              <div className="space-y-1">
-                {[
-                  { id: "ops_dashboard", label: "Production Dashboard", icon: <Activity className="size-4 shrink-0" /> },
-                  { id: "ops_kanban", label: "Order Management Engine", icon: <ShoppingCart className="size-4 shrink-0" /> },
-                  { id: "ops_print_queue", label: "Print Queue Engine", icon: <Printer className="size-4 shrink-0" /> },
-                  { id: "ops_qc", label: "Quality Control (QC)", icon: <ShieldCheck className="size-4 shrink-0" /> },
-                  { id: "ops_packing", label: "Packing Station", icon: <QrCode className="size-4 shrink-0" /> },
-                  { id: "ops_shipping", label: "Shipping Integration", icon: <Truck className="size-4 shrink-0" /> },
-                  { id: "ops_analytics", label: "Operations Analytics", icon: <BarChart3 className="size-4 shrink-0" /> },
-                ].map((item) => {
-                  const active = activeModule === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setActiveModule(item.id as any)}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all ${
-                        active
-                          ? "bg-brand-yellow text-slate-950 font-bold shadow-soft"
-                          : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                      }`}
-                    >
-                      {item.icon}
-                      {sidebarOpen && <span>{item.label}</span>}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </nav>
-        </div>
+          {/* Kanban Pipeline Swimlanes */}
+          <div className="flex items-start gap-4 overflow-x-auto pb-4">
+            {ORDER_LIFECYCLE_STAGES.slice(0, 8).map((stage) => {
+              const stageOrders = filteredOrders.filter((o) => o.status === stage.key);
+              return (
+                <div key={stage.key} className="rounded-2xl border border-border/80 bg-slate-900/80 p-3 w-[260px] shrink-0 space-y-3">
+                  <div className="flex items-center justify-between border-b border-border/60 pb-2">
+                    <span className="text-xs font-bold uppercase">{stage.label}</span>
+                    <Badge variant="outline" size="sm">{stageOrders.length}</Badge>
+                  </div>
 
-        <div className="border-t border-border/60 pt-3">
-          {sidebarOpen ? (
-            <div className="flex items-center justify-between px-2">
-              <div className="truncate">
-                <p className="text-xs font-bold truncate">Operations Lead</p>
-                <p className="text-[10px] text-muted-foreground truncate">ops@stixnvibes.com</p>
-              </div>
-              <button type="button" onClick={logout} className="text-muted-foreground hover:text-red-400 p-1" title="Logout">
-                <LogOut className="size-4" />
-              </button>
-            </div>
-          ) : (
-            <button type="button" onClick={logout} className="w-full flex justify-center py-2 text-muted-foreground hover:text-red-400">
-              <LogOut className="size-4" />
-            </button>
-          )}
-        </div>
-      </aside>
-
-      {/* WORKSPACE CONTENT AREA */}
-      <main className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6">
-        {/* Top Operational Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/80 pb-4">
-          <h1 className="font-display text-2xl font-bold tracking-tight capitalize">
-            {activeModule === "ops_dashboard" && "Production Real-Time Dashboard"}
-            {activeModule === "ops_kanban" && "Order Management Engine (OMS)"}
-            {activeModule === "ops_print_queue" && "Automated Print Queue Engine"}
-            {activeModule === "ops_qc" && "Quality Control Inspection Station"}
-            {activeModule === "ops_packing" && "Dispatch Packing Station"}
-            {activeModule === "ops_shipping" && "Shipping & Courier Integration"}
-            {activeModule === "ops_analytics" && "Operations Analytics & SLA KPIs"}
-          </h1>
-
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => void loadAll()} disabled={fetching}>
-              {fetching ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-            </Button>
-          </div>
-        </div>
-
-        {/* ============================================================ */}
-        {/* MODULE 1: ORDER MANAGEMENT ENGINE (KANBAN WORKFLOW) */}
-        {/* ============================================================ */}
-        {activeModule === "ops_kanban" && (
-          <div className="space-y-6">
-            {/* Filter Matrix */}
-            <div className="rounded-2xl border border-border bg-slate-900/60 p-4 space-y-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="relative min-w-[280px] flex-1">
-                  <Search className="absolute left-3.5 top-2.5 size-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search Orders by Customer Name, Phone, or ID..."
-                    className="pl-10 h-9 text-xs"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-
-                <select
-                  className="h-9 rounded-xl border border-border bg-background px-3 text-xs font-semibold"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                >
-                  <option value="all">All Stages ({orders.length})</option>
-                  {ORDER_LIFECYCLE_STAGES.map((s) => (
-                    <option key={s.key} value={s.key}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Kanban Pipeline Swimlanes */}
-            <div className="flex items-start gap-4 overflow-x-auto pb-4">
-              {ORDER_LIFECYCLE_STAGES.slice(0, 8).map((stage) => {
-                const stageOrders = filteredOrders.filter((o) => o.status === stage.key);
-                return (
-                  <div key={stage.key} className="rounded-2xl border border-border/80 bg-slate-900/80 p-3 w-[260px] shrink-0 space-y-3">
-                    <div className="flex items-center justify-between border-b border-border/60 pb-2">
-                      <span className="text-xs font-bold uppercase">{stage.label}</span>
-                      <Badge variant="outline" size="sm">{stageOrders.length}</Badge>
-                    </div>
-
-                    <div className="space-y-2">
-                      {stageOrders.map((o) => (
-                        <div key={o.id} className="rounded-xl border border-border p-3 bg-slate-950 space-y-2 text-xs">
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold truncate">{o.customer_name}</span>
-                            <span className="font-bold text-brand-yellow">{fmt(o.total_cents)}</span>
-                          </div>
-
-                          <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                            <span>ID: {o.id.slice(0, 8)}</span>
-                            <span className="flex items-center gap-1"><Clock className="size-3" /> SLA 2h</span>
-                          </div>
-
-                          {/* Operator Assignment Dropdown */}
-                          <select
-                            className="w-full h-7 rounded-lg border border-border bg-background px-2 text-[10px] font-semibold"
-                            value={o.assigned_to || "Unassigned"}
-                            onChange={(e) => assignStaffToOrder(o.id, e.target.value)}
-                          >
-                            {OPERATORS.map((op) => (
-                              <option key={op} value={op}>{op}</option>
-                            ))}
-                          </select>
-
-                          {/* Advance Stage Control */}
-                          <div className="flex gap-1 pt-1">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full h-7 text-[10px]"
-                              onClick={() => {
-                                const idx = ORDER_LIFECYCLE_STAGES.findIndex((s) => s.key === o.status);
-                                if (idx >= 0 && idx < ORDER_LIFECYCLE_STAGES.length - 1) {
-                                  updateOrderStatus(o.id, ORDER_LIFECYCLE_STAGES[idx + 1].key);
-                                }
-                              }}
-                            >
-                              Advance Stage ➔
-                            </Button>
-                          </div>
+                  <div className="space-y-2">
+                    {stageOrders.map((o) => (
+                      <div key={o.id} className="rounded-xl border border-border p-3 bg-slate-950 space-y-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold truncate">{o.customer_name}</span>
+                          <span className="font-bold text-brand-yellow">{fmt(o.total_cents)}</span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
-        {/* ============================================================ */}
-        {/* MODULE 2: PRINT QUEUE ENGINE */}
-        {/* ============================================================ */}
-        {activeModule === "ops_print_queue" && (
-          <div className="space-y-6">
-            {/* Batch Generator Control */}
-            <Card className="border-border/80 bg-slate-900/60">
-              <CardHeader className="py-3 flex items-center justify-between">
-                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <Printer className="size-4 text-brand-purple" /> Automated Batch Optimization Generator
-                </CardTitle>
-                <Button variant="gradient" size="sm" onClick={handleCreatePrintBatch}>
-                  ⚡ Generate New Print Batch
-                </Button>
-              </CardHeader>
-              <CardContent className="grid gap-3 sm:grid-cols-3">
-                <div>
-                  <label className="text-[10px] font-bold uppercase text-muted-foreground">Material Type</label>
-                  <select
-                    className="w-full h-8 rounded-xl border border-border bg-background px-2 text-xs font-semibold"
-                    value={batchMaterial}
-                    onChange={(e) => setBatchMaterial(e.target.value)}
-                  >
-                    <option value="Vinyl">Vinyl (Premium Waterproof)</option>
-                    <option value="Holographic Film">Holographic Metallic Film</option>
-                    <option value="Transparent Film">Clear Transparent Film</option>
-                    <option value="Paper">Glossy Poster Paper</option>
-                  </select>
-                </div>
+                        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                          <span>ID: {o.id.slice(0, 8)}</span>
+                          <span className="flex items-center gap-1"><Clock className="size-3" /> SLA 2h</span>
+                        </div>
 
-                <div>
-                  <label className="text-[10px] font-bold uppercase text-muted-foreground">Finish Type</label>
-                  <select
-                    className="w-full h-8 rounded-xl border border-border bg-background px-2 text-xs font-semibold"
-                    value={batchFinish}
-                    onChange={(e) => setBatchFinish(e.target.value)}
-                  >
-                    <option value="Glossy Finish">Glossy Lamination</option>
-                    <option value="Matte Finish">Matte Anti-Glare</option>
-                    <option value="Holographic Sheen">Holographic Rainbow Sheen</option>
-                  </select>
-                </div>
+                        {/* Operator Assignment Dropdown */}
+                        <select
+                          className="w-full h-7 rounded-lg border border-border bg-background px-2 text-[10px] font-semibold"
+                          value={o.assigned_to || "Unassigned"}
+                          onChange={(e) => assignStaffToOrder(o.id, e.target.value)}
+                        >
+                          {OPERATORS.map((op) => (
+                            <option key={op} value={op}>{op}</option>
+                          ))}
+                        </select>
 
-                <div>
-                  <label className="text-[10px] font-bold uppercase text-muted-foreground">Sticker Dimension Size</label>
-                  <select
-                    className="w-full h-8 rounded-xl border border-border bg-background px-2 text-xs font-semibold"
-                    value={batchSize}
-                    onChange={(e) => setBatchSize(e.target.value)}
-                  >
-                    <option value='3" x 3"'>3" x 3" Die-Cut</option>
-                    <option value='4" x 4"'>4" x 4" Die-Cut</option>
-                    <option value='A4 Poster'>A4 Poster Frame</option>
-                  </select>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Print Batches Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {printBatches.map((b) => (
-                <Card key={b.id} className="border-border/80 bg-slate-900/60">
-                  <CardHeader className="py-3 flex items-center justify-between border-b border-border/60">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-brand-purple font-mono">{b.batchNumber}</span>
-                      <Badge variant={b.status === "printing" ? "success" : "outline"} size="sm" className="capitalize">
-                        {b.status}
-                      </Badge>
-                    </div>
-                    <span className="text-xs text-muted-foreground font-mono">{b.estTimeMins} mins est</span>
-                  </CardHeader>
-                  <CardContent className="py-3 space-y-3 text-xs">
-                    <div className="grid grid-cols-2 gap-2 text-muted-foreground">
-                      <p>Material: <strong className="text-foreground">{b.material}</strong></p>
-                      <p>Finish: <strong className="text-foreground">{b.finish}</strong></p>
-                      <p>Jobs Included: <strong className="text-foreground">{b.orderCount} orders</strong></p>
-                      <p>Operator: <strong className="text-foreground">{b.operator}</strong></p>
-                    </div>
-
-                    <div className="flex items-center gap-2 pt-2 border-t border-border/60">
-                      {b.status === "queued" && (
-                        <Button variant="gradient" size="sm" onClick={() => updateBatchStatus(b.id, "printing")}>
-                          <Play className="size-3" /> Start Printing
-                        </Button>
-                      )}
-                      {b.status === "printing" && (
-                        <Button variant="outline" size="sm" onClick={() => updateBatchStatus(b.id, "completed")}>
-                          <Check className="size-3 text-emerald-400" /> Mark Batch Complete
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ============================================================ */}
-        {/* MODULE 4: QUALITY CONTROL (QC) STATION */}
-        {/* ============================================================ */}
-        {activeModule === "ops_qc" && (
-          <div className="space-y-6">
-            <Card className="border-border/80 bg-slate-900/60">
-              <CardHeader className="py-3">
-                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <ShieldCheck className="size-4 text-brand-yellow" /> Quality Control (QC) Inspection Station
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="text-xs font-semibold uppercase text-muted-foreground">Scan or Select Order ID *</label>
-                    <select
-                      className="w-full h-9 rounded-xl border border-border bg-background px-3 text-xs font-semibold"
-                      value={qcSelectedOrderId}
-                      onChange={(e) => setQcSelectedOrderId(e.target.value)}
-                    >
-                      <option value="">Select Order for Inspection...</option>
-                      {orders.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.id.slice(0, 8)} - {o.customer_name} ({o.status})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* 7-Point QC Checklist */}
-                <div className="rounded-xl border border-border bg-slate-950 p-4 space-y-2 text-xs">
-                  <p className="font-bold uppercase text-brand-yellow">7-Point Physical Print Inspection Checklist</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
-                    {[
-                      { key: "artwork", label: "1. Artwork & Vector Registration" },
-                      { key: "dimensions", label: "2. Die-Cut Size & Dimensions" },
-                      { key: "finish", label: "3. Specified Laminate Finish" },
-                      { key: "printQuality", label: "4. DPI Crispness & No Banding" },
-                      { key: "lamination", label: "5. Lamination Adhesion" },
-                      { key: "colorAccuracy", label: "6. CMYK Color Accuracy" },
-                      { key: "quantityCount", label: "7. Quantity Count Verification" },
-                    ].map((item) => (
-                      <label key={item.key} className="flex items-center gap-2 font-medium cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(qcChecklist[item.key])}
-                          onChange={(e) =>
-                            setQcChecklist((prev) => ({ ...prev, [item.key]: e.target.checked }))
-                          }
-                          className="size-4 rounded accent-brand-yellow"
-                        />
-                        {item.label}
-                      </label>
+                        {/* Advance Stage Control */}
+                        <div className="flex gap-1 pt-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full h-7 text-[10px]"
+                            onClick={() => {
+                              const idx = ORDER_LIFECYCLE_STAGES.findIndex((s) => s.key === o.status);
+                              if (idx >= 0 && idx < ORDER_LIFECYCLE_STAGES.length - 1) {
+                                updateOrderStatus(o.id, ORDER_LIFECYCLE_STAGES[idx + 1].key);
+                              }
+                            }}
+                          >
+                            Advance Stage ➔
+                          </Button>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
-
-                {/* Decision Actions */}
-                <div className="flex items-center gap-3 pt-2">
-                  <Button variant="gradient" size="sm" onClick={() => submitQCResult("pass")}>
-                    <CheckCircle2 className="size-4 text-emerald-400" /> ✓ PASS (Advance to Packing)
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => submitQCResult("reprint")}>
-                    <RotateCcw className="size-4 text-amber-400" /> 🔄 REPRINT REQUIRED
-                  </Button>
-                  <Button variant="destructive" size="sm" onClick={() => submitQCResult("reject")}>
-                    <XCircle className="size-4" /> ❌ REJECT (Scrap Order)
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+              );
+            })}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* ============================================================ */}
-        {/* MODULE 5: PACKING STATION */}
-        {/* ============================================================ */}
-        {activeModule === "ops_packing" && (
-          <div className="space-y-6">
-            <Card className="border-border/80 bg-slate-900/60">
-              <CardHeader className="py-3">
-                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <QrCode className="size-4 text-cyan-400" /> Barcode Verification Packing Station
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-xs">
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Scan order barcode or enter order ID..."
-                    value={packingScanOrderInput}
-                    onChange={(e) => setPackingScanOrderInput(e.target.value)}
-                  />
-                  <Button variant="gradient" size="sm" onClick={handlePackingOrderScan}>
-                    Scan Order
-                  </Button>
-                </div>
+      {/* ============================================================ */}
+      {/* MODULE 2: PRINT QUEUE ENGINE */}
+      {/* ============================================================ */}
+      {activeModule === "ops_print_queue" && (
+        <div className="space-y-6">
+          {/* Batch Generator Control */}
+          <Card className="border-border/80 bg-slate-900/60">
+            <CardHeader className="py-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <Printer className="size-4 text-brand-purple" /> Automated Batch Optimization Generator
+              </CardTitle>
+              <Button variant="gradient" size="sm" onClick={handleCreatePrintBatch}>
+                ⚡ Generate New Print Batch
+              </Button>
+            </CardHeader>
+            <CardContent className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Material Type</label>
+                <select
+                  className="w-full h-8 rounded-xl border border-border bg-background px-2 text-xs font-semibold"
+                  value={batchMaterial}
+                  onChange={(e) => setBatchMaterial(e.target.value)}
+                >
+                  <option value="Vinyl">Vinyl (Premium Waterproof)</option>
+                  <option value="Holographic Film">Holographic Metallic Film</option>
+                  <option value="Transparent Film">Clear Transparent Film</option>
+                  <option value="Paper">Glossy Poster Paper</option>
+                </select>
+              </div>
 
-                {packingStatusMsg && (
-                  <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-3 font-semibold text-cyan-400">
-                    {packingStatusMsg}
+              <div>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Finish Type</label>
+                <select
+                  className="w-full h-8 rounded-xl border border-border bg-background px-2 text-xs font-semibold"
+                  value={batchFinish}
+                  onChange={(e) => setBatchFinish(e.target.value)}
+                >
+                  <option value="Glossy Finish">Glossy Lamination</option>
+                  <option value="Matte Finish">Matte Anti-Glare</option>
+                  <option value="Holographic Sheen">Holographic Rainbow Sheen</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Sticker Dimension Size</label>
+                <select
+                  className="w-full h-8 rounded-xl border border-border bg-background px-2 text-xs font-semibold"
+                  value={batchSize}
+                  onChange={(e) => setBatchSize(e.target.value)}
+                >
+                  <option value='3" x 3"'>3" x 3" Die-Cut</option>
+                  <option value='4" x 4"'>4" x 4" Die-Cut</option>
+                  <option value='A4 Poster'>A4 Poster Frame</option>
+                </select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Print Batches Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {printBatches.map((b) => (
+              <Card key={b.id} className="border-border/80 bg-slate-900/60">
+                <CardHeader className="py-3 flex flex-row items-center justify-between border-b border-border/60">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-brand-purple font-mono">{b.batchNumber}</span>
+                    <Badge variant={b.status === "printing" ? "success" : "outline"} size="sm" className="capitalize">
+                      {b.status}
+                    </Badge>
                   </div>
-                )}
+                  <span className="text-xs text-muted-foreground font-mono">{b.estTimeMins} mins est</span>
+                </CardHeader>
+                <CardContent className="py-3 space-y-3 text-xs">
+                  <div className="grid grid-cols-2 gap-2 text-muted-foreground">
+                    <p>Material: <strong className="text-foreground">{b.material}</strong></p>
+                    <p>Finish: <strong className="text-foreground">{b.finish}</strong></p>
+                    <p>Jobs Included: <strong className="text-foreground">{b.orderCount} orders</strong></p>
+                    <p>Operator: <strong className="text-foreground">{b.operator}</strong></p>
+                  </div>
 
-                {packingVerifiedOrder && (
-                  <div className="rounded-xl border border-border bg-slate-950 p-4 space-y-3">
-                    <p className="font-bold text-sm">Packing Order #{packingVerifiedOrder.id.slice(0, 8)}</p>
-                    <p className="text-muted-foreground">Customer: {packingVerifiedOrder.customer_name}</p>
-
-                    <div className="border-t border-border pt-2">
-                      <Button
-                        variant="gradient"
-                        size="sm"
-                        onClick={() => handleGenerateShippingAWB(packingVerifiedOrder.id)}
-                      >
-                        ✓ Pack Verified &amp; Generate Courier Shipping AWB
+                  <div className="flex items-center gap-2 pt-2 border-t border-border/60">
+                    {b.status === "queued" && (
+                      <Button variant="gradient" size="sm" onClick={() => updateBatchStatus(b.id, "printing")}>
+                        <Play className="size-3" /> Start Printing
                       </Button>
-                    </div>
+                    )}
+                    {b.status === "printing" && (
+                      <Button variant="outline" size="sm" onClick={() => updateBatchStatus(b.id, "completed")}>
+                        <Check className="size-3 text-emerald-400" /> Mark Batch Complete
+                      </Button>
+                    )}
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* ============================================================ */}
-        {/* MODULE 6: SHIPPING INTEGRATION */}
-        {/* ============================================================ */}
-        {activeModule === "ops_shipping" && (
-          <div className="space-y-6">
-            <Card className="border-border/80 bg-slate-900/60">
-              <CardHeader className="py-3">
-                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <Truck className="size-4 text-brand-yellow" /> Multi-Courier Integration Aggregator
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-xs">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="font-bold uppercase text-muted-foreground">Selected Courier Partner</label>
-                    <select
-                      className="w-full h-9 rounded-xl border border-border bg-background px-3 text-xs font-semibold"
-                      value={selectedCourier}
-                      onChange={(e) => setSelectedCourier(e.target.value)}
-                    >
-                      <option value="Delhivery">Delhivery Express</option>
-                      <option value="Blue Dart">Blue Dart Air</option>
-                      <option value="XpressBees">XpressBees Surface</option>
-                    </select>
-                  </div>
+      {/* ============================================================ */}
+      {/* MODULE 4: QUALITY CONTROL (QC) STATION */}
+      {/* ============================================================ */}
+      {activeModule === "ops_qc" && (
+        <div className="space-y-6">
+          <Card className="border-border/80 bg-slate-900/60">
+            <CardHeader className="py-3">
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <ShieldCheck className="size-4 text-brand-yellow" /> Quality Control (QC) Inspection Station
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs font-semibold uppercase text-muted-foreground">Scan or Select Order ID *</label>
+                  <select
+                    className="w-full h-9 rounded-xl border border-border bg-background px-3 text-xs font-semibold"
+                    value={qcSelectedOrderId}
+                    onChange={(e) => setQcSelectedOrderId(e.target.value)}
+                  >
+                    <option value="">Select Order for Inspection...</option>
+                    {orders.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.id.slice(0, 8)} - {o.customer_name} ({o.status})
+                      </option>
+                    ))}
+                  </select>
                 </div>
+              </div>
 
-                {generatedAWB && (
-                  <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 space-y-2">
-                    <p className="font-bold text-emerald-400">✓ AWB Generated Successfully!</p>
-                    <p className="font-mono text-sm">AWB: {generatedAWB.awbNumber}</p>
-                    <Button variant="outline" size="sm" asChild>
-                      <a href={generatedAWB.trackingUrl} target="_blank" rel="noreferrer">
-                        Open Tracking URL ↗
-                      </a>
+              {/* 7-Point QC Checklist */}
+              <div className="rounded-xl border border-border bg-slate-950 p-4 space-y-2 text-xs">
+                <p className="font-bold uppercase text-brand-yellow">7-Point Physical Print Inspection Checklist</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
+                  {[
+                    { key: "artwork", label: "1. Artwork & Vector Registration" },
+                    { key: "dimensions", label: "2. Die-Cut Size & Dimensions" },
+                    { key: "finish", label: "3. Specified Laminate Finish" },
+                    { key: "printQuality", label: "4. DPI Crispness & No Banding" },
+                    { key: "lamination", label: "5. Lamination Adhesion" },
+                    { key: "colorAccuracy", label: "6. CMYK Color Accuracy" },
+                    { key: "quantityCount", label: "7. Quantity Count Verification" },
+                  ].map((item) => (
+                    <label key={item.key} className="flex items-center gap-2 font-medium cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(qcChecklist[item.key])}
+                        onChange={(e) =>
+                          setQcChecklist((prev) => ({ ...prev, [item.key]: e.target.checked }))
+                        }
+                        className="size-4 rounded accent-brand-yellow"
+                      />
+                      {item.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Decision Actions */}
+              <div className="flex items-center gap-3 pt-2">
+                <Button variant="gradient" size="sm" onClick={() => submitQCResult("pass")}>
+                  <CheckCircle2 className="size-4 text-emerald-400" /> ✓ PASS (Advance to Packing)
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => submitQCResult("reprint")}>
+                  <RotateCcw className="size-4 text-amber-400" /> 🔄 REPRINT REQUIRED
+                </Button>
+                <Button variant="destructive" size="sm" onClick={() => submitQCResult("reject")}>
+                  <XCircle className="size-4" /> ❌ REJECT (Scrap Order)
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* MODULE 5: PACKING STATION */}
+      {/* ============================================================ */}
+      {activeModule === "ops_packing" && (
+        <div className="space-y-6">
+          <Card className="border-border/80 bg-slate-900/60">
+            <CardHeader className="py-3">
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <QrCode className="size-4 text-cyan-400" /> Barcode Verification Packing Station
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-xs">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Scan order barcode or enter order ID..."
+                  value={packingScanOrderInput}
+                  onChange={(e) => setPackingScanOrderInput(e.target.value)}
+                />
+                <Button variant="gradient" size="sm" onClick={handlePackingOrderScan}>
+                  Scan Order
+                </Button>
+              </div>
+
+              {packingStatusMsg && (
+                <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-3 font-semibold text-cyan-400">
+                  {packingStatusMsg}
+                </div>
+              )}
+
+              {packingVerifiedOrder && (
+                <div className="rounded-xl border border-border bg-slate-950 p-4 space-y-3">
+                  <p className="font-bold text-sm">Packing Order #{packingVerifiedOrder.id.slice(0, 8)}</p>
+                  <p className="text-muted-foreground">Customer: {packingVerifiedOrder.customer_name}</p>
+
+                  <div className="border-t border-border pt-2">
+                    <Button
+                      variant="gradient"
+                      size="sm"
+                      onClick={() => handleGenerateShippingAWB(packingVerifiedOrder.id)}
+                    >
+                      ✓ Pack Verified &amp; Generate Courier Shipping AWB
                     </Button>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-        {/* ============================================================ */}
-        {/* MODULE 7: OPERATIONS ANALYTICS & SLA KPIS */}
-        {/* ============================================================ */}
-        {activeModule === "ops_analytics" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-              <KpiCard icon={<Activity className="size-4 text-brand-yellow" />} label="Active Queue Size" value={orders.filter((o) => o.status !== "shipped" && o.status !== "delivered").length.toString()} />
-              <KpiCard icon={<Printer className="size-4 text-brand-purple" />} label="Batches Printing" value={printBatches.filter((b) => b.status === "printing").length.toString()} />
-              <KpiCard icon={<ShieldCheck className="size-4 text-emerald-400" />} label="QC Pass Rate" value="98.4%" />
-              <KpiCard icon={<Truck className="size-4 text-blue-400" />} label="Avg Dispatch Time" value="1.8 hours" />
-            </div>
+      {/* ============================================================ */}
+      {/* MODULE 6: SHIPPING INTEGRATION */}
+      {/* ============================================================ */}
+      {activeModule === "ops_shipping" && (
+        <div className="space-y-6">
+          <Card className="border-border/80 bg-slate-900/60">
+            <CardHeader className="py-3">
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <Truck className="size-4 text-brand-yellow" /> Multi-Courier Integration Aggregator
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-xs">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="font-bold uppercase text-muted-foreground">Selected Courier Partner</label>
+                  <select
+                    className="w-full h-9 rounded-xl border border-border bg-background px-3 text-xs font-semibold"
+                    value={selectedCourier}
+                    onChange={(e) => setSelectedCourier(e.target.value)}
+                  >
+                    <option value="Delhivery">Delhivery Express</option>
+                    <option value="Blue Dart">Blue Dart Air</option>
+                    <option value="XpressBees">XpressBees Surface</option>
+                  </select>
+                </div>
+              </div>
+
+              {generatedAWB && (
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 space-y-2">
+                  <p className="font-bold text-emerald-400">✓ AWB Generated Successfully!</p>
+                  <p className="font-mono text-sm">AWB: {generatedAWB.awbNumber}</p>
+                  <Button variant="outline" size="sm" asChild>
+                    <a href={generatedAWB.trackingUrl} target="_blank" rel="noreferrer">
+                      Open Tracking URL ↗
+                    </a>
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* MODULE 7: OPERATIONS ANALYTICS & SLA KPIS */}
+      {/* ============================================================ */}
+      {activeModule === "ops_analytics" && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <KpiCard icon={<Activity className="size-4 text-brand-yellow" />} label="Active Queue Size" value={orders.filter((o) => o.status !== "shipped" && o.status !== "delivered").length.toString()} />
+            <KpiCard icon={<Printer className="size-4 text-brand-purple" />} label="Batches Printing" value={printBatches.filter((b) => b.status === "printing").length.toString()} />
+            <KpiCard icon={<ShieldCheck className="size-4 text-emerald-400" />} label="QC Pass Rate" value="98.4%" />
+            <KpiCard icon={<Truck className="size-4 text-blue-400" />} label="Avg Dispatch Time" value="1.8 hours" />
           </div>
-        )}
-      </main>
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function AdminPage() {
+  return (
+    <React.Suspense fallback={<div className="p-6">Loading operations...</div>}>
+      <AdminPageContent />
+    </React.Suspense>
   );
 }
 
