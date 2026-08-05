@@ -83,11 +83,59 @@ function ShopClient() {
     [addItem]
   );
 
+  const [dbProducts, setDbProducts] = React.useState<Product[]>([]);
+  const [dbCollections, setDbCollections] = React.useState<any[]>([]);
+  const [dbMaterials, setDbMaterials] = React.useState<any[]>([]);
+
   React.useEffect(() => {
-    if (initialType) {
-      // Keep URL in sync
-    }
-  }, [initialType]);
+    // Fetch products
+    fetch("/api/admin/products")
+      .then((r) => r.json())
+      .then((json) => {
+        if (json?.ok && Array.isArray(json.data) && json.data.length > 0) {
+          const active = json.data
+            .filter((p: any) => p.status === "active" && p.visibility !== "hidden")
+            .map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              slug: p.slug,
+              description: p.description || p.short_description || "",
+              price: (p.price_cents || 0) / 100,
+              compareAt: p.compare_at_cents ? p.compare_at_cents / 100 : undefined,
+              currency: p.currency || "INR",
+              image: p.image_url || (Array.isArray(p.images) && p.images[0]) || "/images/placeholder.webp",
+              images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [p.image_url || "/images/placeholder.webp"],
+              type: p.type === "sticker" ? "sticker_normal" : p.type,
+              category: p.collection || "Stickers",
+              collection: p.collection || "General",
+              tags: p.tags || [],
+              rating: p.rating || 5.0,
+              reviewCount: p.review_count || 0,
+              customizable: p.customizable ?? false,
+            }));
+          if (active.length > 0) setDbProducts(active);
+        }
+      })
+      .catch(() => {});
+
+    // Fetch collections
+    fetch("/api/admin/collections")
+      .then((r) => r.json())
+      .then((json) => {
+        if (json?.ok && Array.isArray(json.data)) setDbCollections(json.data);
+      })
+      .catch(() => {});
+
+    // Fetch materials
+    fetch("/api/admin/materials")
+      .then((r) => r.json())
+      .then((json) => {
+        if (json?.ok && Array.isArray(json.data)) setDbMaterials(json.data);
+      })
+      .catch(() => {});
+  }, []);
+
+  const allProducts = dbProducts.length > 0 ? dbProducts : mockProducts;
 
   const setParam = React.useCallback(
     (key: string, value?: string | null) => {
@@ -102,7 +150,7 @@ function ShopClient() {
 
   // Filtering pipeline
   const filtered = React.useMemo(() => {
-    let res = mockProducts.slice();
+    let res = allProducts.slice();
     if (searchQuery) {
       res = res.filter(
         (p) =>
@@ -146,7 +194,7 @@ function ShopClient() {
         res = res.sort((a, b) => b.rating - a.rating);
     }
     return res;
-  }, [filterParam, searchQuery, type, collection, priceBand, material, sort]);
+  }, [allProducts, filterParam, searchQuery, type, collection, priceBand, material, sort]);
 
   const activeCount =
     (type !== "all" ? 1 : 0) +

@@ -8,18 +8,23 @@ import { WhyChooseUs } from "@/components/home/why-choose-us";
 import { ReviewsSection } from "@/components/home/reviews-section";
 import { InstagramFeed } from "@/components/home/instagram-feed";
 import { Newsletter } from "@/components/home/newsletter";
+import { getStoreFeatureFlags } from "@/lib/store-features";
 
-export default function HomePage() {
+export const revalidate = 60; // Revalidate feature flags & store configuration every 60s
+
+export default async function HomePage() {
+  const flags = await getStoreFeatureFlags();
+
   return (
     <>
-      <HeroSection />
-      <FeaturedCategories />
+      {flags.homepage_banner_enabled && <HeroSection />}
+      {flags.categories_enabled && <FeaturedCategories />}
       <BestSellers />
       <NewArrivals />
-      <CustomizeShowcase />
-      <TrendingCollections />
+      {flags.custom_orders_enabled && <CustomizeShowcase />}
+      {flags.collections_enabled && <TrendingCollections />}
       <WhyChooseUs />
-      <ReviewsSection />
+      {flags.reviews_enabled && <ReviewsSection />}
       <InstagramFeed />
       <Newsletter />
     </>

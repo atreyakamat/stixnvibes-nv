@@ -45,7 +45,7 @@ export async function getStoreFeatureFlags(): Promise<FeatureFlags> {
     if (error || !data || data.length === 0) return DEFAULT_FEATURE_FLAGS;
 
     const flags = { ...DEFAULT_FEATURE_FLAGS };
-    for (const row of data) {
+    for (const row of (data as any[])) {
       const key = row.key as keyof FeatureFlags;
       if (key in flags) {
         const val = row.value;

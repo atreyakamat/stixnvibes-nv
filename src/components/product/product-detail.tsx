@@ -27,9 +27,45 @@ export function ProductDetail({ product, related }: { product: Product; related:
   const [selectedImage, setSelectedImage] = React.useState(0);
   const [size, setSize] = React.useState(SIZES[1]);
   const [finish, setFinish] = React.useState(FINISHES[0]);
+  const [dbMaterials, setDbMaterials] = React.useState<any[]>([]);
+  const [dbSizes, setDbSizes] = React.useState<any[]>([]);
   const [qty, setQty] = React.useState(1);
   const [zoom, setZoom] = React.useState(false);
   const [added, setAdded] = React.useState(false);
+
+  React.useEffect(() => {
+    // Fetch active materials
+    fetch("/api/admin/materials")
+      .then((r) => r.json())
+      .then((json) => {
+        if (json?.ok && Array.isArray(json.data) && json.data.length > 0) {
+          const active = json.data.filter((m: any) => m.is_active);
+          if (active.length > 0) {
+            setDbMaterials(active);
+            // Default material selection
+            const isPoster = product.type === "poster" || product.name.toLowerCase().includes("poster");
+            const defaultMat = active.find((m: any) =>
+              isPoster
+                ? m.name.toLowerCase().includes("paper") || m.name.toLowerCase().includes("glossy")
+                : m.name.toLowerCase().includes("vinyl") || m.name.toLowerCase().includes("premium")
+            );
+            if (defaultMat) setFinish(defaultMat.name);
+          }
+        }
+      })
+      .catch(() => {});
+
+    // Fetch active sizes
+    fetch("/api/admin/sizes")
+      .then((r) => r.json())
+      .then((json) => {
+        if (json?.ok && Array.isArray(json.data) && json.data.length > 0) {
+          const active = json.data.filter((s: any) => s.is_active);
+          if (active.length > 0) setDbSizes(active);
+        }
+      })
+      .catch(() => {});
+  }, [product.type, product.name]);
 
   const discount = product.compareAt
     ? Math.round(((product.compareAt - product.price) / product.compareAt) * 100)
@@ -210,7 +246,7 @@ export function ProductDetail({ product, related }: { product: Product; related:
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-2">Size</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {SIZES.map((s) => (
+                  {(dbSizes.length > 0 ? dbSizes.map((s) => s.name) : SIZES).map((s) => (
                     <button
                       key={s}
                       onClick={() => setSize(s)}
@@ -225,15 +261,15 @@ export function ProductDetail({ product, related }: { product: Product; related:
                 </div>
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-2">Finish</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-2">Material / Finish</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {FINISHES.map((f) => (
+                  {(dbMaterials.length > 0 ? dbMaterials.map((m) => m.name) : FINISHES).map((f) => (
                     <button
                       key={f}
                       onClick={() => setFinish(f)}
                       className={cn(
                         "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
-                        finish === f ? "bg-accent text-accent-foreground border-transparent" : "border-border hover:bg-secondary"
+                        finish === f ? "bg-brand-yellow text-slate-950 font-bold border-transparent shadow-soft" : "border-border hover:bg-secondary"
                       )}
                     >
                       {f}
