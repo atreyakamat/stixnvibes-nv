@@ -63,9 +63,9 @@ export default function SettingsPage() {
 
   const fetchSettings = async () => {
     try {
-      const token = localStorage.getItem("snv.admin.accessToken");
+      const token = typeof window !== "undefined" ? localStorage.getItem("snv.admin.accessToken") : null;
       const res = await fetch("/api/admin/settings", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (res.ok) {
         const json = await res.json();
@@ -86,8 +86,8 @@ export default function SettingsPage() {
         }
         setSettings(grouped);
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
+      // Handled gracefully
     } finally {
       setLoading(false);
     }

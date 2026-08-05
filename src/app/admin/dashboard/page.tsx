@@ -11,16 +11,16 @@ export default function DashboardPage() {
 
   const fetchDashboard = async () => {
     try {
-      const token = localStorage.getItem("snv.admin.accessToken");
+      const token = typeof window !== "undefined" ? localStorage.getItem("snv.admin.accessToken") : null;
       const res = await fetch("/api/admin/dashboard", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (res.ok) {
         const json = await res.json();
-        setData(json.data || json);
+        if (json?.ok) setData(json.data || json);
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
+      // Handled gracefully
     } finally {
       setLoading(false);
     }

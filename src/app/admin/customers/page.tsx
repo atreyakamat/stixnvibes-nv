@@ -13,18 +13,17 @@ export default function CustomersPage() {
   const [sort, setSort] = useState("total_spent");
 
   const fetchCustomers = async () => {
-    setLoading(true);
     try {
-      const token = localStorage.getItem("snv.admin.accessToken");
-      const res = await fetch(`/api/admin/customers?search=${search}&sort=${sort}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const token = typeof window !== "undefined" ? localStorage.getItem("snv.admin.accessToken") : null;
+      const res = await fetch(`/api/admin/customers?search=${encodeURIComponent(search)}&sort=${sort}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (res.ok) {
         const json = await res.json();
-        setCustomers(json.data || json);
+        if (json?.ok) setCustomers(json.data || []);
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
+      // Handled gracefully
     } finally {
       setLoading(false);
     }

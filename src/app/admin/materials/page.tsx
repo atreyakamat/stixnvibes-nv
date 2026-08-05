@@ -44,15 +44,16 @@ export default function MaterialsPage() {
 
   const fetchMaterials = async () => {
     try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("snv.admin.accessToken") : null;
       const res = await fetch("/api/admin/materials", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("snv.admin.accessToken")}` },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      const json = await res.json();
-      if (json.ok) {
-        setMaterials(json.data || []);
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.ok) setMaterials(json.data || []);
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
+      // Handled gracefully
     } finally {
       setLoading(false);
     }

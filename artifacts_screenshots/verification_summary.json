@@ -1,0 +1,63 @@
+{
+  "consoleErrors": [],
+  "pageErrors": [],
+  "networkFailures": [],
+  "verificationResults": [
+    {
+      "route": "/admin",
+      "status": 200,
+      "title": "Stix N Vibes — Stick Loud. Vibe Harder."
+    },
+    {
+      "route": "/admin/dashboard",
+      "status": 200,
+      "title": "Stix N Vibes — Stick Loud. Vibe Harder."
+    },
+    {
+      "route": "/admin/products",
+      "status": 200,
+      "title": "Stix N Vibes — Stick Loud. Vibe Harder."
+    },
+    {
+      "route": "/admin/categories",
+      "status": 200,
+      "title": "Stix N Vibes — Stick Loud. Vibe Harder."
+    },
+    {
+      "route": "/admin/collections",
+      "status": 200,
+      "title": "Stix N Vibes — Stick Loud. Vibe Harder."
+    },
+    {
+      "route": "/admin/orders",
+      "status": 200,
+      "title": "Stix N Vibes — Stick Loud. Vibe Harder."
+    },
+    {
+      "route": "/admin/customers",
+      "status": 200,
+      "title": "Stix N Vibes — Stick Loud. Vibe Harder."
+    },
+    {
+      "route": "/admin/settings",
+      "status": 200,
+      "title": "Stix N Vibes — Stick Loud. Vibe Harder."
+    },
+    {
+      "route": "/admin/materials",
+      "status": 200,
+      "title": "Stix N Vibes — Stick Loud. Vibe Harder."
+    },
+    {
+      "route": "/admin/sizes",
+      "status": 200,
+      "title": "Stix N Vibes — Stick Loud. Vibe Harder."
+    },
+    {
+      "route": "/admin/pages",
+      "status": 200,
+      "title": "Stix N Vibes — Stick Loud. Vibe Harder."
+    }
+  ],
+  "timestamp": "2026-08-05T09:08:05.709Z"
+}

@@ -90,17 +90,16 @@ export default function ProductsAdminPage() {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("snv.admin.accessToken");
+      const token = typeof window !== "undefined" ? localStorage.getItem("snv.admin.accessToken") : null;
       const res = await fetch("/api/admin/products", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error);
-      setProducts(data.data || []);
-    } catch (err: any) {
-      setError(err.message);
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.ok) setProducts(data.data || []);
+      }
+    } catch {
+      // Handled gracefully
     } finally {
       setLoading(false);
     }

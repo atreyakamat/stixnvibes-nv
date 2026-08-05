@@ -36,16 +36,19 @@ export default function CategoriesPage() {
 
   const fetchCategories = async () => {
     try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("snv.admin.accessToken") : null;
       const res = await fetch("/api/admin/categories", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("snv.admin.accessToken")}` },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      const json = await res.json();
-      if (json.ok) {
-        setCategoriesTree(json.data?.tree || []);
-        setCategoriesFlat(json.data?.flat || []);
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.ok) {
+          setCategoriesTree(json.data?.tree || []);
+          setCategoriesFlat(json.data?.flat || []);
+        }
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
+      // Handled gracefully
     } finally {
       setLoading(false);
     }

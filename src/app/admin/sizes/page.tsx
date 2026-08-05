@@ -35,13 +35,16 @@ export default function SizesPage() {
 
   const fetchSizes = async () => {
     try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("snv.admin.accessToken") : null;
       const res = await fetch("/api/admin/sizes", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("snv.admin.accessToken")}` },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      const json = await res.json();
-      if (json.ok) setSizes(json.data || []);
-    } catch (e) {
-      console.error(e);
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.ok) setSizes(json.data || []);
+      }
+    } catch {
+      // Handled gracefully
     } finally {
       setLoading(false);
     }

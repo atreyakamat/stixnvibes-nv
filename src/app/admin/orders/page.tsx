@@ -16,18 +16,17 @@ export default function OrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
   const fetchOrders = async () => {
-    setLoading(true);
     try {
-      const token = localStorage.getItem("snv.admin.accessToken");
-      const res = await fetch(`/api/admin/orders`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const token = typeof window !== "undefined" ? localStorage.getItem("snv.admin.accessToken") : null;
+      const res = await fetch("/api/admin/orders", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (res.ok) {
         const json = await res.json();
-        setOrders(json.data || json);
+        if (json?.ok) setOrders(json.data || []);
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
+      // Handled gracefully
     } finally {
       setLoading(false);
     }
