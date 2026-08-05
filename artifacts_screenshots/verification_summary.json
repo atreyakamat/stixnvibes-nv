@@ -14,6 +14,16 @@
       "title": "Stix N Vibes — Stick Loud. Vibe Harder."
     },
     {
+      "route": "/admin/homepage",
+      "status": 200,
+      "title": "Stix N Vibes — Stick Loud. Vibe Harder."
+    },
+    {
+      "route": "/admin/media",
+      "status": 200,
+      "title": "Stix N Vibes — Stick Loud. Vibe Harder."
+    },
+    {
       "route": "/admin/products",
       "status": 200,
       "title": "Stix N Vibes — Stick Loud. Vibe Harder."
@@ -57,7 +67,17 @@
       "route": "/admin/pages",
       "status": 200,
       "title": "Stix N Vibes — Stick Loud. Vibe Harder."
+    },
+    {
+      "route": "/admin/theme",
+      "status": 200,
+      "title": "Stix N Vibes — Stick Loud. Vibe Harder."
+    },
+    {
+      "route": "/admin/navigation",
+      "status": 200,
+      "title": "Stix N Vibes — Stick Loud. Vibe Harder."
     }
   ],
-  "timestamp": "2026-08-05T09:08:05.709Z"
+  "timestamp": "2026-08-05T11:03:39.561Z"
 }

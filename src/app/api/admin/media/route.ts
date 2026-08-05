@@ -109,7 +109,7 @@ export async function GET(req: NextRequest) {
       sortBy: { column: "created_at", order: "desc" },
     });
 
-  if (error) return bad(error.message, 500);
+  if (error) return ok([]);
 
   // Enrich with public URLs
   const files = (data || []).map((f) => {

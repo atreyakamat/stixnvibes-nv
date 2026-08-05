@@ -10,20 +10,42 @@ if (!fs.existsSync(screenshotDir)) {
 const ADMIN_ROUTES = [
   { path: "/admin", name: "01_admin_ops" },
   { path: "/admin/dashboard", name: "02_admin_dashboard" },
-  { path: "/admin/products", name: "03_admin_products" },
-  { path: "/admin/categories", name: "04_admin_categories" },
-  { path: "/admin/collections", name: "05_admin_collections" },
-  { path: "/admin/orders", name: "06_admin_orders" },
-  { path: "/admin/customers", name: "07_admin_customers" },
-  { path: "/admin/settings", name: "08_admin_settings" },
-  { path: "/admin/materials", name: "09_admin_materials" },
-  { path: "/admin/sizes", name: "10_admin_sizes" },
-  { path: "/admin/pages", name: "11_admin_pages" },
+  { path: "/admin/homepage", name: "03_admin_homepage" },
+  { path: "/admin/media", name: "04_admin_media" },
+  { path: "/admin/products", name: "05_admin_products" },
+  { path: "/admin/categories", name: "06_admin_categories" },
+  { path: "/admin/collections", name: "07_admin_collections" },
+  { path: "/admin/orders", name: "08_admin_orders" },
+  { path: "/admin/customers", name: "09_admin_customers" },
+  { path: "/admin/settings", name: "10_admin_settings" },
+  { path: "/admin/materials", name: "11_admin_materials" },
+  { path: "/admin/sizes", name: "12_admin_sizes" },
+  { path: "/admin/pages", name: "13_admin_pages" },
+  { path: "/admin/theme", name: "14_admin_theme" },
+  { path: "/admin/navigation", name: "15_admin_navigation" },
 ];
 
 test.describe("Admin Platform E2E & Visual Verification", () => {
-  test("Unauthenticated access redirects to /login", async ({ page }) => {
+  test("Unauthenticated access (missing cookie) redirects to /login", async ({ page }) => {
     await page.context().clearCookies();
+    await page.goto("/admin");
+    await page.waitForURL(/\/login/);
+    expect(page.url()).toContain("/login");
+  });
+
+  test("Invalid cookie redirects to /login", async ({ page, context }) => {
+    await context.addCookies([
+      { name: "snv_admin_token", value: "invalid_cookie_token_123", domain: "localhost", path: "/" }
+    ]);
+    await page.goto("/admin");
+    await page.waitForURL(/\/login/);
+    expect(page.url()).toContain("/login");
+  });
+
+  test("Expired / malformed token redirects to /login", async ({ page, context }) => {
+    await context.addCookies([
+      { name: "snv_admin_token", value: "expired.jwt.token", domain: "localhost", path: "/" }
+    ]);
     await page.goto("/admin");
     await page.waitForURL(/\/login/);
     expect(page.url()).toContain("/login");

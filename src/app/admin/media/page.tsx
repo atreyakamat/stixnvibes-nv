@@ -78,6 +78,22 @@ export default function MediaLibraryPage() {
     setTimeout(() => setCopiedUrl(null), 2000);
   };
 
+  const handleDelete = async (filename: string) => {
+    if (!confirm(`Delete image "${filename}"?`)) return;
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("snv.admin.accessToken") : null;
+      const res = await fetch(`/api/admin/media?path=products/${encodeURIComponent(filename)}`, {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        setFiles((prev) => prev.filter((f) => f.name !== filename));
+      }
+    } catch {
+      // Handled gracefully
+    }
+  };
+
   const filteredFiles = files.filter((f) => f.name.toLowerCase().includes(search.toLowerCase()));
 
   if (loading) {
@@ -148,6 +164,14 @@ export default function MediaLibraryPage() {
                   >
                     <ExternalLink className="size-3.5" />
                   </a>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(file.name)}
+                    className="grid size-8 place-items-center rounded-xl bg-red-950/80 text-red-400 hover:bg-red-900 hover:text-red-200 transition-colors"
+                    title="Delete Image"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
                 </div>
               </div>
               <CardContent className="p-2.5 space-y-1">

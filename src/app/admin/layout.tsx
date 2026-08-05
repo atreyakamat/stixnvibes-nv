@@ -7,7 +7,7 @@ import {
   Package, FolderTree, Tags as TagsIcon, Layers, Box,
   BarChart3, Users, ShoppingBag, FileText, Sliders,
   Activity, ShoppingCart, Printer, ShieldCheck, QrCode, Truck,
-  Menu, LogOut, LayoutTemplate, Image as ImageIcon
+  Menu, LogOut, LayoutTemplate, Image as ImageIcon, Palette, Navigation as NavIcon
 } from "lucide-react";
 
 class AdminErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
@@ -112,6 +112,8 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     { id: "biz_customers", href: "/admin/customers", label: "Customers", icon: <Users className="size-4 shrink-0" /> },
     { id: "biz_orders", href: "/admin/orders", label: "Orders", icon: <ShoppingBag className="size-4 shrink-0" /> },
     { id: "biz_pages", href: "/admin/pages", label: "Page Builder", icon: <FileText className="size-4 shrink-0" /> },
+    { id: "biz_nav", href: "/admin/navigation", label: "Navigation Builder", icon: <NavIcon className="size-4 shrink-0" /> },
+    { id: "biz_theme", href: "/admin/theme", label: "Theme & Branding", icon: <Palette className="size-4 shrink-0" /> },
     { id: "biz_settings", href: "/admin/settings", label: "Settings", icon: <Sliders className="size-4 shrink-0" /> },
   ];
 
