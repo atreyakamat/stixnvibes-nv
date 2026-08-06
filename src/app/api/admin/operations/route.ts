@@ -1,55 +1,23 @@
 export const dynamic = "force-dynamic";
-import { randomUUID } from "crypto";
-import { NextResponse, type NextRequest } from "next/server";
-import { createService } from "@/lib/supabase/service";
+import { type NextRequest } from "next/server";
+import { OperationsRepository } from "@/lib/repositories/operations-repository";
+import { ApiResponse, handleApiError } from "@/lib/api-response";
 import { requireAdminAuth } from "@/lib/auth-guard";
 
-function ok(data: unknown) {
-  return NextResponse.json({ ok: true, data });
-}
-function bad(error: string, status = 400) {
-  return NextResponse.json({ ok: false, error }, { status });
-}
-
-function isConnectionError(message: string): boolean {
-  const msg = message.toLowerCase();
-  return (
-    msg.includes("fetch failed") ||
-    msg.includes("econnrefused") ||
-    msg.includes("networkerror") ||
-    msg.includes("failed to fetch") ||
-    msg.includes("connect econnrefused")
-  );
-}
+const operationsRepo = new OperationsRepository();
 
 export async function GET(req: NextRequest) {
   const authErr = await requireAdminAuth(req);
   if (authErr) return authErr;
-
-  const admin = createService();
-  if (!admin) return bad("Database service unconfigured or unavailable", 503);
 
   const url = new URL(req.url);
   const mode = url.searchParams.get("mode") || "batches";
 
   try {
     if (mode === "qc") {
-      const { data, error } = await admin
-        .from("quality_checks")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(100);
-
-      if (error) {
-        console.error("[/api/admin/operations GET qc]", error.message);
-        if (isConnectionError(error.message)) {
-          return bad(`Database connection failed: ${error.message}`, 503);
-        }
-        return bad(error.message, 500);
-      }
-
-      return ok({
-        qcInspections: (data ?? []).map((row) => ({
+      const inspections = await operationsRepo.getQualityChecks();
+      return ApiResponse.success({
+        qcInspections: inspections.map((row) => ({
           id: row.id,
           orderId: row.order_id ?? row.production_job_id ?? "",
           operator: row.operator,
@@ -59,22 +27,9 @@ export async function GET(req: NextRequest) {
         })),
       });
     } else {
-      const { data, error } = await admin
-        .from("print_batches")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(100);
-
-      if (error) {
-        console.error("[/api/admin/operations GET batches]", error.message);
-        if (isConnectionError(error.message)) {
-          return bad(`Database connection failed: ${error.message}`, 503);
-        }
-        return bad(error.message, 500);
-      }
-
-      return ok({
-        printBatches: (data ?? []).map((row) => ({
+      const batches = await operationsRepo.getPrintBatches();
+      return ApiResponse.success({
+        printBatches: batches.map((row) => ({
           id: row.id,
           batchNumber: row.batch_number,
           material: row.material,
@@ -89,12 +44,7 @@ export async function GET(req: NextRequest) {
       });
     }
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("[/api/admin/operations GET catch]", msg);
-    if (isConnectionError(msg)) {
-      return bad(`Database connection error: ${msg}`, 503);
-    }
-    return bad(msg, 500);
+    return handleApiError(err);
   }
 }
 
@@ -102,14 +52,11 @@ export async function POST(req: NextRequest) {
   const authErr = await requireAdminAuth(req);
   if (authErr) return authErr;
 
-  const admin = createService();
-  if (!admin) return bad("Database service unconfigured or unavailable", 503);
-
   let body: Record<string, any>;
   try {
     body = await req.json();
   } catch {
-    return bad("Invalid JSON");
+    return ApiResponse.error("Invalid JSON body", "BAD_REQUEST", 400);
   }
 
   const { action } = body;
@@ -117,51 +64,29 @@ export async function POST(req: NextRequest) {
   try {
     if (action === "create_batch") {
       const { material, finish, size, orderCount, estTimeMins, operator } = body;
-      if (!material || !finish || !size) return bad("Missing required batch parameters");
+      if (!material || !finish || !size) {
+        return ApiResponse.error("Missing required batch parameters: material, finish, size", "BAD_REQUEST", 400);
+      }
 
-      const batchNumber = `BATCH-${Math.floor(1000 + Math.random() * 9000)}`;
-      const payload = {
-        id: randomUUID(),
-        batch_number: batchNumber,
+      const batch = await operationsRepo.createPrintBatch({
         material,
         finish,
         size,
-        order_count: orderCount || 1,
-        status: "queued",
-        est_time_mins: estTimeMins || 30,
-        operator: operator || "Operator",
-      };
-
-      const { data, error } = await admin.from("print_batches").insert(payload).select().single();
-      if (error) {
-        if (isConnectionError(error.message)) {
-          return bad(`Database connection failed: ${error.message}`, 503);
-        }
-        return bad(error.message, 500);
-      }
-
-      return ok({ created: true, batch: data });
+        orderCount,
+        estTimeMins,
+        operator,
+      });
+      return ApiResponse.success({ created: true, batch });
     }
 
     if (action === "update_batch_status") {
       const { batchId, status } = body;
-      if (!batchId || !status) return bad("Missing batchId or status");
-
-      const { data, error } = await admin
-        .from("print_batches")
-        .update({ status })
-        .eq("id", batchId)
-        .select()
-        .single();
-
-      if (error) {
-        if (isConnectionError(error.message)) {
-          return bad(`Database connection failed: ${error.message}`, 503);
-        }
-        return bad(error.message, 500);
+      if (!batchId || !status) {
+        return ApiResponse.error("Missing batchId or status", "BAD_REQUEST", 400);
       }
 
-      return ok({ updated: true, batch: data });
+      const batch = await operationsRepo.updateBatchStatus(batchId, status);
+      return ApiResponse.success({ updated: true, batch });
     }
 
     if (action === "submit_qc" || action === "qc_inspection") {
@@ -169,34 +94,22 @@ export async function POST(req: NextRequest) {
       const operator = body.operator || "Operator";
       const result = body.result;
       const checklist = body.checklist || {};
-      if (!result) return bad("Missing required QC result");
+      if (!result) {
+        return ApiResponse.error("Missing required QC result", "BAD_REQUEST", 400);
+      }
 
-      const payload = {
-        id: randomUUID(),
-        order_id: orderId || null,
-        production_job_id: body.productionJobId || body.production_job_id || null,
+      const qc = await operationsRepo.recordQualityCheck({
+        orderId,
+        productionJobId: body.productionJobId || body.production_job_id || null,
         operator,
         result,
         checklist,
-      };
-
-      const { data, error } = await admin.from("quality_checks").insert(payload).select().single();
-      if (error) {
-        if (isConnectionError(error.message)) {
-          return bad(`Database connection failed: ${error.message}`, 503);
-        }
-        return bad(error.message, 500);
-      }
-
-      return ok({ recorded: true, qc: data });
+      });
+      return ApiResponse.success({ recorded: true, qc });
     }
 
-    return bad("Unknown action");
+    return ApiResponse.error("Unknown action", "BAD_REQUEST", 400);
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (isConnectionError(msg)) {
-      return bad(`Database connection error: ${msg}`, 503);
-    }
-    return bad(msg, 500);
+    return handleApiError(err);
   }
 }

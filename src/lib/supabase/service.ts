@@ -29,7 +29,7 @@ export function isServiceConfigured() {
 export function createService() {
   const { supabaseUrl, serviceRoleKey } = getEnv();
   if (!isValidHttpUrl(supabaseUrl) || !serviceRoleKey) return null;
-  return createSupabaseClient<Database>(supabaseUrl, serviceRoleKey, {
+  return createSupabaseClient<any>(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }

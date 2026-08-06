@@ -30,7 +30,6 @@ export type OrderStatus =
   | "refunded";
 
 export type Database = {
-  graphql_public: { Tables: Record<string, never>; Views: Record<string, never>; Functions: Record<string, never>; Enums: Record<string, never> };
   public: {
     Tables: {
       categories: {

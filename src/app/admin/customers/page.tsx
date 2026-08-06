@@ -1,33 +1,48 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Search, User, ShoppingBag } from "lucide-react";
+import { User, ShoppingBag } from "lucide-react";
+import { DataTable, type Column } from "@/components/admin/data-table";
+
+interface CustomerRecord {
+  id?: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_email: string | null;
+  total_orders: number;
+  total_spent: number;
+  last_order_at: string;
+  first_order_at: string;
+}
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<CustomerRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
   const [sort, setSort] = useState("total_spent");
 
   const fetchCustomers = useCallback(async () => {
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("snv.admin.accessToken") : null;
-      const res = await fetch(`/api/admin/customers?search=${encodeURIComponent(search)}&sort=${sort}`, {
+      const res = await fetch(`/api/admin/customers?sort=${sort}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (res.ok) {
         const json = await res.json();
-        if (json?.ok) setCustomers(json.data || []);
+        if (json?.ok) {
+          const list = (json.data || []).map((item: CustomerRecord, index: number) => ({
+            ...item,
+            id: item.customer_phone || item.customer_email || `customer-${index}`,
+          }));
+          setCustomers(list);
+        }
       }
     } catch {
       // Handled gracefully
     } finally {
       setLoading(false);
     }
-  }, [search, sort]);
+  }, [sort]);
 
   useEffect(() => {
     fetchCustomers();
@@ -46,9 +61,43 @@ export default function CustomersPage() {
     return new Date(dateString).toLocaleDateString("en-IN", {
       day: "2-digit",
       month: "short",
-      year: "numeric"
+      year: "numeric",
     });
   };
+
+  const columns: Column<CustomerRecord>[] = [
+    {
+      header: "Customer",
+      cell: (row) => (
+        <div>
+          <p className="font-semibold text-slate-100">{row.customer_name || "Guest Customer"}</p>
+          <p className="text-[10px] text-muted-foreground">{row.customer_phone || "No phone"}</p>
+        </div>
+      ),
+    },
+    {
+      header: "Email",
+      accessorKey: "customer_email",
+      cell: (row) => row.customer_email || <span className="text-muted-foreground">—</span>,
+    },
+    {
+      header: "Orders",
+      cell: (row) => (
+        <Badge variant="outline" className="text-xs bg-slate-950/60">
+          <ShoppingBag className="w-3 h-3 mr-1" />
+          {row.total_orders} orders
+        </Badge>
+      ),
+    },
+    {
+      header: "Total Spent",
+      cell: (row) => <span className="font-bold text-brand-yellow">{formatINR(row.total_spent)}</span>,
+    },
+    {
+      header: "Last Order",
+      cell: (row) => <span className="text-muted-foreground">{formatDate(row.last_order_at)}</span>,
+    },
+  ];
 
   return (
     <div className="flex flex-col space-y-6 p-6 pb-20">
@@ -63,21 +112,17 @@ export default function CustomersPage() {
         </Badge>
       </div>
 
-      <Card className="bg-slate-900/60 border-border/80">
-        <CardContent className="p-4 flex flex-col md:flex-row gap-4 items-center">
-          <div className="relative w-full md:w-96">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search customers..." 
-              className="pl-9 bg-slate-950/50 border-border/50 text-sm"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <div className="flex items-center gap-2 w-full md:w-auto">
-            <span className="text-[10px] font-bold uppercase text-muted-foreground ml-auto md:ml-4">Sort By</span>
-            <select 
-              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      <DataTable
+        columns={columns}
+        data={customers}
+        searchPlaceholder="Search customers by name, phone or email..."
+        pageSize={15}
+        emptyText={loading ? "Loading customers..." : "No customer records found."}
+        actions={
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase text-muted-foreground">Sort By</span>
+            <select
+              className="h-9 rounded-md border border-input bg-slate-950 px-3 py-1 text-xs"
               value={sort}
               onChange={(e) => setSort(e.target.value)}
             >
@@ -86,52 +131,8 @@ export default function CustomersPage() {
               <option value="last_order_at">Last Order (Recency)</option>
             </select>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-slate-900/60 border-border/80 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-border/50 bg-slate-950/30">
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Customer</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Contact</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Total Orders</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Total Spent</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">First Order</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Last Order</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={6} className="p-8 text-center text-muted-foreground text-sm">Loading...</td></tr>
-              ) : customers.length === 0 ? (
-                <tr><td colSpan={6} className="p-8 text-center text-muted-foreground text-sm">No customers found.</td></tr>
-              ) : (
-                customers.map((c, i) => (
-                  <tr key={i} className="border-b border-border/30 hover:bg-slate-800/30 transition-colors">
-                    <td className="p-4">
-                      <div className="font-medium text-sm">{c.name || "Anonymous"}</div>
-                    </td>
-                    <td className="p-4 text-xs text-muted-foreground">
-                      <div>{c.email}</div>
-                      <div>{c.phone}</div>
-                    </td>
-                    <td className="p-4 text-sm">
-                      <Badge variant="outline" className="text-[10px]"><ShoppingBag className="w-3 h-3 mr-1"/>{c.total_orders || 0}</Badge>
-                    </td>
-                    <td className="p-4 font-bold text-sm text-brand-yellow">
-                      {formatINR(c.total_spent)}
-                    </td>
-                    <td className="p-4 text-xs text-muted-foreground">{formatDate(c.first_order_at)}</td>
-                    <td className="p-4 text-xs text-muted-foreground">{formatDate(c.last_order_at)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+        }
+      />
     </div>
   );
 }
