@@ -18,11 +18,28 @@ function isValidHttpUrl(url: string): boolean {
 /**
  * Validates that the incoming request is authenticated as an admin user.
  * Returns null if authorized, or a 401/403/500 NextResponse if unauthorized.
+ *
+ * Auth priority:
+ * 1. Static admin token (checked without network — always works)
+ * 2. Supabase JWT Bearer token (requires network)
+ * 3. Supabase session cookie (requires network)
  */
 export async function requireAdminAuth(req: NextRequest): Promise<NextResponse | null> {
   const supabaseConfigured = isValidHttpUrl(supabaseUrl) && Boolean(supabaseAnonKey) && !supabaseAnonKey.includes("YOUR_");
 
-  // Hard fail closed in production if Supabase is not configured.
+  // Step 1: Static token check (no Supabase network call needed)
+  const authHeader = req.headers.get("authorization");
+  const adminCookie = req.cookies.get("snv_admin_token");
+  if (
+    authHeader === `Bearer ${staticAdminToken}` ||
+    authHeader === "Bearer snv_admin_token_static_dev" ||
+    adminCookie?.value === staticAdminToken ||
+    adminCookie?.value === "snv_admin_token_static_dev"
+  ) {
+    return null; // Authorized via Static Admin Token — no DB needed
+  }
+
+  // Step 2: If Supabase is not configured, deny in production
   if (!supabaseConfigured) {
     if (process.env.NODE_ENV === "production") {
       return NextResponse.json(
@@ -34,19 +51,8 @@ export async function requireAdminAuth(req: NextRequest): Promise<NextResponse |
     return null;
   }
 
+  // Step 3: Supabase JWT or session cookie validation
   try {
-    // Check for static admin token in header or cookie
-    const authHeader = req.headers.get("authorization");
-    const adminCookie = req.cookies.get("snv_admin_token");
-    if (
-      authHeader === `Bearer ${staticAdminToken}` ||
-      authHeader === "Bearer snv_admin_token_static_dev" ||
-      adminCookie?.value === staticAdminToken ||
-      adminCookie?.value === "snv_admin_token_static_dev"
-    ) {
-      return null; // Authorized via Static Admin Token
-    }
-
     if (authHeader && authHeader.startsWith("Bearer ")) {
       const token = authHeader.substring(7);
       const { createService } = await import("@/lib/supabase/service");
@@ -79,9 +85,11 @@ export async function requireAdminAuth(req: NextRequest): Promise<NextResponse |
     return null; // Authorized via Supabase Cookie
   } catch (err) {
     console.error("[requireAdminAuth] verification error:", err);
+    // If Supabase is unreachable and no static token was found, deny access
     return NextResponse.json(
-      { ok: false, error: "Authentication verification failed" },
-      { status: 500 }
+      { ok: false, error: "Unauthorized: Authentication service unavailable" },
+      { status: 401 }
     );
   }
 }
+

@@ -12,6 +12,17 @@ function bad(error: string, status = 400) {
   return NextResponse.json({ ok: false, error }, { status });
 }
 
+function isConnectionError(message: string): boolean {
+  const msg = message.toLowerCase();
+  return (
+    msg.includes("fetch failed") ||
+    msg.includes("econnrefused") ||
+    msg.includes("networkerror") ||
+    msg.includes("failed to fetch") ||
+    msg.includes("connect econnrefused")
+  );
+}
+
 export async function GET(req: NextRequest) {
   const authErr = await requireAdminAuth(req);
   if (authErr) return authErr;
@@ -22,16 +33,33 @@ export async function GET(req: NextRequest) {
   const limit = Number(url.searchParams.get("limit") ?? 200);
 
   const admin = createService();
-  if (!admin) return bad("Database not configured", 503);
+  if (!admin) {
+    return bad("Database service unconfigured or unavailable", 503);
+  }
 
-  let q = admin.from("products").select("*");
-  if (type) q = q.eq("type", type);
-  if (featured) q = q.eq("is_featured", true);
-  q = q.limit(Math.min(Math.max(limit, 1), 500)).order("created_at", { ascending: false });
+  try {
+    let q = admin.from("products").select("*");
+    if (type) q = q.eq("type", type);
+    if (featured) q = q.eq("is_featured", true);
+    q = q.limit(Math.min(Math.max(limit, 1), 500)).order("created_at", { ascending: false });
 
-  const { data, error } = await q;
-  if (error) return bad(error.message, 500);
-  return ok(data);
+    const { data, error } = await q;
+    if (error) {
+      console.error("[/api/admin/products GET]", error.message);
+      if (isConnectionError(error.message)) {
+        return bad(`Database connection failed: ${error.message}`, 503);
+      }
+      return bad(error.message, 500);
+    }
+    return ok(data ?? []);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[/api/admin/products GET catch]", msg);
+    if (isConnectionError(msg)) {
+      return bad(`Database connection error: ${msg}`, 503);
+    }
+    return bad(msg, 500);
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -47,78 +75,107 @@ export async function POST(req: NextRequest) {
   // Handle Bulk Operations
   if (body?.bulkAction && Array.isArray(body?.ids)) {
     const { bulkAction, ids, status, tags, category } = body;
-    if (bulkAction === "delete") {
-      const { error } = await admin.from("products").delete().in("id", ids);
-      if (error) return bad(error.message, 500);
-      return ok({ bulk: true, action: "delete", count: ids.length });
+    try {
+      if (bulkAction === "delete") {
+        const { error } = await admin.from("products").delete().in("id", ids);
+        if (error) return bad(error.message, 500);
+        return ok({ bulk: true, action: "delete", count: ids.length });
+      }
+      if (bulkAction === "update_status" && status) {
+        const { error } = await admin.from("products").update({ status } as never).in("id", ids);
+        if (error) return bad(error.message, 500);
+        return ok({ bulk: true, action: "update_status", count: ids.length });
+      }
+      if (bulkAction === "update_tags" && Array.isArray(tags)) {
+        const { error } = await admin.from("products").update({ tags } as never).in("id", ids);
+        if (error) return bad(error.message, 500);
+        return ok({ bulk: true, action: "update_tags", count: ids.length });
+      }
+      if (bulkAction === "update_category" && category) {
+        const { error } = await admin.from("products").update({ collection: category } as never).in("id", ids);
+        if (error) return bad(error.message, 500);
+        return ok({ bulk: true, action: "update_category", count: ids.length });
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[/api/admin/products POST bulk]", msg);
+      return bad("Database connection failed", 503);
     }
-    if (bulkAction === "update_status" && status) {
-      const { error } = await admin.from("products").update({ status } as never).in("id", ids);
-      if (error) return bad(error.message, 500);
-      return ok({ bulk: true, action: "update_status", count: ids.length });
-    }
-    if (bulkAction === "update_tags" && Array.isArray(tags)) {
-      const { error } = await admin.from("products").update({ tags } as never).in("id", ids);
-      if (error) return bad(error.message, 500);
-      return ok({ bulk: true, action: "update_tags", count: ids.length });
-    }
+    return bad("Unknown bulk action");
   }
 
-  if (typeof body?.name !== "string" || typeof body?.slug !== "string" || typeof body?.price_cents !== "number") {
-    return bad("Missing required fields: name, slug, price_cents");
-  }
-  if (!z.slug(body.slug)) return bad("Invalid slug format. Use lowercase letters, numbers, and hyphens (e.g. my-cool-sticker).");
+  // Single product create/update
+  const {
+    id, name, slug, description, short_description, price_cents, compare_at_cents,
+    cost_cents, stock, min_stock, sku, barcode, type: productType, collection,
+    category, tags, is_featured, customizable, status, images, image_url,
+    metadata, seo_title, seo_description, seo_keywords, weight_grams,
+    allow_image_upload, allow_text_input, allow_crop_rotate, allow_bg_removal,
+    min_quantity, max_quantity, default_quantity, allowed_materials, allowed_papers,
+    allowed_sizes, schedule_at,
+  } = body;
 
-  const productPayload = {
-    id: body.id || undefined,
-    name: body.name,
-    slug: body.slug,
-    description: body.description ?? null,
-    short_description: body.short_description ?? null,
-    price_cents: body.price_cents,
-    compare_at_cents: body.compare_at_cents ?? null,
-    image_url: body.image_url ?? null,
-    images: body.images ?? (body.image_url ? [body.image_url] : []),
-    type: body.type ?? "sticker",
-    collection: body.collection ?? null,
-    stock: body.stock ?? 0,
-    is_featured: body.is_featured ?? false,
-    is_bundle: body.is_bundle ?? false,
-    is_limited: body.is_limited ?? false,
-    customizable: body.customizable ?? false,
-    tags: body.tags ?? [],
+  if (!name) return bad("Missing required field: name");
+
+  const finalSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  if (!z.slug(finalSlug)) return bad("Invalid slug format");
+
+  const payload = {
+    ...(id ? { id } : {}),
+    name,
+    slug: finalSlug,
+    description: description ?? null,
+    short_description: short_description ?? null,
+    price_cents: price_cents ?? 0,
+    compare_at_cents: compare_at_cents ?? null,
+    stock: stock ?? 0,
+    type: productType ?? "sticker",
+    collection: collection ?? null,
+    tags: Array.isArray(tags) ? tags : [],
+    is_featured: is_featured ?? false,
+    customizable: customizable ?? false,
+    status: status ?? "draft",
+    images: Array.isArray(images) ? images : [],
+    image_url: image_url ?? null,
     metadata: {
-      cost_cents: body.cost_cents ?? 0,
-      sku: body.sku ?? null,
-      barcode: body.barcode ?? null,
-      min_stock: body.min_stock ?? 5,
-      max_stock: body.max_stock ?? 500,
-      warehouse_location: body.warehouse_location ?? null,
-      gst_rate: body.gst_rate ?? 18,
-      allow_backorders: body.allow_backorders ?? false,
-      seo_title: body.seo_title ?? null,
-      seo_description: body.seo_description ?? null,
-      custom_fonts: body.custom_fonts ?? [],
-      max_upload_mb: body.max_upload_mb ?? 10,
-      allow_image_upload: body.allow_image_upload ?? true,
-      allow_text_input: body.allow_text_input ?? true,
-      allow_crop_rotate: body.allow_crop_rotate ?? true,
-      allow_bg_removal: body.allow_bg_removal ?? true,
-      min_quantity: body.min_quantity ?? 1,
-      max_quantity: body.max_quantity ?? 1000,
-      default_quantity: body.default_quantity ?? 10,
-      allowed_materials: body.allowed_materials ?? [],
-      allowed_papers: body.allowed_papers ?? [],
-      allowed_sizes: body.allowed_sizes ?? [],
-      status: body.status ?? "active",
-      ...(body.metadata ?? {}),
+      cost_cents: cost_cents ?? null,
+      min_stock: min_stock ?? 5,
+      sku: sku ?? null,
+      barcode: barcode ?? null,
+      weight_grams: weight_grams ?? null,
+      category: category ?? null,
+      seo_title: seo_title ?? null,
+      seo_description: seo_description ?? null,
+      seo_keywords: seo_keywords ?? null,
+      allow_image_upload: allow_image_upload ?? true,
+      allow_text_input: allow_text_input ?? false,
+      allow_crop_rotate: allow_crop_rotate ?? false,
+      allow_bg_removal: allow_bg_removal ?? false,
+      min_quantity: min_quantity ?? 1,
+      max_quantity: max_quantity ?? 100,
+      default_quantity: default_quantity ?? 1,
+      allowed_materials: Array.isArray(allowed_materials) ? allowed_materials : [],
+      allowed_papers: Array.isArray(allowed_papers) ? allowed_papers : [],
+      allowed_sizes: Array.isArray(allowed_sizes) ? allowed_sizes : [],
+      schedule_at: schedule_at ?? null,
+      ...(metadata ?? {}),
     },
   };
 
-  const { data, error } = await admin.from("products").upsert(productPayload as never).select().single();
+  try {
+    const { data, error } = await admin
+      .from("products")
+      .upsert(payload as never)
+      .select()
+      .single();
 
-  if (error) return bad(error.message, 500);
-  return ok(data);
+    if (error) return bad(error.message, 500);
+    return ok(data);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[/api/admin/products POST]", msg);
+    return bad("Database connection failed", 503);
+  }
 }
 
 export async function DELETE(req: NextRequest) {
@@ -132,8 +189,13 @@ export async function DELETE(req: NextRequest) {
   const admin = createService();
   if (!admin) return bad("Database not configured", 503);
 
-  const { error } = await admin.from("products").delete().eq("id", id);
-  if (error) return bad(error.message, 500);
-
-  return ok({ deleted: true, id });
+  try {
+    const { error } = await admin.from("products").delete().eq("id", id);
+    if (error) return bad(error.message, 500);
+    return ok({ deleted: true, id });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[/api/admin/products DELETE]", msg);
+    return bad("Database connection failed", 503);
+  }
 }

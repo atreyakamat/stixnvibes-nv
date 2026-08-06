@@ -2,6 +2,17 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createService } from "@/lib/supabase/service";
 import { requireAdminAuth } from "@/lib/auth-guard";
 
+function isConnectionError(message: string): boolean {
+  const msg = message.toLowerCase();
+  return (
+    msg.includes("fetch failed") ||
+    msg.includes("econnrefused") ||
+    msg.includes("networkerror") ||
+    msg.includes("failed to fetch") ||
+    msg.includes("connect econnrefused")
+  );
+}
+
 const DEFAULT_THEME = {
   announcement_enabled: true,
   announcement_text: "⚡ FREE Shipping on all orders above ₹499! Code: VIBE499",
@@ -18,23 +29,35 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const authErr = await requireAdminAuth(req);
   if (authErr) return authErr;
 
-  try {
-    const admin = createService();
-    if (!admin) return NextResponse.json({ ok: true, data: DEFAULT_THEME });
+  const admin = createService();
+  if (!admin) {
+    return NextResponse.json({ ok: false, error: "Database service unconfigured or unavailable" }, { status: 503 });
+  }
 
+  try {
     const { data, error } = await admin
       .from("settings")
       .select("value")
       .eq("key", "theme_config")
       .single();
 
-    if (error || !data || !(data as any).value) {
-      return NextResponse.json({ ok: true, data: DEFAULT_THEME });
+    if (error) {
+      if (error.code === "PGRST116") {
+        return NextResponse.json({ ok: true, data: DEFAULT_THEME });
+      }
+      if (isConnectionError(error.message)) {
+        return NextResponse.json({ ok: false, error: `Database connection failed: ${error.message}` }, { status: 503 });
+      }
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, data: (data as any).value });
+    return NextResponse.json({ ok: true, data: (data as any)?.value ?? DEFAULT_THEME });
   } catch (err: any) {
-    return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
+    const msg = err instanceof Error ? err.message : String(err);
+    if (isConnectionError(msg)) {
+      return NextResponse.json({ ok: false, error: `Database connection error: ${msg}` }, { status: 503 });
+    }
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }
 
@@ -48,7 +71,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     const admin = createService();
     if (!admin) {
-      return NextResponse.json({ ok: false, error: "Database service unavailable" }, { status: 500 });
+      return NextResponse.json({ ok: false, error: "Database service unavailable" }, { status: 503 });
     }
 
     const { error } = await admin.from("settings").upsert(
@@ -63,11 +86,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
 
     if (error) {
+      if (isConnectionError(error.message)) {
+        return NextResponse.json({ ok: false, error: `Database connection failed: ${error.message}` }, { status: 503 });
+      }
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true, data: theme });
   } catch (err: any) {
-    return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
+    const msg = err instanceof Error ? err.message : String(err);
+    if (isConnectionError(msg)) {
+      return NextResponse.json({ ok: false, error: `Database connection error: ${msg}` }, { status: 503 });
+    }
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }

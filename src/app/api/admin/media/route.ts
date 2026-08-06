@@ -10,6 +10,17 @@ function bad(error: string, status = 400) {
   return NextResponse.json({ ok: false, error }, { status });
 }
 
+function isConnectionError(message: string): boolean {
+  const msg = message.toLowerCase();
+  return (
+    msg.includes("fetch failed") ||
+    msg.includes("econnrefused") ||
+    msg.includes("networkerror") ||
+    msg.includes("failed to fetch") ||
+    msg.includes("connect econnrefused")
+  );
+}
+
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = new Set([
   "image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml", "image/avif",
@@ -17,15 +28,13 @@ const ALLOWED_TYPES = new Set([
 
 /**
  * POST /api/admin/media/upload — Upload file to Supabase Storage
- * Accepts multipart/form-data with a 'file' field and optional 'folder' field.
- * Returns the public URL of the uploaded file.
  */
 export async function POST(req: NextRequest) {
   const authErr = await requireAdminAuth(req);
   if (authErr) return authErr;
 
   const admin = createService();
-  if (!admin) return bad("Database not configured", 503);
+  if (!admin) return bad("Database service unconfigured or unavailable", 503);
 
   let formData: FormData;
   try {
@@ -41,17 +50,14 @@ export async function POST(req: NextRequest) {
 
   const blob = file as File;
 
-  // Validate size
   if (blob.size > MAX_FILE_SIZE) {
     return bad(`File too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)}MB.`);
   }
 
-  // Validate type
   if (!ALLOWED_TYPES.has(blob.type)) {
     return bad(`Unsupported file type: ${blob.type}. Allowed: ${Array.from(ALLOWED_TYPES).join(", ")}`);
   }
 
-  // Determine storage path
   const folder = (formData.get("folder") as string) || "products";
   const ext = blob.name.split(".").pop() || "webp";
   const timestamp = Date.now();
@@ -62,7 +68,6 @@ export async function POST(req: NextRequest) {
     .slice(0, 50);
   const storagePath = `${folder}/${timestamp}-${safeName}.${ext}`;
 
-  // Upload to Supabase Storage
   const buffer = Buffer.from(await blob.arrayBuffer());
   const { data, error } = await admin.storage
     .from("stixnvibes")
@@ -71,9 +76,14 @@ export async function POST(req: NextRequest) {
       upsert: false,
     });
 
-  if (error) return bad(`Upload failed: ${error.message}`, 500);
+  if (error) {
+    console.error("[/api/admin/media POST]", error.message);
+    if (isConnectionError(error.message)) {
+      return bad(`Storage connection failed: ${error.message}`, 503);
+    }
+    return bad(`Upload failed: ${error.message}`, 500);
+  }
 
-  // Get public URL
   const { data: publicUrlData } = admin.storage
     .from("stixnvibes")
     .getPublicUrl(data.path);
@@ -96,34 +106,48 @@ export async function GET(req: NextRequest) {
   if (authErr) return authErr;
 
   const admin = createService();
-  if (!admin) return bad("Database not configured", 503);
+  if (!admin) return bad("Database service unconfigured or unavailable", 503);
 
   const url = new URL(req.url);
   const folder = url.searchParams.get("folder") || "products";
   const limit = Math.min(Number(url.searchParams.get("limit") ?? 50), 200);
 
-  const { data, error } = await admin.storage
-    .from("stixnvibes")
-    .list(folder, {
-      limit,
-      sortBy: { column: "created_at", order: "desc" },
+  try {
+    const { data, error } = await admin.storage
+      .from("stixnvibes")
+      .list(folder, {
+        limit,
+        sortBy: { column: "created_at", order: "desc" },
+      });
+
+    if (error) {
+      console.error("[/api/admin/media GET]", error.message);
+      if (isConnectionError(error.message)) {
+        return bad(`Storage connection failed: ${error.message}`, 503);
+      }
+      return bad(error.message, 500);
+    }
+
+    const files = (data || []).map((f) => {
+      const { data: urlData } = admin.storage
+        .from("stixnvibes")
+        .getPublicUrl(`${folder}/${f.name}`);
+      return {
+        ...f,
+        url: urlData.publicUrl,
+        folder,
+      };
     });
 
-  if (error) return ok([]);
-
-  // Enrich with public URLs
-  const files = (data || []).map((f) => {
-    const { data: urlData } = admin.storage
-      .from("stixnvibes")
-      .getPublicUrl(`${folder}/${f.name}`);
-    return {
-      ...f,
-      url: urlData.publicUrl,
-      folder,
-    };
-  });
-
-  return ok(files);
+    return ok(files);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[/api/admin/media GET catch]", msg);
+    if (isConnectionError(msg)) {
+      return bad(`Storage connection error: ${msg}`, 503);
+    }
+    return bad(msg, 500);
+  }
 }
 
 /**
@@ -138,9 +162,22 @@ export async function DELETE(req: NextRequest) {
   if (!path) return bad("Missing required query parameter: path");
 
   const admin = createService();
-  if (!admin) return bad("Database not configured", 503);
+  if (!admin) return bad("Database service unconfigured or unavailable", 503);
 
-  const { error } = await admin.storage.from("stixnvibes").remove([path]);
-  if (error) return bad(error.message, 500);
-  return ok({ deleted: true, path });
+  try {
+    const { error } = await admin.storage.from("stixnvibes").remove([path]);
+    if (error) {
+      if (isConnectionError(error.message)) {
+        return bad(`Storage connection failed: ${error.message}`, 503);
+      }
+      return bad(error.message, 500);
+    }
+    return ok({ deleted: true, path });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (isConnectionError(msg)) {
+      return bad(`Storage connection error: ${msg}`, 503);
+    }
+    return bad(msg, 500);
+  }
 }

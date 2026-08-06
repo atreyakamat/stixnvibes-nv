@@ -11,40 +11,64 @@ function bad(error: string, status = 400) {
   return NextResponse.json({ ok: false, error }, { status });
 }
 
+function isConnectionError(message: string): boolean {
+  const msg = message.toLowerCase();
+  return (
+    msg.includes("fetch failed") ||
+    msg.includes("econnrefused") ||
+    msg.includes("networkerror") ||
+    msg.includes("failed to fetch") ||
+    msg.includes("connect econnrefused")
+  );
+}
+
 /** GET /api/admin/categories — List all categories (hierarchical) */
 export async function GET(req: NextRequest) {
   const authErr = await requireAdminAuth(req);
   if (authErr) return authErr;
 
   const admin = createService();
-  if (!admin) return bad("Database not configured", 503);
+  if (!admin) return bad("Database service unconfigured or unavailable", 503);
 
-  const { data, error } = await admin
-    .from("categories")
-    .select("*")
-    .order("sort_order", { ascending: true });
+  try {
+    const { data, error } = await admin
+      .from("categories")
+      .select("*")
+      .order("sort_order", { ascending: true });
 
-  if (error) return bad(error.message, 500);
-
-  // Build tree structure for hierarchical display
-  const rows = data as any[];
-  const map = new Map<string, any>();
-  const tree: any[] = [];
-
-  for (const cat of rows) {
-    map.set(cat.id, { ...cat, children: [] });
-  }
-
-  for (const cat of rows) {
-    const node = map.get(cat.id)!;
-    if (cat.parent_id && map.has(cat.parent_id)) {
-      map.get(cat.parent_id)!.children.push(node);
-    } else {
-      tree.push(node);
+    if (error) {
+      console.error("[/api/admin/categories GET]", error.message);
+      if (isConnectionError(error.message)) {
+        return bad(`Database connection failed: ${error.message}`, 503);
+      }
+      return bad(error.message, 500);
     }
-  }
 
-  return ok({ flat: rows, tree });
+    const rows = (data as any[]) ?? [];
+    const map = new Map<string, any>();
+    const tree: any[] = [];
+
+    for (const cat of rows) {
+      map.set(cat.id, { ...cat, children: [] });
+    }
+    for (const cat of rows) {
+      const node = map.get(cat.id)!;
+      if (cat.parent_id && map.has(cat.parent_id)) {
+        map.get(cat.parent_id)!.children.push(node);
+      } else {
+        tree.push(node);
+      }
+    }
+
+    return ok({ flat: rows, tree });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[/api/admin/categories GET catch]", msg);
+    if (isConnectionError(msg)) {
+      return bad(`Database connection error: ${msg}`, 503);
+    }
+    return bad(msg, 500);
+  }
 }
 
 /** POST /api/admin/categories — Create or update a category */
@@ -73,14 +97,20 @@ export async function POST(req: NextRequest) {
     is_featured: body.is_featured ?? false,
   };
 
-  const { data, error } = await admin
-    .from("categories")
-    .upsert(payload as never)
-    .select()
-    .single();
+  try {
+    const { data, error } = await admin
+      .from("categories")
+      .upsert(payload as never)
+      .select()
+      .single();
 
-  if (error) return bad(error.message, 500);
-  return ok(data);
+    if (error) return bad(error.message, 500);
+    return ok(data);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[/api/admin/categories POST]", msg);
+    return bad("Database connection failed", 503);
+  }
 }
 
 /** DELETE /api/admin/categories?id=<uuid> — Delete a category */
@@ -95,7 +125,13 @@ export async function DELETE(req: NextRequest) {
   const admin = createService();
   if (!admin) return bad("Database not configured", 503);
 
-  const { error } = await admin.from("categories").delete().eq("id", id);
-  if (error) return bad(error.message, 500);
-  return ok({ deleted: true, id });
+  try {
+    const { error } = await admin.from("categories").delete().eq("id", id);
+    if (error) return bad(error.message, 500);
+    return ok({ deleted: true, id });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[/api/admin/categories DELETE]", msg);
+    return bad("Database connection failed", 503);
+  }
 }

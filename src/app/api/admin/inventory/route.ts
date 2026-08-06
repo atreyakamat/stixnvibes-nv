@@ -11,6 +11,17 @@ function bad(error: string, status = 400) {
   return NextResponse.json({ ok: false, error }, { status });
 }
 
+function isConnectionError(message: string): boolean {
+  const msg = message.toLowerCase();
+  return (
+    msg.includes("fetch failed") ||
+    msg.includes("econnrefused") ||
+    msg.includes("networkerror") ||
+    msg.includes("failed to fetch") ||
+    msg.includes("connect econnrefused")
+  );
+}
+
 // Memory log store fallback for inventory movement history
 const inventoryLogs: Array<{
   id: string;
@@ -29,29 +40,44 @@ export async function GET(req: NextRequest) {
   if (authErr) return authErr;
 
   const admin = createService();
-  if (admin) {
+  if (!admin) return bad("Database service unconfigured or unavailable", 503);
+
+  try {
     const { data, error } = await admin
       .from("inventory_logs")
       .select("*")
       .order("created_at", { ascending: false })
       .limit(100);
 
-    if (!error && data) {
-      return ok({ logs: (data as any[]).map((row: any) => ({
-        id: row.id,
-        productId: row.product_id,
-        productName: row.product_name ?? "Product",
-        change: row.change,
-        reason: row.reason,
-        previousStock: row.previous_stock,
-        newStock: row.new_stock,
-        notes: row.notes,
-        timestamp: row.created_at,
-      })) });
+    if (error) {
+      console.error("[/api/admin/inventory GET]", error.message);
+      if (isConnectionError(error.message)) {
+        return bad(`Database connection failed: ${error.message}`, 503);
+      }
+      return bad(error.message, 500);
     }
-  }
 
-  return ok({ logs: inventoryLogs });
+    const logs = (data as any[]).map((row: any) => ({
+      id: row.id,
+      productId: row.product_id,
+      productName: row.product_name ?? "Product",
+      change: row.change,
+      reason: row.reason,
+      previousStock: row.previous_stock,
+      newStock: row.new_stock,
+      notes: row.notes,
+      timestamp: row.created_at,
+    }));
+
+    return ok({ logs });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[/api/admin/inventory GET catch]", msg);
+    if (isConnectionError(msg)) {
+      return bad(`Database connection error: ${msg}`, 503);
+    }
+    return bad(msg, 500);
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -59,7 +85,7 @@ export async function POST(req: NextRequest) {
   if (authErr) return authErr;
 
   const admin = createService();
-  if (!admin) return bad("Database not configured", 503);
+  if (!admin) return bad("Database service unconfigured or unavailable", 503);
 
   let body: any;
   try { body = await req.json(); } catch { return bad("Invalid JSON"); }
@@ -69,40 +95,41 @@ export async function POST(req: NextRequest) {
     return bad("Missing required fields: productId, change, reason");
   }
 
-  // Fetch current product
-  const { data: prod, error: fetchErr } = await admin
-    .from("products")
-    .select("id, name, stock")
-    .eq("id", productId)
-    .single();
+  try {
+    // Fetch current product
+    const { data: prod, error: fetchErr } = await admin
+      .from("products")
+      .select("id, name, stock")
+      .eq("id", productId)
+      .single();
 
-  if (fetchErr || !prod) return bad("Product not found", 404);
+    if (fetchErr) {
+      const errObj = fetchErr as any;
+      if (isConnectionError(errObj.message ?? "")) {
+        return bad(`Database connection failed: ${errObj.message}`, 503);
+      }
+      if (errObj.code === "PGRST116" || !prod) {
+        return bad("Product not found", 404);
+      }
+      return bad(errObj.message ?? "Fetch error", 500);
+    }
 
-  const previousStock = (prod as any).stock ?? 0;
-  const newStock = Math.max(0, previousStock + change);
+    const previousStock = (prod as any).stock ?? 0;
+    const newStock = Math.max(0, previousStock + change);
 
-  // Update product stock
-  const { error: updateErr } = await admin
-    .from("products")
-    .update({ stock: newStock } as never)
-    .eq("id", productId);
+    // Update product stock
+    const { error: updateErr } = await admin
+      .from("products")
+      .update({ stock: newStock } as never)
+      .eq("id", productId);
 
-  if (updateErr) return bad(updateErr.message, 500);
+    if (updateErr) {
+      if (isConnectionError(updateErr.message)) {
+        return bad(`Database connection failed: ${updateErr.message}`, 503);
+      }
+      return bad(updateErr.message, 500);
+    }
 
-  // Create audit log
-  const logEntry = {
-    id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-    productId,
-    productName: (prod as any).name ?? "Product",
-    change,
-    reason,
-    previousStock,
-    newStock,
-    notes: notes || null,
-    timestamp: new Date().toISOString(),
-  };
-
-  if (admin) {
     const insertPayload = {
       id: randomUUID(),
       product_id: productId,
@@ -115,25 +142,33 @@ export async function POST(req: NextRequest) {
       operator: "admin",
     };
 
-    const insertResult = await admin.from("inventory_logs").insert(insertPayload as never);
-    const insertedRow = (insertResult as any)?.data ?? null;
-    if (!insertResult?.error && insertedRow) {
-      const persistedLog = {
-        id: insertedRow.id ?? logEntry.id,
-        productId: insertedRow.product_id ?? productId,
-        productName: insertedRow.product_name ?? (prod as any).name ?? "Product",
-        change: insertedRow.change ?? change,
-        reason: insertedRow.reason ?? reason,
-        previousStock: insertedRow.previous_stock ?? previousStock,
-        newStock: insertedRow.new_stock ?? newStock,
-        notes: insertedRow.notes ?? null,
-        timestamp: insertedRow.created_at ?? new Date().toISOString(),
-      };
-      inventoryLogs.unshift(persistedLog);
-      return ok({ updated: true, newStock, log: persistedLog });
+    const insertResult = await admin.from("inventory_logs").insert(insertPayload as never).select().single();
+    if (insertResult.error) {
+      if (isConnectionError(insertResult.error.message)) {
+        return bad(`Database connection failed: ${insertResult.error.message}`, 503);
+      }
+      return bad(insertResult.error.message, 500);
     }
-  }
 
-  inventoryLogs.unshift(logEntry);
-  return ok({ updated: true, newStock, log: logEntry });
+    const insertedRow = insertResult.data as any;
+    const persistedLog = {
+      id: insertedRow?.id ?? insertPayload.id,
+      productId: insertedRow?.product_id ?? productId,
+      productName: insertedRow?.product_name ?? (prod as any).name ?? "Product",
+      change: insertedRow?.change ?? change,
+      reason: insertedRow?.reason ?? reason,
+      previousStock: insertedRow?.previous_stock ?? previousStock,
+      newStock: insertedRow?.new_stock ?? newStock,
+      notes: insertedRow?.notes ?? null,
+      timestamp: insertedRow?.created_at ?? new Date().toISOString(),
+    };
+    inventoryLogs.unshift(persistedLog);
+    return ok({ updated: true, newStock, log: persistedLog });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (isConnectionError(msg)) {
+      return bad(`Database connection error: ${msg}`, 503);
+    }
+    return bad(msg, 500);
+  }
 }

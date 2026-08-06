@@ -11,29 +11,54 @@ function bad(error: string, status = 400) {
   return NextResponse.json({ ok: false, error }, { status });
 }
 
+function isConnectionError(message: string): boolean {
+  const msg = message.toLowerCase();
+  return (
+    msg.includes("fetch failed") ||
+    msg.includes("econnrefused") ||
+    msg.includes("networkerror") ||
+    msg.includes("failed to fetch") ||
+    msg.includes("connect econnrefused")
+  );
+}
+
 /** GET /api/admin/collections — List all collections with product counts */
 export async function GET(req: NextRequest) {
   const authErr = await requireAdminAuth(req);
   if (authErr) return authErr;
 
   const admin = createService();
-  if (!admin) return bad("Database not configured", 503);
+  if (!admin) return bad("Database service unconfigured or unavailable", 503);
 
-  const { data, error } = await admin
-    .from("collections")
-    .select("*, product_collections(product_id)")
-    .order("sort_order", { ascending: true });
+  try {
+    const { data, error } = await admin
+      .from("collections")
+      .select("*, product_collections(product_id)")
+      .order("sort_order", { ascending: true });
 
-  if (error) return bad(error.message, 500);
+    if (error) {
+      console.error("[/api/admin/collections GET]", error.message);
+      if (isConnectionError(error.message)) {
+        return bad(`Database connection failed: ${error.message}`, 503);
+      }
+      return bad(error.message, 500);
+    }
 
-  // Attach product_count to each collection
-  const enriched = (data as any[]).map((c) => ({
-    ...c,
-    product_count: Array.isArray(c.product_collections) ? c.product_collections.length : 0,
-    product_collections: undefined,
-  }));
+    const enriched = ((data as any[]) ?? []).map((c) => ({
+      ...c,
+      product_count: Array.isArray(c.product_collections) ? c.product_collections.length : 0,
+      product_collections: undefined,
+    }));
 
-  return ok(enriched);
+    return ok(enriched);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[/api/admin/collections GET catch]", msg);
+    if (isConnectionError(msg)) {
+      return bad(`Database connection error: ${msg}`, 503);
+    }
+    return bad(msg, 500);
+  }
 }
 
 /** POST /api/admin/collections — Create or update a collection */
@@ -47,53 +72,57 @@ export async function POST(req: NextRequest) {
   let body: any;
   try { body = await req.json(); } catch { return bad("Invalid JSON"); }
 
-  // Handle adding/removing products from a collection
-  if (body?.action === "add_products" && body?.collection_id && Array.isArray(body?.product_ids)) {
-    const rows = body.product_ids.map((pid: string, i: number) => ({
-      collection_id: body.collection_id,
-      product_id: pid,
-      sort_order: i,
-    }));
-    const { error } = await admin.from("product_collections").upsert(rows as never);
+  try {
+    if (body?.action === "add_products" && body?.collection_id && Array.isArray(body?.product_ids)) {
+      const rows = body.product_ids.map((pid: string, i: number) => ({
+        collection_id: body.collection_id,
+        product_id: pid,
+        sort_order: i,
+      }));
+      const { error } = await admin.from("product_collections").upsert(rows as never);
+      if (error) return bad(error.message, 500);
+      return ok({ added: true, count: rows.length });
+    }
+
+    if (body?.action === "remove_product" && body?.collection_id && body?.product_id) {
+      const { error } = await admin
+        .from("product_collections")
+        .delete()
+        .eq("collection_id", body.collection_id)
+        .eq("product_id", body.product_id);
+      if (error) return bad(error.message, 500);
+      return ok({ removed: true });
+    }
+
+    if (!body?.name) return bad("Missing required field: name");
+
+    const slug = body.slug || body.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    if (!z.slug(slug)) return bad("Invalid slug format");
+
+    const payload = {
+      ...(body.id ? { id: body.id } : {}),
+      name: body.name,
+      slug,
+      description: body.description ?? null,
+      image_url: body.image_url ?? null,
+      is_active: body.is_active ?? true,
+      sort_order: body.sort_order ?? 0,
+      metadata: body.metadata ?? {},
+    };
+
+    const { data, error } = await admin
+      .from("collections")
+      .upsert(payload as never)
+      .select()
+      .single();
+
     if (error) return bad(error.message, 500);
-    return ok({ added: true, count: rows.length });
+    return ok(data);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[/api/admin/collections POST]", msg);
+    return bad("Database connection failed", 503);
   }
-
-  if (body?.action === "remove_product" && body?.collection_id && body?.product_id) {
-    const { error } = await admin
-      .from("product_collections")
-      .delete()
-      .eq("collection_id", body.collection_id)
-      .eq("product_id", body.product_id);
-    if (error) return bad(error.message, 500);
-    return ok({ removed: true });
-  }
-
-  // Standard create/update
-  if (!body?.name) return bad("Missing required field: name");
-
-  const slug = body.slug || body.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  if (!z.slug(slug)) return bad("Invalid slug format");
-
-  const payload = {
-    ...(body.id ? { id: body.id } : {}),
-    name: body.name,
-    slug,
-    description: body.description ?? null,
-    image_url: body.image_url ?? null,
-    is_active: body.is_active ?? true,
-    sort_order: body.sort_order ?? 0,
-    metadata: body.metadata ?? {},
-  };
-
-  const { data, error } = await admin
-    .from("collections")
-    .upsert(payload as never)
-    .select()
-    .single();
-
-  if (error) return bad(error.message, 500);
-  return ok(data);
 }
 
 /** DELETE /api/admin/collections?id=<uuid> — Delete a collection */
@@ -108,7 +137,13 @@ export async function DELETE(req: NextRequest) {
   const admin = createService();
   if (!admin) return bad("Database not configured", 503);
 
-  const { error } = await admin.from("collections").delete().eq("id", id);
-  if (error) return bad(error.message, 500);
-  return ok({ deleted: true, id });
+  try {
+    const { error } = await admin.from("collections").delete().eq("id", id);
+    if (error) return bad(error.message, 500);
+    return ok({ deleted: true, id });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[/api/admin/collections DELETE]", msg);
+    return bad("Database connection failed", 503);
+  }
 }
