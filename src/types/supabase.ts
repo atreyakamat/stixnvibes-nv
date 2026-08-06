@@ -456,6 +456,151 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["pages"]["Insert"]>;
       };
+      inventory_logs: {
+        Row: {
+          id: string;
+          product_id: string | null;
+          product_name: string | null;
+          change: number;
+          reason: string;
+          previous_stock: number;
+          new_stock: number;
+          notes: string | null;
+          operator: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          product_id?: string | null;
+          product_name?: string | null;
+          change: number;
+          reason: string;
+          previous_stock: number;
+          new_stock: number;
+          notes?: string | null;
+          operator?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["inventory_logs"]["Insert"]>;
+      };
+      print_batches: {
+        Row: {
+          id: string;
+          batch_number: string;
+          material: string;
+          finish: string;
+          size: string;
+          order_count: number;
+          status: string;
+          est_time_mins: number;
+          operator: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          batch_number: string;
+          material: string;
+          finish: string;
+          size: string;
+          order_count?: number;
+          status?: string;
+          est_time_mins?: number;
+          operator?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["print_batches"]["Insert"]>;
+      };
+      quality_checks: {
+        Row: {
+          id: string;
+          order_id: string | null;
+          production_job_id: string | null;
+          operator: string;
+          result: string;
+          checklist: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id?: string | null;
+          production_job_id?: string | null;
+          operator?: string;
+          result: string;
+          checklist?: Json;
+        };
+        Update: Partial<Database["public"]["Tables"]["quality_checks"]["Insert"]>;
+      };
+      production_jobs: {
+        Row: {
+          id: string;
+          order_id: string;
+          order_item_id: string | null;
+          stage: string;
+          batch_id: string | null;
+          notes: string | null;
+          reprint_count: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          order_item_id?: string | null;
+          stage?: string;
+          batch_id?: string | null;
+          notes?: string | null;
+          reprint_count?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["production_jobs"]["Insert"]>;
+      };
+      shipments: {
+        Row: {
+          id: string;
+          order_id: string;
+          carrier: string;
+          tracking_number: string | null;
+          status: string;
+          shipping_label_url: string | null;
+          shipped_at: string | null;
+          delivered_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          carrier?: string;
+          tracking_number?: string | null;
+          status?: string;
+          shipping_label_url?: string | null;
+          shipped_at?: string | null;
+          delivered_at?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["shipments"]["Insert"]>;
+      };
+      payments: {
+        Row: {
+          id: string;
+          order_id: string;
+          razorpay_payment_id: string | null;
+          razorpay_signature: string | null;
+          amount_cents: number;
+          currency: string;
+          status: string;
+          payment_method: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          razorpay_payment_id?: string | null;
+          razorpay_signature?: string | null;
+          amount_cents: number;
+          currency?: string;
+          status?: string;
+          payment_method?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["payments"]["Insert"]>;
+      };
     };
     Views: {
       customer_summary: {

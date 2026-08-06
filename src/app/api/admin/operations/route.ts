@@ -22,55 +22,6 @@ function isConnectionError(message: string): boolean {
   );
 }
 
-// In-Memory Print Batch Fallback Store
-const printBatches: Array<{
-  id: string;
-  batchNumber: string;
-  material: string;
-  finish: string;
-  size: string;
-  orderCount: number;
-  status: "queued" | "printing" | "completed" | "paused";
-  estTimeMins: number;
-  operator: string;
-  created_at: string;
-}> = [
-  {
-    id: "batch_1",
-    batchNumber: "BATCH-1042",
-    material: "Vinyl",
-    finish: "Glossy Finish",
-    size: '3" x 3"',
-    orderCount: 18,
-    status: "printing",
-    estTimeMins: 25,
-    operator: "Operator-01",
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "batch_2",
-    batchNumber: "BATCH-1043",
-    material: "Holographic Film",
-    finish: "Metallic Sheen",
-    size: '4" x 4"',
-    orderCount: 12,
-    status: "queued",
-    estTimeMins: 35,
-    operator: "Operator-02",
-    created_at: new Date().toISOString(),
-  },
-];
-
-// In-Memory QC Inspections Store
-const qcInspections: Array<{
-  id: string;
-  orderId: string;
-  operator: string;
-  result: "pass" | "reprint" | "reject";
-  checklist: Record<string, boolean>;
-  timestamp: string;
-}> = [];
-
 export async function GET(req: NextRequest) {
   const authErr = await requireAdminAuth(req);
   if (authErr) return authErr;
@@ -97,14 +48,16 @@ export async function GET(req: NextRequest) {
         return bad(error.message, 500);
       }
 
-      return ok({ qcInspections: (data as any[]).map((row: any) => ({
-        id: row.id,
-        orderId: row.order_id,
-        operator: row.operator,
-        result: row.result,
-        checklist: row.checklist ?? {},
-        timestamp: row.created_at,
-      })) });
+      return ok({
+        qcInspections: (data ?? []).map((row) => ({
+          id: row.id,
+          orderId: row.order_id ?? row.production_job_id ?? "",
+          operator: row.operator,
+          result: row.result,
+          checklist: (row.checklist as Record<string, boolean>) ?? {},
+          timestamp: row.created_at,
+        })),
+      });
     } else {
       const { data, error } = await admin
         .from("print_batches")
@@ -120,18 +73,20 @@ export async function GET(req: NextRequest) {
         return bad(error.message, 500);
       }
 
-      return ok({ printBatches: (data as any[]).map((row: any) => ({
-        id: row.id,
-        batchNumber: row.batch_number,
-        material: row.material,
-        finish: row.finish,
-        size: row.size,
-        orderCount: row.order_count,
-        status: row.status,
-        estTimeMins: row.est_time_mins,
-        operator: row.operator,
-        created_at: row.created_at,
-      })) });
+      return ok({
+        printBatches: (data ?? []).map((row) => ({
+          id: row.id,
+          batchNumber: row.batch_number,
+          material: row.material,
+          finish: row.finish,
+          size: row.size,
+          orderCount: row.order_count,
+          status: row.status,
+          estTimeMins: row.est_time_mins,
+          operator: row.operator,
+          created_at: row.created_at,
+        })),
+      });
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -150,8 +105,12 @@ export async function POST(req: NextRequest) {
   const admin = createService();
   if (!admin) return bad("Database service unconfigured or unavailable", 503);
 
-  let body: any;
-  try { body = await req.json(); } catch { return bad("Invalid JSON"); }
+  let body: Record<string, any>;
+  try {
+    body = await req.json();
+  } catch {
+    return bad("Invalid JSON");
+  }
 
   const { action } = body;
 
@@ -173,7 +132,7 @@ export async function POST(req: NextRequest) {
         operator: operator || "Operator",
       };
 
-      const { data, error } = await admin.from("print_batches").insert(payload as never).select().single();
+      const { data, error } = await admin.from("print_batches").insert(payload).select().single();
       if (error) {
         if (isConnectionError(error.message)) {
           return bad(`Database connection failed: ${error.message}`, 503);
@@ -190,7 +149,7 @@ export async function POST(req: NextRequest) {
 
       const { data, error } = await admin
         .from("print_batches")
-        .update({ status } as never)
+        .update({ status })
         .eq("id", batchId)
         .select()
         .single();
@@ -221,7 +180,7 @@ export async function POST(req: NextRequest) {
         checklist,
       };
 
-      const { data, error } = await admin.from("quality_checks").insert(payload as never).select().single();
+      const { data, error } = await admin.from("quality_checks").insert(payload).select().single();
       if (error) {
         if (isConnectionError(error.message)) {
           return bad(`Database connection failed: ${error.message}`, 503);

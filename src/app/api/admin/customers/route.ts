@@ -21,6 +21,16 @@ function isConnectionError(message: string): boolean {
   );
 }
 
+export interface CustomerSummaryItem {
+  customer_name: string;
+  customer_phone: string;
+  customer_email: string | null;
+  total_orders: number;
+  total_spent: number;
+  last_order_at: string;
+  first_order_at: string;
+}
+
 /**
  * GET /api/admin/customers — List customer summaries aggregated from orders
  */
@@ -39,25 +49,34 @@ export async function GET(req: NextRequest) {
   try {
     // Try the customer_summary view first
     const { data: viewData, error: viewError } = await admin
-      .from("customer_summary" as any)
+      .from("customer_summary")
       .select("*")
       .limit(limit);
 
     if (!viewError && viewData) {
-      let customers = viewData as any[];
+      let customers = (viewData ?? []).map((c) => ({
+        customer_name: c.customer_name ?? "Customer",
+        customer_phone: c.customer_phone ?? "",
+        customer_email: c.customer_email ?? null,
+        total_orders: c.total_orders ?? 0,
+        total_spent: c.total_spent ?? 0,
+        last_order_at: c.last_order_at ?? new Date().toISOString(),
+        first_order_at: c.first_order_at ?? new Date().toISOString(),
+      }));
+
       if (search) {
         const term = search.toLowerCase();
         customers = customers.filter(
           (c) =>
             (c.customer_name && c.customer_name.toLowerCase().includes(term)) ||
             (c.customer_phone && c.customer_phone.includes(term)) ||
-            (c.customer_email && c.customer_email?.toLowerCase().includes(term))
+            (c.customer_email && c.customer_email.toLowerCase().includes(term))
         );
       }
       customers.sort((a, b) => {
-        if (sortBy === "total_spent") return (b.total_spent ?? 0) - (a.total_spent ?? 0);
-        if (sortBy === "total_orders") return (b.total_orders ?? 0) - (a.total_orders ?? 0);
-        return new Date(b.last_order_at ?? 0).getTime() - new Date(a.last_order_at ?? 0).getTime();
+        if (sortBy === "total_spent") return b.total_spent - a.total_spent;
+        if (sortBy === "total_orders") return b.total_orders - a.total_orders;
+        return new Date(b.last_order_at).getTime() - new Date(a.last_order_at).getTime();
       });
       return ok(customers);
     }
@@ -77,17 +96,9 @@ export async function GET(req: NextRequest) {
       return bad(ordersErr.message, 500);
     }
 
-    const customerMap = new Map<string, {
-      customer_name: string;
-      customer_phone: string;
-      customer_email: string | null;
-      total_orders: number;
-      total_spent: number;
-      last_order_at: string;
-      first_order_at: string;
-    }>();
+    const customerMap = new Map<string, CustomerSummaryItem>();
 
-    for (const order of (orders as any[])) {
+    for (const order of orders ?? []) {
       const key = order.customer_phone || order.customer_email || order.customer_name;
       const existing = customerMap.get(key);
       if (existing) {

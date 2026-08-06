@@ -53,7 +53,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, data: (data as any)?.value ?? DEFAULT_SECTIONS });
+    return NextResponse.json({ ok: true, data: data?.value ?? DEFAULT_SECTIONS });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : String(err);
     if (isConnectionError(msg)) {

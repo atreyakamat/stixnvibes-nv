@@ -2,7 +2,7 @@
  * Unit tests for cart context logic.
  * Uses jsdom environment via environmentMatchGlobs in vitest.config.ts.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, act, cleanup } from "@testing-library/react";
 import React from "react";
 
@@ -93,7 +93,9 @@ describe("CartContext", () => {
 
   it("throws when used outside provider", async () => {
     const { useCart } = await importCart();
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() => renderHook(() => useCart())).toThrowError(/useCart must be used within a <CartProvider>/);
+    spy.mockRestore();
   });
 
   it("caps quantity at 99 and minimum at 1 on direct addItem", async () => {

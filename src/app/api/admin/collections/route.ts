@@ -44,11 +44,13 @@ export async function GET(req: NextRequest) {
       return bad(error.message, 500);
     }
 
-    const enriched = ((data as any[]) ?? []).map((c) => ({
-      ...c,
-      product_count: Array.isArray(c.product_collections) ? c.product_collections.length : 0,
-      product_collections: undefined,
-    }));
+    const enriched = (data ?? []).map((c) => {
+      const { product_collections, ...rest } = c as typeof c & { product_collections?: { product_id: string }[] };
+      return {
+        ...rest,
+        product_count: Array.isArray(product_collections) ? product_collections.length : 0,
+      };
+    });
 
     return ok(enriched);
   } catch (err: unknown) {

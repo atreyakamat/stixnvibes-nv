@@ -57,9 +57,9 @@ export async function GET(req: NextRequest) {
       return bad(error.message, 500);
     }
 
-    const logs = (data as any[]).map((row: any) => ({
+    const logs = (data ?? []).map((row) => ({
       id: row.id,
-      productId: row.product_id,
+      productId: row.product_id ?? "",
       productName: row.product_name ?? "Product",
       change: row.change,
       reason: row.reason,
@@ -87,8 +87,12 @@ export async function POST(req: NextRequest) {
   const admin = createService();
   if (!admin) return bad("Database service unconfigured or unavailable", 503);
 
-  let body: any;
-  try { body = await req.json(); } catch { return bad("Invalid JSON"); }
+  let body: { productId?: string; change?: number; reason?: string; notes?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return bad("Invalid JSON");
+  }
 
   const { productId, change, reason, notes } = body;
   if (!productId || typeof change !== "number" || !reason) {
@@ -104,23 +108,22 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (fetchErr) {
-      const errObj = fetchErr as any;
-      if (isConnectionError(errObj.message ?? "")) {
-        return bad(`Database connection failed: ${errObj.message}`, 503);
+      if (isConnectionError(fetchErr.message)) {
+        return bad(`Database connection failed: ${fetchErr.message}`, 503);
       }
-      if (errObj.code === "PGRST116" || !prod) {
+      if (fetchErr.code === "PGRST116" || !prod) {
         return bad("Product not found", 404);
       }
-      return bad(errObj.message ?? "Fetch error", 500);
+      return bad(fetchErr.message, 500);
     }
 
-    const previousStock = (prod as any).stock ?? 0;
+    const previousStock = prod.stock ?? 0;
     const newStock = Math.max(0, previousStock + change);
 
     // Update product stock
     const { error: updateErr } = await admin
       .from("products")
-      .update({ stock: newStock } as never)
+      .update({ stock: newStock })
       .eq("id", productId);
 
     if (updateErr) {
@@ -133,7 +136,7 @@ export async function POST(req: NextRequest) {
     const insertPayload = {
       id: randomUUID(),
       product_id: productId,
-      product_name: (prod as any).name ?? "Product",
+      product_name: prod.name ?? "Product",
       change,
       reason,
       previous_stock: previousStock,
@@ -142,7 +145,7 @@ export async function POST(req: NextRequest) {
       operator: "admin",
     };
 
-    const insertResult = await admin.from("inventory_logs").insert(insertPayload as never).select().single();
+    const insertResult = await admin.from("inventory_logs").insert(insertPayload).select().single();
     if (insertResult.error) {
       if (isConnectionError(insertResult.error.message)) {
         return bad(`Database connection failed: ${insertResult.error.message}`, 503);
@@ -150,17 +153,17 @@ export async function POST(req: NextRequest) {
       return bad(insertResult.error.message, 500);
     }
 
-    const insertedRow = insertResult.data as any;
+    const insertedRow = insertResult.data;
     const persistedLog = {
-      id: insertedRow?.id ?? insertPayload.id,
-      productId: insertedRow?.product_id ?? productId,
-      productName: insertedRow?.product_name ?? (prod as any).name ?? "Product",
-      change: insertedRow?.change ?? change,
-      reason: insertedRow?.reason ?? reason,
-      previousStock: insertedRow?.previous_stock ?? previousStock,
-      newStock: insertedRow?.new_stock ?? newStock,
-      notes: insertedRow?.notes ?? null,
-      timestamp: insertedRow?.created_at ?? new Date().toISOString(),
+      id: insertedRow.id,
+      productId: insertedRow.product_id ?? productId,
+      productName: insertedRow.product_name ?? prod.name ?? "Product",
+      change: insertedRow.change,
+      reason: insertedRow.reason,
+      previousStock: insertedRow.previous_stock,
+      newStock: insertedRow.new_stock,
+      notes: insertedRow.notes,
+      timestamp: insertedRow.created_at,
     };
     inventoryLogs.unshift(persistedLog);
     return ok({ updated: true, newStock, log: persistedLog });

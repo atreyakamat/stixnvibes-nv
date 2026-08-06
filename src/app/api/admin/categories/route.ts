@@ -44,9 +44,20 @@ export async function GET(req: NextRequest) {
       return bad(error.message, 500);
     }
 
-    const rows = (data as any[]) ?? [];
-    const map = new Map<string, any>();
-    const tree: any[] = [];
+    interface CategoryNode {
+      id: string;
+      name: string;
+      slug: string;
+      parent_id: string | null;
+      icon: string | null;
+      sort_order: number;
+      is_featured: boolean;
+      children: CategoryNode[];
+    }
+
+    const rows = data ?? [];
+    const map = new Map<string, CategoryNode>();
+    const tree: CategoryNode[] = [];
 
     for (const cat of rows) {
       map.set(cat.id, { ...cat, children: [] });

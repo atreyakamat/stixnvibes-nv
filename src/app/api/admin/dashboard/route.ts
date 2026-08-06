@@ -76,13 +76,13 @@ export async function GET(req: NextRequest) {
       return bad(firstError.message, 500);
     }
 
-    const allOrders = (ordersRes.data as any[]) || [];
-    const allProducts = (productsRes.data as any[]) || [];
-    const todayOrders = (todayOrdersRes.data as any[]) || [];
-    const thisMonthOrders = (thisMonthOrdersRes.data as any[]) || [];
-    const lastMonthOrders = (lastMonthOrdersRes.data as any[]) || [];
-    const lowStockData = (lowStockRes.data as any[]) || [];
-    const recentOrdersData = (recentOrdersRes.data as any[]) || [];
+    const allOrders = ordersRes.data ?? [];
+    const allProducts = productsRes.data ?? [];
+    const todayOrders = todayOrdersRes.data ?? [];
+    const thisMonthOrders = thisMonthOrdersRes.data ?? [];
+    const lastMonthOrders = lastMonthOrdersRes.data ?? [];
+    const lowStockData = lowStockRes.data ?? [];
+    const recentOrdersData = recentOrdersRes.data ?? [];
 
     // Calculate revenue
     const totalRevenue = allOrders.reduce((sum, o) => sum + (o.total_cents || 0), 0);
