@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
+import Image from "next/image";
 import {
   Card,
   CardHeader,
@@ -391,7 +392,7 @@ export default function ProductsAdminPage() {
                     <td className="p-4 flex items-center gap-4">
                       <div className="w-12 h-12 rounded-lg bg-slate-800 border border-border/80 flex items-center justify-center overflow-hidden flex-shrink-0">
                         {product.image_url ? (
-                          <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                          <Image src={product.image_url} alt={product.name} width={48} height={48} className="w-full h-full object-cover" />
                         ) : (
                           <LayoutGrid className="w-6 h-6 text-slate-600" />
                         )}
@@ -464,7 +465,7 @@ export default function ProductsAdminPage() {
                   )}
                 </div>
                 {product.image_url ? (
-                  <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                  <Image src={product.image_url} alt={product.name} width={300} height={300} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <LayoutGrid className="w-12 h-12 text-slate-700" />

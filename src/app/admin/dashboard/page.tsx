@@ -108,6 +108,38 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      {/* Actionable Merchant Operations Queue */}
+      <div className="rounded-2xl border border-brand-yellow/30 bg-slate-900/80 p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-brand-yellow flex items-center gap-2">
+            <Package className="size-4" /> Operational Action Queue
+          </h2>
+          <span className="text-xs text-muted-foreground">Updated live from PostgreSQL</span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-1">
+          <a href="/admin/orders?status=pending" className="p-3 rounded-xl bg-slate-950/60 border border-border/80 hover:border-brand-yellow/50 transition-colors block">
+            <span className="text-[10px] font-semibold uppercase text-slate-400">Pending Approval</span>
+            <div className="text-xl font-bold text-brand-yellow mt-1">{orders?.pending || 0}</div>
+            <span className="text-[10px] text-muted-foreground">Requires admin artwork review</span>
+          </a>
+          <a href="/admin?module=ops_print_queue" className="p-3 rounded-xl bg-slate-950/60 border border-border/80 hover:border-blue-500/50 transition-colors block">
+            <span className="text-[10px] font-semibold uppercase text-slate-400">Print Queue</span>
+            <div className="text-xl font-bold text-blue-400 mt-1">{data?.production_queue?.printing || 0}</div>
+            <span className="text-[10px] text-muted-foreground">Ready for print & lamination</span>
+          </a>
+          <a href="/admin?module=ops_qc" className="p-3 rounded-xl bg-slate-950/60 border border-border/80 hover:border-purple-500/50 transition-colors block">
+            <span className="text-[10px] font-semibold uppercase text-slate-400">Waiting QC</span>
+            <div className="text-xl font-bold text-purple-400 mt-1">{data?.production_queue?.qc || 0}</div>
+            <span className="text-[10px] text-muted-foreground">Inspection & cutting</span>
+          </a>
+          <a href="/admin?module=ops_packing" className="p-3 rounded-xl bg-slate-950/60 border border-border/80 hover:border-emerald-500/50 transition-colors block">
+            <span className="text-[10px] font-semibold uppercase text-slate-400">Ready to Pack</span>
+            <div className="text-xl font-bold text-emerald-400 mt-1">{data?.production_queue?.packing || 0}</div>
+            <span className="text-[10px] text-muted-foreground">Packing & courier dispatch</span>
+          </a>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 bg-slate-900/60 border-border/80">
           <CardHeader>

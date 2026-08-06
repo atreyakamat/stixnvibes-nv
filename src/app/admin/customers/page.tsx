@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ export default function CustomersPage() {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("total_spent");
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = useCallback(async () => {
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("snv.admin.accessToken") : null;
       const res = await fetch(`/api/admin/customers?search=${encodeURIComponent(search)}&sort=${sort}`, {
@@ -27,11 +27,11 @@ export default function CustomersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, sort]);
 
   useEffect(() => {
     fetchCustomers();
-  }, [search, sort]);
+  }, [fetchCustomers]);
 
   const formatINR = (cents: number) => {
     return new Intl.NumberFormat("en-IN", {
