@@ -1,123 +1,64 @@
 export const dynamic = "force-dynamic";
-import { NextResponse, type NextRequest } from "next/server";
-import { z } from "@/lib/zod-lite";
-import { createService } from "@/lib/supabase/service";
+import { type NextRequest } from "next/server";
+import { SizeService } from "@/lib/services/size-service";
+import { ApiResponse, handleApiError } from "@/lib/api-response";
 import { requireAdminAuth } from "@/lib/auth-guard";
 
-function ok(data: unknown) {
-  return NextResponse.json({ ok: true, data });
-}
-function bad(error: string, status = 400) {
-  return NextResponse.json({ ok: false, error }, { status });
-}
+const sizeService = new SizeService();
 
-function isConnectionError(message: string): boolean {
-  const msg = message.toLowerCase();
-  return (
-    msg.includes("fetch failed") ||
-    msg.includes("econnrefused") ||
-    msg.includes("networkerror") ||
-    msg.includes("failed to fetch") ||
-    msg.includes("connect econnrefused")
-  );
-}
-
-/** GET /api/admin/sizes — List all sizes */
 export async function GET(req: NextRequest) {
   const authErr = await requireAdminAuth(req);
   if (authErr) return authErr;
 
-  const admin = createService();
-  if (!admin) return bad("Database service unconfigured or unavailable", 503);
-
   const url = new URL(req.url);
-  const category = url.searchParams.get("category");
+  const category = url.searchParams.get("category") || undefined;
 
   try {
-    let q = admin.from("sizes").select("*").order("sort_order", { ascending: true });
-    if (category) q = q.eq("category", category);
-
-    const { data, error } = await q;
-    if (error) {
-      console.error("[/api/admin/sizes GET]", error.message);
-      if (isConnectionError(error.message)) {
-        return bad(`Database connection failed: ${error.message}`, 503);
-      }
-      return bad(error.message, 500);
-    }
-    return ok(data ?? []);
+    const data = await sizeService.getSizes(category);
+    return ApiResponse.success(data);
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("[/api/admin/sizes GET catch]", msg);
-    if (isConnectionError(msg)) {
-      return bad(`Database connection error: ${msg}`, 503);
-    }
-    return bad(msg, 500);
+    return handleApiError(err);
   }
 }
 
-/** POST /api/admin/sizes — Create or update a size */
 export async function POST(req: NextRequest) {
   const authErr = await requireAdminAuth(req);
   if (authErr) return authErr;
 
-  const admin = createService();
-  if (!admin) return bad("Database not configured", 503);
-
   let body: any;
-  try { body = await req.json(); } catch { return bad("Invalid JSON"); }
-
-  if (!body?.name) return bad("Missing required field: name");
-
-  const slug = body.slug || body.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  if (!z.slug(slug)) return bad("Invalid slug format");
-
-  const payload = {
-    ...(body.id ? { id: body.id } : {}),
-    name: body.name,
-    slug,
-    width_mm: body.width_mm ?? null,
-    height_mm: body.height_mm ?? null,
-    category: body.category ?? "sticker",
-    is_active: body.is_active ?? true,
-    sort_order: body.sort_order ?? 0,
-  };
+  try {
+    body = await req.json();
+  } catch {
+    return ApiResponse.error("Invalid JSON body", "BAD_REQUEST", 400);
+  }
 
   try {
-    const { data, error } = await admin
-      .from("sizes")
-      .upsert(payload as never)
-      .select()
-      .single();
-
-    if (error) return bad(error.message, 500);
-    return ok(data);
+    if (body.id) {
+      const updated = await sizeService.updateSize(body.id, body);
+      return ApiResponse.success(updated);
+    } else {
+      const created = await sizeService.createSize(body);
+      return ApiResponse.success(created, undefined, 201);
+    }
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("[/api/admin/sizes POST]", msg);
-    return bad("Database connection failed", 503);
+    return handleApiError(err);
   }
 }
 
-/** DELETE /api/admin/sizes?id=<uuid> — Delete a size */
 export async function DELETE(req: NextRequest) {
   const authErr = await requireAdminAuth(req);
   if (authErr) return authErr;
 
   const url = new URL(req.url);
   const id = url.searchParams.get("id");
-  if (!id) return bad("Missing required query parameter: id");
-
-  const admin = createService();
-  if (!admin) return bad("Database not configured", 503);
+  if (!id) {
+    return ApiResponse.error("Missing size ID", "BAD_REQUEST", 400);
+  }
 
   try {
-    const { error } = await admin.from("sizes").delete().eq("id", id);
-    if (error) return bad(error.message, 500);
-    return ok({ deleted: true, id });
+    await sizeService.deleteSize(id);
+    return ApiResponse.success({ deleted: true, id });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("[/api/admin/sizes DELETE]", msg);
-    return bad("Database connection failed", 503);
+    return handleApiError(err);
   }
 }

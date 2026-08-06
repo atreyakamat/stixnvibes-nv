@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import { Plus, Edit, Trash2, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DataTable, type Column } from "@/components/admin/data-table";
 
 type Material = {
   id: string;
@@ -63,173 +63,240 @@ export default function MaterialsPage() {
     fetchMaterials();
   }, []);
 
-  const openModal = (mat?: Material) => {
-    if (mat) {
-      setEditingId(mat.id);
-      setFormData({
-        name: mat.name,
-        description: mat.description || "",
-        cost_per_unit_cents: mat.cost_per_unit_cents || 0,
-        is_active: mat.is_active,
-        waterproof: !!mat.properties?.waterproof,
-        uv_resistant: !!mat.properties?.uv_resistant,
-        scratch_resistant: !!mat.properties?.scratch_resistant,
-        food_safe: !!mat.properties?.food_safe,
-        sort_order: mat.sort_order || 0,
-      });
-    } else {
-      setEditingId(null);
-      setFormData({
-        name: "",
-        description: "",
-        cost_per_unit_cents: 0,
-        is_active: true,
-        waterproof: false,
-        uv_resistant: false,
-        scratch_resistant: false,
-        food_safe: false,
-        sort_order: 0,
-      });
-    }
+  const openCreateModal = () => {
+    setEditingId(null);
+    setFormData({
+      name: "",
+      description: "",
+      cost_per_unit_cents: 0,
+      is_active: true,
+      waterproof: false,
+      uv_resistant: false,
+      scratch_resistant: false,
+      food_safe: false,
+      sort_order: materials.length,
+    });
     setIsModalOpen(true);
   };
 
-  const saveMaterial = async () => {
-    const payload = {
-      id: editingId,
-      name: formData.name,
-      description: formData.description,
-      cost_per_unit_cents: formData.cost_per_unit_cents,
-      is_active: formData.is_active,
-      sort_order: formData.sort_order,
-      properties: {
-        waterproof: formData.waterproof,
-        uv_resistant: formData.uv_resistant,
-        scratch_resistant: formData.scratch_resistant,
-        food_safe: formData.food_safe,
-      }
-    };
+  const openEditModal = (material: Material) => {
+    setEditingId(material.id);
+    setFormData({
+      name: material.name,
+      description: material.description || "",
+      cost_per_unit_cents: material.cost_per_unit_cents || 0,
+      is_active: material.is_active,
+      waterproof: !!material.properties?.waterproof,
+      uv_resistant: !!material.properties?.uv_resistant,
+      scratch_resistant: !!material.properties?.scratch_resistant,
+      food_safe: !!material.properties?.food_safe,
+      sort_order: material.sort_order || 0,
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("snv.admin.accessToken") : null;
+      const payload = {
+        ...(editingId ? { id: editingId } : {}),
+        name: formData.name,
+        description: formData.description,
+        cost_per_unit_cents: Number(formData.cost_per_unit_cents),
+        is_active: formData.is_active,
+        properties: {
+          waterproof: formData.waterproof,
+          uv_resistant: formData.uv_resistant,
+          scratch_resistant: formData.scratch_resistant,
+          food_safe: formData.food_safe,
+        },
+        sort_order: Number(formData.sort_order),
+      };
+
       const res = await fetch("/api/admin/materials", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("snv.admin.accessToken")}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(payload),
       });
+
       if (res.ok) {
         setIsModalOpen(false);
         fetchMaterials();
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
+      // Handled gracefully
     }
   };
 
-  const deleteMaterial = async (id: string) => {
-    if (!confirm("Are you sure?")) return;
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this material?")) return;
     try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("snv.admin.accessToken") : null;
       const res = await fetch(`/api/admin/materials?id=${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${localStorage.getItem("snv.admin.accessToken")}` },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (res.ok) fetchMaterials();
-    } catch (e) {
-      console.error(e);
+    } catch {
+      // Handled gracefully
     }
   };
 
+  const columns: Column<Material>[] = [
+    {
+      header: "Material",
+      cell: (row) => (
+        <div>
+          <p className="font-semibold text-slate-100">{row.name}</p>
+          <p className="text-[10px] text-muted-foreground">{row.description || "No description"}</p>
+        </div>
+      ),
+    },
+    {
+      header: "Cost / Unit",
+      cell: (row) => (
+        <span className="font-medium text-slate-200">
+          ₹{((row.cost_per_unit_cents || 0) / 100).toFixed(2)}
+        </span>
+      ),
+    },
+    {
+      header: "Properties",
+      cell: (row) => (
+        <div className="flex flex-wrap gap-1">
+          {row.properties?.waterproof && <Badge variant="outline" className="text-[10px]">Waterproof</Badge>}
+          {row.properties?.uv_resistant && <Badge variant="outline" className="text-[10px]">UV Resistant</Badge>}
+          {row.properties?.scratch_resistant && <Badge variant="outline" className="text-[10px]">Scratch Resistant</Badge>}
+          {row.properties?.food_safe && <Badge variant="outline" className="text-[10px]">Food Safe</Badge>}
+        </div>
+      ),
+    },
+    {
+      header: "Status",
+      cell: (row) =>
+        row.is_active ? (
+          <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-xs">
+            <CheckCircle className="w-3 h-3 mr-1" /> Active
+          </Badge>
+        ) : (
+          <Badge className="bg-slate-500/10 text-slate-400 border-slate-500/20 text-xs">
+            <XCircle className="w-3 h-3 mr-1" /> Inactive
+          </Badge>
+        ),
+    },
+    {
+      header: "Actions",
+      cell: (row) => (
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => openEditModal(row)} className="h-8 w-8 p-0">
+            <Edit className="w-4 h-4 text-slate-400 hover:text-white" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => handleDelete(row.id)} className="h-8 w-8 p-0">
+            <Trash2 className="w-4 h-4 text-red-400 hover:text-red-300" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div className="p-8 space-y-8 bg-slate-950 min-h-screen text-foreground">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-display font-bold">Materials Manager</h1>
-        <Button onClick={() => openModal()} className="bg-brand-yellow text-black hover:bg-brand-yellow/80">
+    <div className="flex flex-col space-y-6 p-6 pb-20">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-display text-2xl font-bold">Materials Manager</h1>
+          <p className="text-xs text-muted-foreground mt-1">Manage print materials, finishes, and specs.</p>
+        </div>
+        <Button onClick={openCreateModal} className="bg-brand-yellow text-slate-950 font-bold hover:bg-brand-yellow/90">
           <Plus className="w-4 h-4 mr-2" /> Add Material
         </Button>
       </div>
 
-      {loading ? (
-        <p>Loading...</p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {materials.map(m => (
-            <Card key={m.id} className="bg-slate-900/60 border-border/80 relative group">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <CardTitle>{m.name}</CardTitle>
-                  <Badge variant={m.is_active ? "success" : "outline"}>{m.is_active ? "Active" : "Inactive"}</Badge>
-                </div>
-                <CardDescription className="line-clamp-2">{m.description || "No description"}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm">Cost: {(m.cost_per_unit_cents / 100).toFixed(2)} USD</div>
-                <div className="flex flex-wrap gap-2">
-                  {m.properties?.waterproof && <Badge variant="outline" size="sm">Waterproof</Badge>}
-                  {m.properties?.uv_resistant && <Badge variant="outline" size="sm">UV Resistant</Badge>}
-                  {m.properties?.scratch_resistant && <Badge variant="outline" size="sm">Scratch Resistant</Badge>}
-                  {m.properties?.food_safe && <Badge variant="outline" size="sm">Food Safe</Badge>}
-                </div>
-                <div className="flex gap-2 pt-4 border-t border-border/50">
-                  <Button variant="outline" size="sm" onClick={() => openModal(m)}>
-                    <Edit className="w-4 h-4 mr-2" /> Edit
-                  </Button>
-                  <Button variant="destructive" size="sm" onClick={() => deleteMaterial(m.id)}>
-                    <Trash2 className="w-4 h-4 mr-2" /> Delete
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      <DataTable
+        columns={columns}
+        data={materials}
+        searchPlaceholder="Search materials..."
+        pageSize={10}
+        emptyText={loading ? "Loading materials..." : "No materials configured."}
+      />
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="bg-slate-900 border-border max-w-md">
           <DialogHeader>
             <DialogTitle>{editingId ? "Edit Material" : "Add Material"}</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Name</label>
-              <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Material Name" />
+          <form onSubmit={handleSubmit} className="space-y-4 text-xs mt-2">
+            <div>
+              <label className="font-semibold block mb-1">Material Name</label>
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g. Vinyl Glossy"
+                required
+              />
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Description</label>
-              <Input value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Brief description" />
+            <div>
+              <label className="font-semibold block mb-1">Description</label>
+              <Input
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Material specifications..."
+              />
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Cost (cents)</label>
-              <Input type="number" value={formData.cost_per_unit_cents} onChange={e => setFormData({...formData, cost_per_unit_cents: parseInt(e.target.value) || 0})} />
+            <div>
+              <label className="font-semibold block mb-1">Cost Per Unit (paise/cents)</label>
+              <Input
+                type="number"
+                value={formData.cost_per_unit_cents}
+                onChange={(e) => setFormData({ ...formData, cost_per_unit_cents: Number(e.target.value) })}
+              />
             </div>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-xs">
-                <input type="checkbox" checked={formData.is_active} onChange={e => setFormData({...formData, is_active: e.target.checked})} />
-                Active
-              </label>
-              <label className="flex items-center gap-2 text-xs">
-                <input type="checkbox" checked={formData.waterproof} onChange={e => setFormData({...formData, waterproof: e.target.checked})} />
+            <div className="grid grid-cols-2 gap-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.waterproof}
+                  onChange={(e) => setFormData({ ...formData, waterproof: e.target.checked })}
+                />
                 Waterproof
               </label>
-              <label className="flex items-center gap-2 text-xs">
-                <input type="checkbox" checked={formData.uv_resistant} onChange={e => setFormData({...formData, uv_resistant: e.target.checked})} />
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.uv_resistant}
+                  onChange={(e) => setFormData({ ...formData, uv_resistant: e.target.checked })}
+                />
                 UV Resistant
               </label>
-              <label className="flex items-center gap-2 text-xs">
-                <input type="checkbox" checked={formData.scratch_resistant} onChange={e => setFormData({...formData, scratch_resistant: e.target.checked})} />
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.scratch_resistant}
+                  onChange={(e) => setFormData({ ...formData, scratch_resistant: e.target.checked })}
+                />
                 Scratch Resistant
               </label>
-              <label className="flex items-center gap-2 text-xs">
-                <input type="checkbox" checked={formData.food_safe} onChange={e => setFormData({...formData, food_safe: e.target.checked})} />
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.food_safe}
+                  onChange={(e) => setFormData({ ...formData, food_safe: e.target.checked })}
+                />
                 Food Safe
               </label>
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Sort Order</label>
-              <Input type="number" value={formData.sort_order} onChange={e => setFormData({...formData, sort_order: parseInt(e.target.value) || 0})} />
+            <div className="flex items-center justify-end gap-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-brand-yellow text-slate-950 font-bold">
+                Save
+              </Button>
             </div>
-          </div>
-          <Button onClick={saveMaterial} className="w-full bg-brand-yellow text-black hover:bg-brand-yellow/80">Save</Button>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
