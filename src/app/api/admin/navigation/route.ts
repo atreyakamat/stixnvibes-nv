@@ -1,114 +1,51 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { createService } from "@/lib/supabase/service";
+export const dynamic = "force-dynamic";
+import { type NextRequest } from "next/server";
+import { SettingsRepository } from "@/lib/repositories/settings-repository";
+import { ApiResponse, handleApiError } from "@/lib/api-response";
 import { requireAdminAuth } from "@/lib/auth-guard";
 
-function isConnectionError(message: string): boolean {
-  const msg = message.toLowerCase();
-  return (
-    msg.includes("fetch failed") ||
-    msg.includes("econnrefused") ||
-    msg.includes("networkerror") ||
-    msg.includes("failed to fetch") ||
-    msg.includes("connect econnrefused")
-  );
-}
+const settingsRepo = new SettingsRepository();
 
-const DEFAULT_NAVIGATION = {
-  header_menu: [
-    { label: "Shop All", url: "/shop" },
-    { label: "Stickers", url: "/shop?type=sticker" },
-    { label: "Posters", url: "/shop?type=poster" },
-    { label: "Spotify Cards", url: "/customize/spotify-card" },
-    { label: "Customizer", url: "/customize" },
-  ],
-  footer_menu: [
-    { label: "About Us", url: "/about" },
-    { label: "Contact", url: "/contact" },
-    { label: "FAQ", url: "/faq" },
-    { label: "Order Tracking", url: "/track" },
-    { label: "Privacy Policy", url: "/policies/privacy" },
-    { label: "Refund Policy", url: "/policies/refund" },
-  ],
-  social_links: {
-    instagram: "https://instagram.com/stixnvibes",
-    whatsapp: "https://wa.me/919999999999",
-    facebook: "https://facebook.com/stixnvibes",
-  },
-};
+const DEFAULT_NAVIGATION = [
+  { id: "nav_1", label: "Shop All", href: "/shop", visible: true, is_external: false, sort_order: 1 },
+  { id: "nav_2", label: "Customizer", href: "/customize", visible: true, is_external: false, sort_order: 2 },
+  { id: "nav_3", label: "About Us", href: "/about", visible: true, is_external: false, sort_order: 3 },
+  { id: "nav_4", label: "Contact", href: "/contact", visible: true, is_external: false, sort_order: 4 },
+  { id: "nav_5", label: "FAQ", href: "/faq", visible: true, is_external: false, sort_order: 5 },
+];
 
-export async function GET(req: NextRequest): Promise<NextResponse> {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
-
-  const admin = createService();
-  if (!admin) {
-    return NextResponse.json({ ok: false, error: "Database service unconfigured or unavailable" }, { status: 503 });
-  }
-
-  try {
-    const { data, error } = await admin
-      .from("settings")
-      .select("value")
-      .eq("key", "navigation_config")
-      .single();
-
-    if (error) {
-      if (error.code === "PGRST116") {
-        return NextResponse.json({ ok: true, data: DEFAULT_NAVIGATION });
-      }
-      if (isConnectionError(error.message)) {
-        return NextResponse.json({ ok: false, error: `Database connection failed: ${error.message}` }, { status: 503 });
-      }
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ ok: true, data: data?.value ?? DEFAULT_NAVIGATION });
-  } catch (err: any) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (isConnectionError(msg)) {
-      return NextResponse.json({ ok: false, error: `Database connection error: ${msg}` }, { status: 503 });
-    }
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
-  }
-}
-
-export async function POST(req: NextRequest): Promise<NextResponse> {
+export async function GET(req: NextRequest) {
   const authErr = await requireAdminAuth(req);
   if (authErr) return authErr;
 
   try {
-    const body = await req.json();
-    const navigation = { ...DEFAULT_NAVIGATION, ...(body.navigation || {}) };
+    const nav = await settingsRepo.get("navigation_config");
+    return ApiResponse.success(nav ?? DEFAULT_NAVIGATION);
+  } catch (err: unknown) {
+    return handleApiError(err);
+  }
+}
 
-    const admin = createService();
-    if (!admin) {
-      return NextResponse.json({ ok: false, error: "Database service unavailable" }, { status: 503 });
-    }
+export async function POST(req: NextRequest) {
+  const authErr = await requireAdminAuth(req);
+  if (authErr) return authErr;
 
-    const { error } = await admin.from("settings").upsert(
-      {
-        key: "navigation_config",
-        value: navigation as any,
-        category: "navigation",
-        description: "Storefront header menus, footer links, social media links, and policies",
-        updated_at: new Date().toISOString(),
-      } as any,
-      { onConflict: "key" }
-    );
+  let body: { navigation?: unknown };
+  try {
+    body = await req.json();
+  } catch {
+    return ApiResponse.error("Invalid JSON body", "BAD_REQUEST", 400);
+  }
 
-    if (error) {
-      if (isConnectionError(error.message)) {
-        return NextResponse.json({ ok: false, error: `Database connection failed: ${error.message}` }, { status: 503 });
-      }
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-    }
+  const { navigation } = body;
+  if (!Array.isArray(navigation)) {
+    return ApiResponse.error("Missing required 'navigation' array", "BAD_REQUEST", 400);
+  }
 
-    return NextResponse.json({ ok: true, data: navigation });
-  } catch (err: any) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (isConnectionError(msg)) {
-      return NextResponse.json({ ok: false, error: `Database connection error: ${msg}` }, { status: 503 });
-    }
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  try {
+    const updated = await settingsRepo.set("navigation_config", navigation, "cms", "Navigation items configuration");
+    return ApiResponse.success({ saved: true, data: updated.value });
+  } catch (err: unknown) {
+    return handleApiError(err);
   }
 }

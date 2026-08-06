@@ -671,6 +671,46 @@ export default function ProductsAdminPage() {
               </div>
             </div>
 
+            {/* SEO Optimization & Live SERP Preview */}
+            <div className="space-y-4">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-2">SEO & Search Engine Preview</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold uppercase text-slate-400">SEO Title</label>
+                  <Input 
+                    value={editingProduct?.seo_title || ""} 
+                    onChange={e => setEditingProduct(prev => ({ ...prev, seo_title: e.target.value }))} 
+                    className="bg-slate-950/50" 
+                    placeholder={editingProduct?.name || "Product Title"}
+                  />
+                  <p className="text-[10px] text-muted-foreground">{(editingProduct?.seo_title || "").length}/60 characters</p>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold uppercase text-slate-400">SEO Description</label>
+                  <textarea 
+                    className="flex w-full rounded-md border border-input bg-slate-950/50 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring min-h-[60px]"
+                    value={editingProduct?.seo_description || ""}
+                    onChange={e => setEditingProduct(prev => ({ ...prev, seo_description: e.target.value }))}
+                    placeholder="Short description for Google search results..."
+                  />
+                  <p className="text-[10px] text-muted-foreground">{(editingProduct?.seo_description || "").length}/160 characters</p>
+                </div>
+              </div>
+
+              {/* SERP Card Preview */}
+              <div className="rounded-xl border border-border/60 bg-slate-950 p-4 space-y-1">
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <span className="text-emerald-400 font-mono text-[11px]">https://stixnvibes.com/shop/{editingProduct?.slug || "product-slug"}</span>
+                </div>
+                <h5 className="text-blue-400 hover:underline font-medium text-base leading-snug cursor-pointer">
+                  {editingProduct?.seo_title || editingProduct?.name || "Sticker Title"} | Stix N Vibes
+                </h5>
+                <p className="text-xs text-slate-400 line-clamp-2">
+                  {editingProduct?.seo_description || editingProduct?.description || "Buy premium high quality vinyl stickers, custom holographic decals & art prints online in India with fast shipping."}
+                </p>
+              </div>
+            </div>
+
             {/* Flags */}
             <div className="space-y-4">
               <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-2">Flags</h4>

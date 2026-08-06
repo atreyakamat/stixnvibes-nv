@@ -1,25 +1,8 @@
 export const dynamic = "force-dynamic";
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import { createService } from "@/lib/supabase/service";
+import { ApiResponse, handleApiError } from "@/lib/api-response";
 import { requireAdminAuth } from "@/lib/auth-guard";
-
-function ok(data: unknown) {
-  return NextResponse.json({ ok: true, data });
-}
-function bad(error: string, status = 400) {
-  return NextResponse.json({ ok: false, error }, { status });
-}
-
-function isConnectionError(message: string): boolean {
-  const msg = message.toLowerCase();
-  return (
-    msg.includes("fetch failed") ||
-    msg.includes("econnrefused") ||
-    msg.includes("networkerror") ||
-    msg.includes("failed to fetch") ||
-    msg.includes("connect econnrefused")
-  );
-}
 
 /**
  * GET /api/admin/dashboard — Aggregated business KPIs
@@ -30,7 +13,7 @@ export async function GET(req: NextRequest) {
   if (authErr) return authErr;
 
   const admin = createService();
-  if (!admin) return bad("Database service unconfigured or unavailable", 503);
+  if (!admin) return ApiResponse.unavailable("Database service unconfigured or unavailable");
 
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
@@ -69,11 +52,7 @@ export async function GET(req: NextRequest) {
       recentOrdersRes.error;
 
     if (firstError) {
-      console.error("[/api/admin/dashboard GET]", firstError.message);
-      if (isConnectionError(firstError.message)) {
-        return bad(`Database connection failed: ${firstError.message}`, 503);
-      }
-      return bad(firstError.message, 500);
+      throw firstError;
     }
 
     const allOrders = ordersRes.data ?? [];
@@ -94,21 +73,19 @@ export async function GET(req: NextRequest) {
       : thisMonthRevenue > 0 ? 100 : 0;
 
     // Order status breakdown
-    const statusBreakdown: Record<string, number> = {};
-    for (const o of allOrders) {
-      statusBreakdown[o.status] = (statusBreakdown[o.status] || 0) + 1;
-    }
+    const statusBreakdown = allOrders.reduce((acc: Record<string, number>, o) => {
+      const s = o.status || "pending";
+      acc[s] = (acc[s] || 0) + 1;
+      return acc;
+    }, {});
 
-    // Average order value
-    const avgOrderValue = allOrders.length > 0
-      ? Math.round(totalRevenue / allOrders.length)
-      : 0;
+    // Product breakdown
+    const activeProducts = allProducts.filter((p) => p.status === "active").length;
+    const outOfStockProducts = allProducts.filter((p) => (p.stock ?? 0) <= 0).length;
 
-    // Active vs out of stock products
-    const outOfStock = allProducts.filter((p) => (p.stock ?? 0) <= 0).length;
-    const activeProducts = allProducts.filter((p) => p.status !== "archived").length;
+    const avgOrderValue = allOrders.length > 0 ? Math.round(totalRevenue / allOrders.length) : 0;
 
-    return ok({
+    return ApiResponse.success({
       revenue: {
         total: totalRevenue,
         today: todayRevenue,
@@ -118,26 +95,21 @@ export async function GET(req: NextRequest) {
         avg_order_value: avgOrderValue,
       },
       orders: {
-        total: allOrders.length,
+        total: ordersRes.count ?? allOrders.length,
         today: todayOrders.length,
         this_month: thisMonthOrders.length,
         status_breakdown: statusBreakdown,
-        pending: (statusBreakdown["created"] || 0) + (statusBreakdown["sent"] || 0),
+        pending: (statusBreakdown["pending"] || 0) + (statusBreakdown["created"] || 0) + (statusBreakdown["WAITING_FOR_CONFIRMATION"] || 0),
       },
       products: {
-        total: allProducts.length,
+        total: productsRes.count ?? allProducts.length,
         active: activeProducts,
-        out_of_stock: outOfStock,
+        out_of_stock: outOfStockProducts,
         low_stock: lowStockData,
       },
       recent_orders: recentOrdersData,
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("[/api/admin/dashboard GET catch]", msg);
-    if (isConnectionError(msg)) {
-      return bad(`Database connection error: ${msg}`, 503);
-    }
-    return bad(msg, 500);
+    return handleApiError(err);
   }
 }

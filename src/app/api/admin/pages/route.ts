@@ -1,140 +1,69 @@
 export const dynamic = "force-dynamic";
-import { NextResponse, type NextRequest } from "next/server";
-import { z } from "@/lib/zod-lite";
-import { createService } from "@/lib/supabase/service";
+import { type NextRequest } from "next/server";
+import { PageService } from "@/lib/services/page-service";
+import { ApiResponse, handleApiError } from "@/lib/api-response";
 import { requireAdminAuth } from "@/lib/auth-guard";
 
-function ok(data: unknown) {
-  return NextResponse.json({ ok: true, data });
-}
-function bad(error: string, status = 400) {
-  return NextResponse.json({ ok: false, error }, { status });
-}
+const pageService = new PageService();
 
-function isConnectionError(message: string): boolean {
-  const msg = message.toLowerCase();
-  return (
-    msg.includes("fetch failed") ||
-    msg.includes("econnrefused") ||
-    msg.includes("networkerror") ||
-    msg.includes("failed to fetch") ||
-    msg.includes("connect econnrefused")
-  );
-}
-
-/** GET /api/admin/pages — List all CMS pages */
 export async function GET(req: NextRequest) {
   const authErr = await requireAdminAuth(req);
   if (authErr) return authErr;
-
-  const admin = createService();
-  if (!admin) return bad("Database service unconfigured or unavailable", 503);
 
   const url = new URL(req.url);
   const slug = url.searchParams.get("slug");
 
   try {
     if (slug) {
-      const { data, error } = await admin
-        .from("pages")
-        .select("*")
-        .eq("slug", slug)
-        .single();
-
-      if (error) {
-        console.error("[/api/admin/pages GET slug]", error.message);
-        if (isConnectionError(error.message)) {
-          return bad(`Database connection failed: ${error.message}`, 503);
-        }
-        return bad(error.message, 404);
-      }
-      return ok(data);
+      const page = await pageService.getPageBySlug(slug);
+      if (!page) return ApiResponse.notFound("Page not found");
+      return ApiResponse.success(page);
     }
-
-    const { data, error } = await admin
-      .from("pages")
-      .select("*")
-      .order("updated_at", { ascending: false });
-
-    if (error) {
-      console.error("[/api/admin/pages GET]", error.message);
-      if (isConnectionError(error.message)) {
-        return bad(`Database connection failed: ${error.message}`, 503);
-      }
-      return bad(error.message, 500);
-    }
-    return ok(data ?? []);
+    const pages = await pageService.getPages();
+    return ApiResponse.success(pages);
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("[/api/admin/pages GET catch]", msg);
-    if (isConnectionError(msg)) {
-      return bad(`Database connection error: ${msg}`, 503);
-    }
-    return bad(msg, 500);
+    return handleApiError(err);
   }
 }
 
-/** POST /api/admin/pages — Create or update a CMS page */
 export async function POST(req: NextRequest) {
   const authErr = await requireAdminAuth(req);
   if (authErr) return authErr;
 
-  const admin = createService();
-  if (!admin) return bad("Database not configured", 503);
-
   let body: any;
-  try { body = await req.json(); } catch { return bad("Invalid JSON"); }
-
-  if (!body?.title) return bad("Missing required field: title");
-
-  const slug = body.slug || body.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  if (!z.slug(slug)) return bad("Invalid slug format");
-
-  const payload = {
-    ...(body.id ? { id: body.id } : {}),
-    title: body.title,
-    slug,
-    content: body.content ?? [],
-    is_published: body.is_published ?? false,
-    seo_title: body.seo_title ?? null,
-    seo_description: body.seo_description ?? null,
-  };
+  try {
+    body = await req.json();
+  } catch {
+    return ApiResponse.error("Invalid JSON body", "BAD_REQUEST", 400);
+  }
 
   try {
-    const { data, error } = await admin
-      .from("pages")
-      .upsert(payload as never)
-      .select()
-      .single();
-
-    if (error) return bad(error.message, 500);
-    return ok(data);
+    if (body.id) {
+      const updated = await pageService.updatePage(body.id, body);
+      return ApiResponse.success(updated);
+    } else {
+      const created = await pageService.createPage(body);
+      return ApiResponse.success(created, undefined, 201);
+    }
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("[/api/admin/pages POST]", msg);
-    return bad("Database connection failed", 503);
+    return handleApiError(err);
   }
 }
 
-/** DELETE /api/admin/pages?id=<uuid> — Delete a page */
 export async function DELETE(req: NextRequest) {
   const authErr = await requireAdminAuth(req);
   if (authErr) return authErr;
 
   const url = new URL(req.url);
   const id = url.searchParams.get("id");
-  if (!id) return bad("Missing required query parameter: id");
-
-  const admin = createService();
-  if (!admin) return bad("Database not configured", 503);
+  if (!id) {
+    return ApiResponse.error("Missing page ID", "BAD_REQUEST", 400);
+  }
 
   try {
-    const { error } = await admin.from("pages").delete().eq("id", id);
-    if (error) return bad(error.message, 500);
-    return ok({ deleted: true, id });
+    await pageService.deletePage(id);
+    return ApiResponse.success({ deleted: true, id });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("[/api/admin/pages DELETE]", msg);
-    return bad("Database connection failed", 503);
+    return handleApiError(err);
   }
 }

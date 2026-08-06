@@ -1,17 +1,10 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { createService } from "@/lib/supabase/service";
+export const dynamic = "force-dynamic";
+import { type NextRequest } from "next/server";
+import { SettingsRepository } from "@/lib/repositories/settings-repository";
+import { ApiResponse, handleApiError } from "@/lib/api-response";
 import { requireAdminAuth } from "@/lib/auth-guard";
 
-function isConnectionError(message: string): boolean {
-  const msg = message.toLowerCase();
-  return (
-    msg.includes("fetch failed") ||
-    msg.includes("econnrefused") ||
-    msg.includes("networkerror") ||
-    msg.includes("failed to fetch") ||
-    msg.includes("connect econnrefused")
-  );
-}
+const settingsRepo = new SettingsRepository();
 
 const DEFAULT_SECTIONS = [
   { id: "hero", name: "Hero Banner", enabled: true, sort_order: 1, headline: "Stick Loud. Vibe Harder.", subheadline: "Premium stickers, posters, Spotify cards & frames." },
@@ -26,80 +19,38 @@ const DEFAULT_SECTIONS = [
   { id: "newsletter", name: "Newsletter Signup", enabled: true, sort_order: 10 },
 ];
 
-export async function GET(req: NextRequest): Promise<NextResponse> {
+export async function GET(req: NextRequest) {
   const authErr = await requireAdminAuth(req);
   if (authErr) return authErr;
 
-  const admin = createService();
-  if (!admin) {
-    return NextResponse.json({ ok: false, error: "Database service unconfigured or unavailable" }, { status: 503 });
-  }
-
   try {
-    const { data, error } = await admin
-      .from("settings")
-      .select("value")
-      .eq("key", "homepage_layout")
-      .single();
-
-    if (error) {
-      if (error.code === "PGRST116") {
-        // Single row not found in database — fallback to default configuration
-        return NextResponse.json({ ok: true, data: DEFAULT_SECTIONS });
-      }
-      if (isConnectionError(error.message)) {
-        return NextResponse.json({ ok: false, error: `Database connection failed: ${error.message}` }, { status: 503 });
-      }
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ ok: true, data: data?.value ?? DEFAULT_SECTIONS });
-  } catch (err: any) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (isConnectionError(msg)) {
-      return NextResponse.json({ ok: false, error: `Database connection error: ${msg}` }, { status: 503 });
-    }
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+    const layout = await settingsRepo.get("homepage_layout");
+    return ApiResponse.success(layout ?? DEFAULT_SECTIONS);
+  } catch (err: unknown) {
+    return handleApiError(err);
   }
 }
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
+export async function POST(req: NextRequest) {
   const authErr = await requireAdminAuth(req);
   if (authErr) return authErr;
 
+  let body: { sections?: unknown };
   try {
-    const body = await req.json();
-    const sections = body.sections || DEFAULT_SECTIONS;
+    body = await req.json();
+  } catch {
+    return ApiResponse.error("Invalid JSON body", "BAD_REQUEST", 400);
+  }
 
-    const admin = createService();
-    if (!admin) {
-      return NextResponse.json({ ok: false, error: "Database service unavailable" }, { status: 503 });
-    }
+  const { sections } = body;
+  if (!Array.isArray(sections)) {
+    return ApiResponse.error("Missing required 'sections' array", "BAD_REQUEST", 400);
+  }
 
-    const { error } = await admin.from("settings").upsert(
-      {
-        key: "homepage_layout",
-        value: sections as any,
-        category: "homepage",
-        description: "Homepage section order, visibility, and copy configuration",
-        updated_at: new Date().toISOString(),
-      } as any,
-      { onConflict: "key" }
-    );
-
-    if (error) {
-      if (isConnectionError(error.message)) {
-        return NextResponse.json({ ok: false, error: `Database connection failed: ${error.message}` }, { status: 503 });
-      }
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ ok: true, data: sections });
-  } catch (err: any) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (isConnectionError(msg)) {
-      return NextResponse.json({ ok: false, error: `Database connection error: ${msg}` }, { status: 503 });
-    }
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  try {
+    const updated = await settingsRepo.set("homepage_layout", sections, "cms", "Homepage sections layout configuration");
+    return ApiResponse.success({ saved: true, data: updated.value });
+  } catch (err: unknown) {
+    return handleApiError(err);
   }
 }
