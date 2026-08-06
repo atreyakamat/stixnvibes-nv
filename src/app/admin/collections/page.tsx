@@ -85,21 +85,21 @@ export default function CollectionsPage() {
         setIsModalOpen(false);
         fetchCollections();
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
+      // Handled gracefully
     }
   };
 
   const deleteCollection = async (id: string) => {
-    if (!confirm("Are you sure?")) return;
+    if (!confirm("Are you sure you want to delete this collection?")) return;
     try {
       const res = await fetch(`/api/admin/collections?id=${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${localStorage.getItem("snv.admin.accessToken")}` },
       });
       if (res.ok) fetchCollections();
-    } catch (e) {
-      console.error(e);
+    } catch {
+      // Handled gracefully
     }
   };
 

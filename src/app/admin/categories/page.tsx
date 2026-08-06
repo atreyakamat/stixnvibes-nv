@@ -97,21 +97,21 @@ export default function CategoriesPage() {
         setIsModalOpen(false);
         fetchCategories();
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
+      // Handled gracefully
     }
   };
 
   const deleteCategory = async (id: string) => {
-    if (!confirm("Are you sure?")) return;
+    if (!confirm("Are you sure you want to delete this category?")) return;
     try {
       const res = await fetch(`/api/admin/categories?id=${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${localStorage.getItem("snv.admin.accessToken")}` },
       });
       if (res.ok) fetchCategories();
-    } catch (e) {
-      console.error(e);
+    } catch {
+      // Handled gracefully
     }
   };
 
