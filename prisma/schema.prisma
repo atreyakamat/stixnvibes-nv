@@ -1,329 +1,375 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+  schemas   = ["auth", "public"]
 }
 
 model Category {
-  id          String     @id @default(uuid()) @db.Uuid
-  name        String
-  slug        String     @unique
-  parentId    String?    @map("parent_id") @db.Uuid
-  parent      Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children    Category[] @relation("CategoryHierarchy")
-  icon        String?
-  sortOrder   Int        @default(0) @map("sort_order")
-  isFeatured  Boolean    @default(false) @map("is_featured")
-  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
-  products    Product[]
+  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String
+  slug       String     @unique
+  parentId   String?    @map("parent_id") @db.Uuid
+  icon       String?
+  sortOrder  Int        @default(0) @map("sort_order")
+  isFeatured Boolean    @default(false) @map("is_featured")
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  parent     Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onUpdate: NoAction)
+  children   Category[] @relation("CategoryHierarchy")
+  products   Product[]
 
   @@index([parentId])
   @@index([slug])
   @@map("categories")
-}
-
-enum ProductType {
-  sticker
-  sticker_vinyl
-  poster
-  spotify_card
-  frame
-  mystery_pack
+  @@schema("public")
 }
 
 model Product {
-  id               String       @id @default(uuid()) @db.Uuid
+  id               String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name             String
-  slug             String       @unique
+  slug             String          @unique
   description      String?
-  shortDescription String?      @map("short_description")
-  priceCents       Int          @map("price_cents")
-  compareAtCents   Int?         @map("compare_at_cents")
-  currency         String       @default("INR")
-  imageUrl         String?      @map("image_url")
-  images           Json         @default("[]")
-  type             ProductType
-  categoryId       String?      @map("category_id") @db.Uuid
-  category         Category?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  shortDescription String?         @map("short_description")
+  priceCents       Int             @map("price_cents")
+  compareAtCents   Int?            @map("compare_at_cents")
+  currency         String          @default("INR")
+  imageUrl         String?         @map("image_url")
+  images           Json            @default("[]")
+  type             product_type
+  categoryId       String?         @map("category_id") @db.Uuid
   collection       String?
-  tags             String[]     @default([])
-  stock            Int          @default(0)
-  status           String       @default("active")
-  isFeatured       Boolean      @default(false) @map("is_featured")
-  isBundle         Boolean      @default(false) @map("is_bundle")
-  isLimited        Boolean      @default(false) @map("is_limited")
-  bundleIds        String[]     @default([]) @map("bundle_ids") @db.Uuid
-  customizable     Boolean      @default(false)
-  rating           Decimal      @default(0) @db.Decimal(2, 1)
-  reviewCount      Int          @default(0) @map("review_count")
-  metadata         Json         @default("{}")
-  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
-  variants         Variant[]
-  orderItems       OrderItem[]
-  reviews          Review[]
+  tags             String[]        @default([])
+  stock            Int             @default(0)
+  isFeatured       Boolean         @default(false) @map("is_featured")
+  isBundle         Boolean         @default(false) @map("is_bundle")
+  isLimited        Boolean         @default(false) @map("is_limited")
+  bundleIds        String[]        @default([]) @map("bundle_ids") @db.Uuid
+  customizable     Boolean         @default(false)
+  rating           Decimal         @default(0) @db.Decimal(2, 1)
+  reviewCount      Int             @default(0) @map("review_count")
+  metadata         Json            @default("{}")
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  customizations   Customization[]
   inventoryLogs    InventoryLog[]
+  orderItems       OrderItem[]
+  category         Category?       @relation(fields: [categoryId], references: [id], onUpdate: NoAction)
+  reviews          Review[]
+  variants         Variant[]
 
   @@index([categoryId])
   @@index([slug])
   @@index([type])
-  @@index([status])
-  @@index([collection])
-  @@index([stock])
-  @@index([isFeatured])
+  @@index([isFeatured], map: "products_featured_idx")
+  @@index([tags], type: Gin)
   @@map("products")
+  @@schema("public")
 }
 
 model Variant {
-  id                 String      @id @default(uuid()) @db.Uuid
+  id                 String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   productId          String      @map("product_id") @db.Uuid
-  product            Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
   name               String
   sku                String?     @unique
   priceModifierCents Int         @default(0) @map("price_modifier_cents")
   stock              Int         @default(0)
   attributes         Json        @default("{}")
   sortOrder          Int         @default(0) @map("sort_order")
-  createdAt          DateTime    @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  createdAt          DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   orderItems         OrderItem[]
+  product            Product     @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([productId])
   @@map("variants")
+  @@schema("public")
 }
 
 model InventoryLog {
-  id            String   @id @default(uuid()) @db.Uuid
-  productId     String   @map("product_id") @db.Uuid
-  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId     String?  @map("product_id") @db.Uuid
   change        Int
   reason        String
   previousStock Int      @map("previous_stock")
   newStock      Int      @map("new_stock")
   notes         String?
   operator      String   @default("admin")
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  product       Product? @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([productId])
-  @@index([createdAt])
+  @@index([createdAt(sort: Desc)])
   @@map("inventory_logs")
-}
-
-enum OrderStatus {
-  created
-  pending
-  payment_pending
-  paid
-  processing
-  verified
-  print_queue
-  printing
-  quality_check
-  packing
-  ready_for_dispatch
-  shipped
-  delivered
-  completed
-  cancelled
-  refunded
-  replacement
-  returned
-  failed_delivery
-  lost_shipment
+  @@schema("public")
 }
 
 model Order {
-  id            String         @id @default(uuid()) @db.Uuid
-  customerName  String         @map("customer_name")
-  customerPhone String         @map("customer_phone")
-  customerEmail String?        @map("customer_email")
-  address       String
-  pincode       String
-  totalCents    Int            @map("total_cents")
-  status        OrderStatus    @default(created)
-  priority      String         @default("standard")
-  assignedTo    String?        @map("assigned_to")
-  notes         String?
-  awbNumber     String?        @map("awb_number")
-  courier       String?
-  metadata      Json           @default("{}")
-  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt     DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
-  items         OrderItem[]
-  shipment      Shipment?
+  id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id           String?      @db.Uuid
+  razorpay_order_id String?
+  whatsapp_url      String?
+  customerName      String       @map("customer_name")
+  customerPhone     String       @map("customer_phone")
+  customerEmail     String?      @map("customer_email")
+  address           String
+  pincode           String
+  totalCents        Int          @map("total_cents")
+  status            order_status @default(created)
+  notes             String?
+  metadata          Json         @default("{}")
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  items             OrderItem[]
+  users             users?       @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+  shipment          Shipment?
 
-  @@index([customerPhone])
   @@index([status])
-  @@index([priority])
-  @@index([createdAt])
+  @@index([createdAt(sort: Desc)])
+  @@index([user_id])
   @@map("orders")
+  @@schema("public")
 }
 
 model OrderItem {
-  id         String   @id @default(uuid()) @db.Uuid
-  orderId    String   @map("order_id") @db.Uuid
-  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId  String?  @map("product_id") @db.Uuid
-  product    Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
-  variantId  String?  @map("variant_id") @db.Uuid
-  variant    Variant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
-  name       String
-  quantity   Int
-  priceCents Int      @map("price_cents")
-  imageUrl   String?  @map("image_url")
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id                     String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId                String                  @map("order_id") @db.Uuid
+  productId              String?                 @map("product_id") @db.Uuid
+  variantId              String?                 @map("variant_id") @db.Uuid
+  name                   String
+  quantity               Int
+  priceCents             Int                     @map("price_cents")
+  imageUrl               String?                 @map("image_url")
+  metadata               Json                    @default("{}")
+  createdAt              DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
   customizationSnapshots CustomizationSnapshot[]
-  productionJobs ProductionJob[]
+  order                  Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  product                Product?                @relation(fields: [productId], references: [id], onUpdate: NoAction)
+  variant                Variant?                @relation(fields: [variantId], references: [id], onUpdate: NoAction)
+  productionJobs         ProductionJob[]
 
   @@index([orderId])
+  @@index([productId])
   @@map("order_items")
+  @@schema("public")
 }
 
 model PrintBatch {
-  id            String   @id @default(uuid()) @db.Uuid
-  batchNumber   String   @unique @map("batch_number")
-  material      String
-  finish        String
-  size          String
-  printerId     String   @default("Printer-01") @map("printer_id")
-  orderCount    Int      @default(0) @map("order_count")
-  status        String   @default("queued")
-  estTimeMins   Int      @default(30) @map("est_time_mins")
-  operator      String   @default("operator_1")
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  batchNumber    String          @unique @map("batch_number")
+  material       String
+  finish         String
+  size           String
+  printerId      String          @default("Printer-01") @map("printer_id")
+  orderCount     Int             @default(0) @map("order_count")
+  status         String          @default("queued")
+  estTimeMins    Int             @default(30) @map("est_time_mins")
+  operator       String          @default("operator_1")
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   productionJobs ProductionJob[]
 
   @@index([status])
   @@index([material])
   @@map("print_batches")
+  @@schema("public")
 }
 
 model QualityCheck {
-  id               String        @id @default(uuid()) @db.Uuid
-  productionJobId  String        @map("production_job_id") @db.Uuid
-  productionJob    ProductionJob @relation(fields: [productionJobId], references: [id], onDelete: Cascade)
-  operator         String
-  result           String   // pass, reprint, reject
-  failureReason    String?  @map("failure_reason")
-  checklist        Json     @default("{}")
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productionJobId String        @map("production_job_id") @db.Uuid
+  operator        String
+  result          String
+  failureReason   String?       @map("failure_reason")
+  checklist       Json          @default("{}")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  productionJob   ProductionJob @relation(fields: [productionJobId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([productionJobId])
   @@index([result])
   @@map("quality_checks")
+  @@schema("public")
 }
 
 model ProductionJob {
-  id           String      @id @default(uuid()) @db.Uuid
-  orderItemId  String      @map("order_item_id") @db.Uuid
-  orderItem    OrderItem   @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
-  printBatchId String?     @map("print_batch_id") @db.Uuid
-  printBatch   PrintBatch? @relation(fields: [printBatchId], references: [id], onDelete: SetNull)
-  status       String      @default("queued")
-  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderItemId   String         @map("order_item_id") @db.Uuid
+  printBatchId  String?        @map("print_batch_id") @db.Uuid
+  status        String         @default("queued")
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  orderItem     OrderItem      @relation(fields: [orderItemId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  printBatch    PrintBatch?    @relation(fields: [printBatchId], references: [id], onUpdate: NoAction)
   qcInspections QualityCheck[]
 
   @@index([orderItemId])
   @@index([printBatchId])
   @@index([status])
   @@map("production_jobs")
+  @@schema("public")
 }
 
 model CustomizationSnapshot {
-  id          String    @id @default(uuid()) @db.Uuid
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   orderItemId String    @map("order_item_id") @db.Uuid
-  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
   data        Json
   imageUrl    String?   @map("image_url")
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([orderItemId])
   @@map("customization_snapshots")
+  @@schema("public")
 }
 
 model Shipment {
-  id              String          @id @default(uuid()) @db.Uuid
-  orderId         String          @unique @map("order_id") @db.Uuid
-  order           Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  courier         String
-  awb             String          @unique
-  status          String          @default("manifested")
-  events          ShipmentEvent[]
-  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id        String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId   String          @unique @map("order_id") @db.Uuid
+  courier   String
+  awb       String          @unique
+  status    String          @default("manifested")
+  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  events    ShipmentEvent[]
+  order     Order           @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@map("shipments")
+  @@schema("public")
 }
 
 model ShipmentEvent {
-  id         String   @id @default(uuid()) @db.Uuid
-  shipmentId String   @map("shipment_id") @db.Uuid
-  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
-  status     String
-  location   String?
-  timestamp  DateTime @db.Timestamptz
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  shipmentId  String   @map("shipment_id") @db.Uuid
+  status      String
+  location    String?
+  timestamp   DateTime @db.Timestamptz(6)
   description String?
+  shipment    Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([shipmentId])
   @@map("shipment_events")
+  @@schema("public")
 }
 
 model Customization {
-  id         String   @id @default(uuid()) @db.Uuid
-  userId     String?  @map("user_id") @db.Uuid
-  name       String
-  type       String
-  state      Json
-  exportUrl  String?  @map("export_url")
-  previewUrl String?  @map("preview_url")
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_id   String   @db.Uuid
+  userId       String?  @map("user_id") @db.Uuid
+  data         Json     @default("{}")
+  snapshot_url String?
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  products     Product  @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users        users?   @relation(fields: [userId], references: [id], onUpdate: NoAction)
 
+  @@index([product_id])
+  @@index([userId])
   @@map("customizations")
+  @@schema("public")
 }
 
 model Review {
-  id         String   @id @default(uuid()) @db.Uuid
-  productId  String   @map("product_id") @db.Uuid
-  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  userName   String   @map("user_name")
-  rating     Int
-  title      String?
-  comment    String?
-  isVerified Boolean  @default(false) @map("is_verified")
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId     String   @map("product_id") @db.Uuid
+  user_id       String?  @db.Uuid
+  author_name   String
+  author_avatar String?
+  rating        Int
+  comment       String?
+  is_featured   Boolean  @default(false)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users         users?   @relation(fields: [user_id], references: [id], onUpdate: NoAction)
 
   @@index([productId])
+  @@index([is_featured], map: "reviews_featured_idx")
   @@map("reviews")
+  @@schema("public")
 }
 
 model Referral {
-  id           String   @id @default(uuid()) @db.Uuid
-  code         String   @unique
-  referrerName String   @map("referrer_name")
-  creditCents  Int      @default(0) @map("credit_cents")
-  usesCount    Int      @default(0) @map("uses_count")
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id                                      String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  referrer_user_id                        String    @db.Uuid
+  referred_user_id                        String?   @db.Uuid
+  referral_code                           String    @unique
+  referred_email                          String?
+  creditCents                             Int       @default(10000) @map("credit_cents")
+  used                                    Boolean   @default(false)
+  used_at                                 DateTime? @db.Timestamptz(6)
+  createdAt                               DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  users_referrals_referred_user_idTousers users?    @relation("referrals_referred_user_idTousers", fields: [referred_user_id], references: [id], onUpdate: NoAction)
+  users_referrals_referrer_user_idTousers users     @relation("referrals_referrer_user_idTousers", fields: [referrer_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
+  @@index([referral_code], map: "referrals_code_idx")
+  @@index([referrer_user_id], map: "referrals_referrer_idx")
   @@map("referrals")
+  @@schema("public")
 }
 
 model Analytics {
-  id        String   @id @default(uuid()) @db.Uuid
-  metric    String
-  value     Float
-  path      String?
-  metadata  Json     @default("{}")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  event      String
+  payload    Json     @default("{}")
+  session_id String?
+  user_id    String?  @db.Uuid
+  url        String?
+  user_agent String?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  users      users?   @relation(fields: [user_id], references: [id], onUpdate: NoAction)
 
-  @@index([metric])
-  @@index([createdAt])
+  @@index([createdAt(sort: Desc)])
+  @@index([event])
   @@map("analytics")
+  @@schema("public")
+}
+
+model users {
+  id                                          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                                       String?
+  admin_users                                 admin_users?
+  analytics                                   Analytics[]
+  customizations                              Customization[]
+  orders                                      Order[]
+  referrals_referrals_referred_user_idTousers Referral[]      @relation("referrals_referred_user_idTousers")
+  referrals_referrals_referrer_user_idTousers Referral[]      @relation("referrals_referrer_user_idTousers")
+  reviews                                     Review[]
+
+  @@schema("auth")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model admin_users {
+  user_id    String   @id @db.Uuid
+  email      String
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  users      users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@schema("public")
+}
+
+enum order_status {
+  created
+  sent
+  confirmed
+  paid
+  fulfilled
+  cancelled
+  refunded
+
+  @@schema("public")
+}
+
+enum product_type {
+  sticker
+  sticker_vinyl
+  poster
+  spotify_card
+  frame
+  mystery_pack
+
+  @@schema("public")
 }

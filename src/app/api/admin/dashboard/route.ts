@@ -1,124 +1,94 @@
 export const dynamic = "force-dynamic";
 import { type NextRequest } from "next/server";
-import { createService } from "@/lib/supabase/service";
 import { ApiResponse, handleApiError } from "@/lib/api-response";
 import { requireAdminAuth } from "@/lib/auth-guard";
+import { prisma } from "@/lib/prisma";
 
-/**
- * GET /api/admin/dashboard — Aggregated business KPIs
- * Returns revenue, order counts, production queue, product stats
- */
 export async function GET(req: NextRequest) {
   const authErr = await requireAdminAuth(req);
   if (authErr) return authErr;
 
-  const admin = createService();
-  if (!admin) return ApiResponse.unavailable("Database service unconfigured or unavailable");
-
   const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
-  const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
 
   try {
     const [
-      ordersRes,
-      productsRes,
-      todayOrdersRes,
-      thisMonthOrdersRes,
-      lastMonthOrdersRes,
-      lowStockRes,
-      recentOrdersRes,
-      artworkQueueRes,
-      printQueueRes,
-      qcQueueRes,
-      packingQueueRes,
-      delayedRes,
-      bestSellersRes,
+      allOrders,
+      allProducts,
+      todayOrders,
+      thisMonthOrders,
+      lastMonthOrders,
+      lowStockData,
+      recentOrdersData,
+      artworkCount,
+      printCount,
+      qcCount,
+      packingCount,
+      delayedCount,
+      bestSellers
     ] = await Promise.all([
-      admin.from("orders").select("id, total_cents, status, created_at", { count: "exact" }),
-      admin.from("products").select("id, stock, status", { count: "exact" }),
-      admin.from("orders").select("id, total_cents").gte("created_at", today),
-      admin.from("orders").select("id, total_cents").gte("created_at", thisMonthStart),
-      admin
-        .from("orders")
-        .select("id, total_cents")
-        .gte("created_at", lastMonthStart)
-        .lt("created_at", thisMonthStart),
-      admin
-        .from("products")
-        .select("id, name, stock, image_url")
-        .lt("stock", 10)
-        .order("stock", { ascending: true })
-        .limit(10),
-      admin
-        .from("orders")
-        .select("id, order_number, customer_name, total_cents, status, created_at")
-        .order("created_at", { ascending: false })
-        .limit(10),
-      admin
-        .from("orders")
-        .select("id", { count: "exact" })
-        .in("status", ["artwork_review", "created", "sent", "WAITING_FOR_CONFIRMATION"]),
-      admin
-        .from("orders")
-        .select("id", { count: "exact" })
-        .in("status", ["print_queue", "printing"]),
-      admin
-        .from("orders")
-        .select("id", { count: "exact" })
-        .in("status", ["quality_check"]),
-      admin
-        .from("orders")
-        .select("id", { count: "exact" })
-        .in("status", ["packing", "ready_for_dispatch"]),
-      admin
-        .from("orders")
-        .select("id", { count: "exact" })
-        .not("status", "in", '("shipped","delivered","cancelled","refunded")')
-        .lt("created_at", fortyEightHoursAgo),
-      admin
-        .from("products")
-        .select("id, name, image_url, price_cents")
-        .eq("status", "active")
-        .eq("is_featured", true)
-        .limit(5),
+      prisma.order.findMany({
+        select: { id: true, totalCents: true, status: true, createdAt: true },
+      }),
+      prisma.product.findMany({
+        select: { id: true, stock: true },
+      }),
+      prisma.order.findMany({
+        where: { createdAt: { gte: today } },
+        select: { id: true, totalCents: true },
+      }),
+      prisma.order.findMany({
+        where: { createdAt: { gte: thisMonthStart } },
+        select: { id: true, totalCents: true },
+      }),
+      prisma.order.findMany({
+        where: { createdAt: { gte: lastMonthStart, lt: thisMonthStart } },
+        select: { id: true, totalCents: true },
+      }),
+      prisma.product.findMany({
+        where: { stock: { lt: 10 } },
+        orderBy: { stock: 'asc' },
+        take: 10,
+        select: { id: true, name: true, stock: true, imageUrl: true },
+      }),
+      prisma.order.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        select: { id: true, metadata: true, customerName: true, totalCents: true, status: true, createdAt: true },
+      }),
+      prisma.order.count({
+        where: { status: { in: ["created", "sent"] as any } },
+      }),
+      prisma.order.count({
+        where: { status: { in: ["confirmed"] as any } },
+      }),
+      prisma.order.count({
+        where: { status: { in: ["paid"] as any } },
+      }),
+      prisma.order.count({
+        where: { status: { in: ["fulfilled"] as any } },
+      }),
+      prisma.order.count({
+        where: { 
+          status: { notIn: ["cancelled", "refunded"] as any },
+          createdAt: { lt: fortyEightHoursAgo }
+        },
+      }),
+      prisma.product.findMany({
+        where: { isFeatured: true },
+        take: 5,
+        select: { id: true, name: true, imageUrl: true, priceCents: true },
+      }),
     ]);
 
-    const firstError =
-      ordersRes.error ||
-      productsRes.error ||
-      todayOrdersRes.error ||
-      thisMonthOrdersRes.error ||
-      lastMonthOrdersRes.error ||
-      lowStockRes.error ||
-      recentOrdersRes.error;
-
-    if (firstError) {
-      throw firstError;
-    }
-
-    const allOrders = ordersRes.data ?? [];
-    const allProducts = productsRes.data ?? [];
-    const todayOrders = todayOrdersRes.data ?? [];
-    const thisMonthOrders = thisMonthOrdersRes.data ?? [];
-    const lastMonthOrders = lastMonthOrdersRes.data ?? [];
-    const lowStockData = lowStockRes.data ?? [];
-    const recentOrdersData = recentOrdersRes.data ?? [];
-    const bestSellers = bestSellersRes.data ?? [];
-
-    const artworkCount = artworkQueueRes.count ?? 0;
-    const printCount = printQueueRes.count ?? 0;
-    const qcCount = qcQueueRes.count ?? 0;
-    const packingCount = packingQueueRes.count ?? 0;
-    const delayedCount = delayedRes.count ?? 0;
-
     // Calculate revenue
-    const totalRevenue = allOrders.reduce((sum, o) => sum + (o.total_cents || 0), 0);
-    const todayRevenue = todayOrders.reduce((sum, o) => sum + (o.total_cents || 0), 0);
-    const thisMonthRevenue = thisMonthOrders.reduce((sum, o) => sum + (o.total_cents || 0), 0);
-    const lastMonthRevenue = lastMonthOrders.reduce((sum, o) => sum + (o.total_cents || 0), 0);
+    const totalRevenue = allOrders.reduce((sum, o) => sum + (o.totalCents || 0), 0);
+    const todayRevenue = todayOrders.reduce((sum, o) => sum + (o.totalCents || 0), 0);
+    const thisMonthRevenue = thisMonthOrders.reduce((sum, o) => sum + (o.totalCents || 0), 0);
+    const lastMonthRevenue = lastMonthOrders.reduce((sum, o) => sum + (o.totalCents || 0), 0);
     const revenueGrowth =
       lastMonthRevenue > 0
         ? Math.round(((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100)
@@ -134,7 +104,7 @@ export async function GET(req: NextRequest) {
     }, {});
 
     // Product breakdown
-    const activeProducts = allProducts.filter((p) => p.status === "active").length;
+    const activeProducts = allProducts.length;
     const outOfStockProducts = allProducts.filter((p) => (p.stock ?? 0) <= 0).length;
 
     const avgOrderValue =
@@ -150,7 +120,7 @@ export async function GET(req: NextRequest) {
         avg_order_value: avgOrderValue,
       },
       orders: {
-        total: ordersRes.count ?? allOrders.length,
+        total: allOrders.length,
         today: todayOrders.length,
         this_month: thisMonthOrders.length,
         status_breakdown: statusBreakdown,
@@ -165,7 +135,7 @@ export async function GET(req: NextRequest) {
         delayed: delayedCount,
       },
       products: {
-        total: productsRes.count ?? allProducts.length,
+        total: allProducts.length,
         active: activeProducts,
         out_of_stock: outOfStockProducts,
         low_stock: lowStockData,
