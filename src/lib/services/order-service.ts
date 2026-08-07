@@ -25,4 +25,8 @@ export class OrderService {
   async updateOrderNotes(id: string, notes: string) {
     return this.repo.updateNotes(id, notes);
   }
+
+  async updateTracking(id: string, tracking_number: string, courier: string) {
+    return this.repo.updateTracking(id, tracking_number, courier);
+  }
 }

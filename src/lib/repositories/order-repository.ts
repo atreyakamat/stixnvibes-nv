@@ -111,4 +111,24 @@ export class OrderRepository {
     if (error) throw error;
     return data as OrderRow;
   }
+
+  async updateTracking(id: string, tracking_number: string, courier: string): Promise<OrderRow> {
+    const client = this.getClient();
+    const { data: existing, error: fetchErr } = await client.from("orders").select("metadata").eq("id", id).single();
+    if (fetchErr) throw fetchErr;
+
+    const metadata = (existing.metadata as Record<string, any>) || {};
+    if (tracking_number !== undefined) metadata.tracking_number = tracking_number;
+    if (courier !== undefined) metadata.courier = courier;
+
+    const { data, error } = await client
+      .from("orders")
+      .update({ metadata, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as OrderRow;
+  }
 }

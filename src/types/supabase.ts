@@ -27,7 +27,20 @@ export type OrderStatus =
   | "paid"
   | "fulfilled"
   | "cancelled"
-  | "refunded";
+  | "refunded"
+  | "artwork_review"
+  | "approved"
+  | "rejected"
+  | "production"
+  | "print_queue"
+  | "printing"
+  | "quality_check"
+  | "packing"
+  | "ready_for_dispatch"
+  | "dispatched"
+  | "shipped"
+  | "delivered"
+  | "returned";
 
 export type Database = {
   public: {

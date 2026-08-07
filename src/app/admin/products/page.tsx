@@ -73,6 +73,14 @@ export default function ProductsAdminPage() {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const showToast = (msg: string, type: "success" | "error" = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
+  };
 
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "table">("table");
@@ -116,38 +124,40 @@ export default function ProductsAdminPage() {
       const token = localStorage.getItem("snv.admin.accessToken");
       const ids = Array.from(selectedIds);
       
-      let payload: any = { ids };
+      let payload: Record<string, unknown> = { ids };
       if (action === "delete") payload.bulkAction = "delete";
       if (action === "archive") {
-        payload.bulkAction = "update_status";
+        payload.bulkAction = "status";
         payload.status = "archived";
       }
       if (action === "feature") {
-        // Feature might not be in bulk API directly, doing tags or we update individually
-        alert("Bulk feature might require multiple requests or API update.");
-        return;
+        payload.bulkAction = "status";
+        payload.status = "active";
+        payload.is_featured = true;
       }
 
-      if (payload.bulkAction) {
-        await fetch("/api/admin/products", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        });
-        setSelectedIds(new Set());
-        fetchProducts();
-      }
-    } catch (err: any) {
-      alert("Bulk action failed");
+      const res = await fetch("/api/admin/products", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Bulk action failed");
+      setSelectedIds(new Set());
+      fetchProducts();
+      showToast(`${ids.length} product${ids.length > 1 ? "s" : ""} ${action}d successfully.`);
+    } catch (err: unknown) {
+      showToast((err as Error).message || "Bulk action failed", "error");
     }
   };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
+    setFormError(null);
     try {
       const token = localStorage.getItem("snv.admin.accessToken");
       const res = await fetch("/api/admin/products", {
@@ -159,31 +169,31 @@ export default function ProductsAdminPage() {
         body: JSON.stringify(editingProduct),
       });
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error);
+      if (!data.ok) throw new Error(data.error || "Save failed");
       
       setDialogOpen(false);
       setEditingProduct(null);
       fetchProducts();
-    } catch (err: any) {
-      alert(err.message);
+      showToast(editingProduct.id ? "Product updated." : "Product created.");
+    } catch (err: unknown) {
+      setFormError((err as Error).message || "Failed to save product.");
     }
   };
 
   const handleDeleteProduct = async (id: string) => {
-    if (!confirm("Are you sure?")) return;
+    setDeleteConfirmId(null);
     try {
       const token = localStorage.getItem("snv.admin.accessToken");
       const res = await fetch(`/api/admin/products?id=${id}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error);
+      if (!data.ok) throw new Error(data.error || "Delete failed");
       fetchProducts();
-    } catch (err: any) {
-      alert(err.message);
+      showToast("Product deleted.");
+    } catch (err: unknown) {
+      showToast((err as Error).message || "Delete failed", "error");
     }
   };
 
@@ -248,6 +258,32 @@ export default function ProductsAdminPage() {
 
   return (
     <div className="flex flex-col gap-6 min-h-screen bg-slate-950 text-slate-50 p-6 md:p-8">
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold transition-all animate-in slide-in-from-bottom-4 ${
+          toast.type === "error"
+            ? "bg-red-950 border border-red-500/40 text-red-300"
+            : "bg-emerald-950 border border-emerald-500/40 text-emerald-300"
+        }`}>
+          {toast.type === "error" ? "⚠ " : "✓ "}
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-red-500/30 rounded-2xl p-6 max-w-sm w-full space-y-4">
+            <h3 className="font-bold text-lg">Delete Product?</h3>
+            <p className="text-sm text-muted-foreground">This action cannot be undone. The product will be permanently removed from your catalog.</p>
+            <div className="flex gap-3 justify-end">
+              <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>Cancel</Button>
+              <Button variant="destructive" onClick={() => handleDeleteProduct(deleteConfirmId)}>Delete</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -437,7 +473,7 @@ export default function ProductsAdminPage() {
                         <Button variant="ghost" size="icon-sm" onClick={() => openEditor(product)}>
                           <Edit2 className="w-4 h-4 text-slate-400" />
                         </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => handleDeleteProduct(product.id)}>
+                        <Button variant="ghost" size="icon-sm" onClick={() => setDeleteConfirmId(product.id)}>
                           <Trash2 className="w-4 h-4 text-red-400" />
                         </Button>
                       </div>
@@ -475,7 +511,7 @@ export default function ProductsAdminPage() {
                   <Button variant="secondary" size="icon" onClick={() => openEditor(product)}>
                     <Edit2 className="w-4 h-4" />
                   </Button>
-                  <Button variant="destructive" size="icon" onClick={() => handleDeleteProduct(product.id)}>
+                  <Button variant="destructive" size="icon" onClick={() => setDeleteConfirmId(product.id)}>
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
@@ -754,13 +790,20 @@ export default function ProductsAdminPage() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-6 border-t border-border/50">
-              <Button type="button" variant="ghost" onClick={() => setDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" variant="gradient">
-                {editingProduct?.id ? "Save Changes" : "Create Product"}
-              </Button>
+            <div className="space-y-3 pt-6 border-t border-border/50">
+              {formError && (
+                <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400 font-semibold">
+                  ⚠ {formError}
+                </div>
+              )}
+              <div className="flex justify-end gap-3">
+                <Button type="button" variant="ghost" onClick={() => { setDialogOpen(false); setFormError(null); }}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="gradient">
+                  {editingProduct?.id ? "Save Changes" : "Create Product"}
+                </Button>
+              </div>
             </div>
           </form>
         </DialogContent>

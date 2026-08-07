@@ -22,3 +22,44 @@ export async function GET(req: NextRequest) {
     return handleApiError(err);
   }
 }
+
+export async function POST(req: NextRequest) {
+  const authErr = await requireAdminAuth(req);
+  if (authErr) return authErr;
+
+  try {
+    const body = await req.json();
+    const id = body.id || body.customer_phone || body.customer_email || body.customer_name;
+    if (!id) throw new Error("Missing customer identifier");
+    
+    await customerService.updateCustomer(id, {
+      customer_name: body.customer_name,
+      customer_phone: body.customer_phone,
+      customer_email: body.customer_email,
+      vip: body.vip,
+      blacklisted: body.blacklisted,
+      blacklist_reason: body.blacklist_reason,
+      notes: body.notes,
+      favourite_products: body.favourite_products
+    });
+    return ApiResponse.success({ success: true });
+  } catch (err: unknown) {
+    return handleApiError(err);
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  const authErr = await requireAdminAuth(req);
+  if (authErr) return authErr;
+
+  const url = new URL(req.url);
+  const id = url.searchParams.get("id");
+  if (!id) return ApiResponse.error("Missing id", "BAD_REQUEST", 400);
+
+  try {
+    await customerService.deleteCustomer(id);
+    return ApiResponse.success({ success: true });
+  } catch (err: unknown) {
+    return handleApiError(err);
+  }
+}

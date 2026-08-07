@@ -6,7 +6,7 @@ import { requireAdminAuth } from "@/lib/auth-guard";
 
 /**
  * GET /api/admin/dashboard — Aggregated business KPIs
- * Returns revenue, order counts, product stats, customer stats
+ * Returns revenue, order counts, production queue, product stats
  */
 export async function GET(req: NextRequest) {
   const authErr = await requireAdminAuth(req);
@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
   const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+  const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
 
   try {
     const [
@@ -29,17 +30,60 @@ export async function GET(req: NextRequest) {
       lastMonthOrdersRes,
       lowStockRes,
       recentOrdersRes,
+      artworkQueueRes,
+      printQueueRes,
+      qcQueueRes,
+      packingQueueRes,
+      delayedRes,
+      bestSellersRes,
     ] = await Promise.all([
       admin.from("orders").select("id, total_cents, status, created_at", { count: "exact" }),
       admin.from("products").select("id, stock, status", { count: "exact" }),
       admin.from("orders").select("id, total_cents").gte("created_at", today),
       admin.from("orders").select("id, total_cents").gte("created_at", thisMonthStart),
-      admin.from("orders").select("id, total_cents")
+      admin
+        .from("orders")
+        .select("id, total_cents")
         .gte("created_at", lastMonthStart)
         .lt("created_at", thisMonthStart),
-      admin.from("products").select("id, name, stock, image_url").lt("stock", 10).order("stock", { ascending: true }).limit(10),
-      admin.from("orders").select("id, order_number, customer_name, total_cents, status, created_at")
-        .order("created_at", { ascending: false }).limit(10),
+      admin
+        .from("products")
+        .select("id, name, stock, image_url")
+        .lt("stock", 10)
+        .order("stock", { ascending: true })
+        .limit(10),
+      admin
+        .from("orders")
+        .select("id, order_number, customer_name, total_cents, status, created_at")
+        .order("created_at", { ascending: false })
+        .limit(10),
+      admin
+        .from("orders")
+        .select("id", { count: "exact" })
+        .in("status", ["artwork_review", "created", "sent", "WAITING_FOR_CONFIRMATION"]),
+      admin
+        .from("orders")
+        .select("id", { count: "exact" })
+        .in("status", ["print_queue", "printing"]),
+      admin
+        .from("orders")
+        .select("id", { count: "exact" })
+        .in("status", ["quality_check"]),
+      admin
+        .from("orders")
+        .select("id", { count: "exact" })
+        .in("status", ["packing", "ready_for_dispatch"]),
+      admin
+        .from("orders")
+        .select("id", { count: "exact" })
+        .not("status", "in", '("shipped","delivered","cancelled","refunded")')
+        .lt("created_at", fortyEightHoursAgo),
+      admin
+        .from("products")
+        .select("id, name, image_url, price_cents")
+        .eq("status", "active")
+        .eq("is_featured", true)
+        .limit(5),
     ]);
 
     const firstError =
@@ -62,15 +106,25 @@ export async function GET(req: NextRequest) {
     const lastMonthOrders = lastMonthOrdersRes.data ?? [];
     const lowStockData = lowStockRes.data ?? [];
     const recentOrdersData = recentOrdersRes.data ?? [];
+    const bestSellers = bestSellersRes.data ?? [];
+
+    const artworkCount = artworkQueueRes.count ?? 0;
+    const printCount = printQueueRes.count ?? 0;
+    const qcCount = qcQueueRes.count ?? 0;
+    const packingCount = packingQueueRes.count ?? 0;
+    const delayedCount = delayedRes.count ?? 0;
 
     // Calculate revenue
     const totalRevenue = allOrders.reduce((sum, o) => sum + (o.total_cents || 0), 0);
     const todayRevenue = todayOrders.reduce((sum, o) => sum + (o.total_cents || 0), 0);
     const thisMonthRevenue = thisMonthOrders.reduce((sum, o) => sum + (o.total_cents || 0), 0);
     const lastMonthRevenue = lastMonthOrders.reduce((sum, o) => sum + (o.total_cents || 0), 0);
-    const revenueGrowth = lastMonthRevenue > 0
-      ? Math.round(((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100)
-      : thisMonthRevenue > 0 ? 100 : 0;
+    const revenueGrowth =
+      lastMonthRevenue > 0
+        ? Math.round(((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100)
+        : thisMonthRevenue > 0
+        ? 100
+        : 0;
 
     // Order status breakdown
     const statusBreakdown = allOrders.reduce((acc: Record<string, number>, o) => {
@@ -83,7 +137,8 @@ export async function GET(req: NextRequest) {
     const activeProducts = allProducts.filter((p) => p.status === "active").length;
     const outOfStockProducts = allProducts.filter((p) => (p.stock ?? 0) <= 0).length;
 
-    const avgOrderValue = allOrders.length > 0 ? Math.round(totalRevenue / allOrders.length) : 0;
+    const avgOrderValue =
+      allOrders.length > 0 ? Math.round(totalRevenue / allOrders.length) : 0;
 
     return ApiResponse.success({
       revenue: {
@@ -99,7 +154,15 @@ export async function GET(req: NextRequest) {
         today: todayOrders.length,
         this_month: thisMonthOrders.length,
         status_breakdown: statusBreakdown,
-        pending: (statusBreakdown["pending"] || 0) + (statusBreakdown["created"] || 0) + (statusBreakdown["WAITING_FOR_CONFIRMATION"] || 0),
+        pending: artworkCount,
+        delayed: delayedCount,
+      },
+      production_queue: {
+        artwork_review: artworkCount,
+        printing: printCount,
+        qc: qcCount,
+        packing: packingCount,
+        delayed: delayedCount,
       },
       products: {
         total: productsRes.count ?? allProducts.length,
@@ -107,6 +170,7 @@ export async function GET(req: NextRequest) {
         out_of_stock: outOfStockProducts,
         low_stock: lowStockData,
       },
+      best_sellers: bestSellers,
       recent_orders: recentOrdersData,
     });
   } catch (err: unknown) {

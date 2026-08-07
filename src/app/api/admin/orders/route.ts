@@ -32,14 +32,14 @@ export async function POST(req: NextRequest) {
   const authErr = await requireAdminAuth(req);
   if (authErr) return authErr;
 
-  let body: { orderId?: string; status?: OrderStatus; notes?: string };
+  let body: { orderId?: string; status?: OrderStatus; notes?: string; tracking_number?: string; courier?: string };
   try {
     body = await req.json();
   } catch {
     return ApiResponse.error("Invalid JSON body", "BAD_REQUEST", 400);
   }
 
-  const { orderId, status, notes } = body;
+  const { orderId, status, notes, tracking_number, courier } = body;
   if (!orderId) {
     return ApiResponse.error("Missing required orderId", "BAD_REQUEST", 400);
   }
@@ -52,6 +52,11 @@ export async function POST(req: NextRequest) {
 
     if (typeof notes === "string") {
       const updated = await orderService.updateOrderNotes(orderId, notes);
+      return ApiResponse.success(updated);
+    }
+
+    if (tracking_number !== undefined || courier !== undefined) {
+      const updated = await orderService.updateTracking(orderId, tracking_number || "", courier || "");
       return ApiResponse.success(updated);
     }
 
