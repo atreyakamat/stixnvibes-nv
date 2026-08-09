@@ -72,11 +72,28 @@ export async function POST(req: NextRequest) {
 
   // Handle Single Product Create or Update
   try {
+    const { validateProduct } = await import("@/lib/validations/product");
+    
+    // Format incoming data to map correctly to schema
+    const dataToValidate = {
+      ...body,
+      price_cents: Number(body.price_cents || 0),
+      compare_at_cents: body.compare_at_cents ? Number(body.compare_at_cents) : undefined,
+      stock: Number(body.stock || 0),
+    };
+    
+    const validation = validateProduct(dataToValidate);
+    if (!validation.success) {
+      return ApiResponse.error("Validation failed", "VALIDATION_ERROR", 400, validation.error.flatten());
+    }
+
+    const validData = validation.data;
+
     if (body.id) {
-      const updated = await productService.updateProduct(body.id, body);
+      const updated = await productService.updateProduct(body.id, validData);
       return ApiResponse.success(updated);
     } else {
-      const created = await productService.createProduct(body);
+      const created = await productService.createProduct(validData);
       return ApiResponse.success(created, undefined, 201);
     }
   } catch (err: unknown) {
