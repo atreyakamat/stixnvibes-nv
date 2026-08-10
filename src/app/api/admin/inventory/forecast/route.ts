@@ -1,18 +1,6 @@
-export const dynamic = "force-dynamic";
-import { NextResponse, type NextRequest } from "next/server";
+import { createApiHandler } from "@/lib/api-handler";
 import { createService } from "@/lib/supabase/service";
-import { requireAdminAuth } from "@/lib/auth-guard";
-
-/**
- * Inventory forecast CSV for the back-office.
- *
- * Forecast rule (simple, conservative):
- *   expected_30d_units = historical_orders_units (last 30 days) + 20% buffer
- *   restock_required   = expected_30d_units - current_stock
- *
- * When Supabase isn't configured we return an empty CSV with a header row
- * so the admin download still works offline.
- */
+import { z } from "zod";
 
 function csvEscape(value: unknown) {
   const s = value == null ? "" : String(value);
@@ -20,30 +8,32 @@ function csvEscape(value: unknown) {
   return s;
 }
 
-export async function GET(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
+export const GET = createApiHandler({
+  requireAdmin: true,
+  querySchema: z.object({
+    days: z.coerce.number().min(7).max(180).optional().default(30),
+    buffer: z.coerce.number().min(0).max(1).optional().default(0.2),
+  }),
+  handler: async ({ query }) => {
+    const days = query.days;
+    const bufferPct = query.buffer;
+    const admin = createService();
 
-  const days = Math.min(180, Math.max(7, Number(req.nextUrl.searchParams.get("days")) || 30));
-  const bufferPct = Math.min(1, Math.max(0, Number(req.nextUrl.searchParams.get("buffer")) || 0.2));
-  const admin = createService();
+    if (!admin) {
+      const csv = [
+        "sku,name,current_stock,sold_30d,expected_30d,restock_required,supplier_note",
+        "NO-DATA,Awaiting Supabase env vars,0,0,0,0,configure NEXT_PUBLIC_SUPABASE_URL",
+      ].join("\n");
+      return new Response(csv, {
+        status: 200,
+        headers: {
+          "content-type": "text/csv; charset=utf-8",
+          "content-disposition": `attachment; filename="snv-inventory-forecast-${days}d.csv"`,
+        },
+      });
+    }
 
-  if (!admin) {
-    const csv = [
-      "sku,name,current_stock,sold_30d,expected_30d,restock_required,supplier_note",
-      "NO-DATA,Awaiting Supabase env vars,0,0,0,0,configure NEXT_PUBLIC_SUPABASE_URL",
-    ].join("\n");
-    return new NextResponse(csv, {
-      status: 200,
-      headers: {
-        "content-type": "text/csv; charset=utf-8",
-        "content-disposition": `attachment; filename="snv-inventory-forecast-${days}d.csv"`,
-      },
-    });
-  }
-
-  const client = admin;
-  try {
+    const client = admin;
     const sinceIso = new Date(Date.now() - days * 86400_000).toISOString();
 
     const [productsRes, itemsRes] = await Promise.all([
@@ -97,15 +87,12 @@ export async function GET(req: NextRequest) {
     }
 
     const csv = lines.join("\n");
-    return new NextResponse(csv, {
+    return new Response(csv, {
       status: 200,
       headers: {
         "content-type": "text/csv; charset=utf-8",
         "content-disposition": `attachment; filename="snv-inventory-forecast-${days}d.csv"`,
       },
     });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unexpected";
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
-  }
-}
+  },
+});

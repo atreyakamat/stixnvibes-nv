@@ -46,4 +46,22 @@ export class MediaRepository {
     if (error) throw error;
     return true;
   }
+
+  async uploadFile(filename: string, buffer: Buffer, contentType: string, bucket = "media"): Promise<{ url: string; path: string }> {
+    const client = this.getClient();
+    const { data: uploadData, error: uploadErr } = await client.storage
+      .from(bucket)
+      .upload(filename, buffer, {
+        contentType,
+        upsert: true,
+      });
+
+    if (uploadErr) throw uploadErr;
+
+    const { data: publicUrlData } = client.storage.from(bucket).getPublicUrl(uploadData.path);
+    return {
+      url: publicUrlData.publicUrl,
+      path: uploadData.path,
+    };
+  }
 }

@@ -28,7 +28,9 @@ export function isServiceConfigured() {
  */
 export function createService() {
   const { supabaseUrl, serviceRoleKey } = getEnv();
-  if (!isValidHttpUrl(supabaseUrl) || !serviceRoleKey) return null;
+  if (!isValidHttpUrl(supabaseUrl) || !serviceRoleKey) {
+    throw new Error("❌ CRITICAL ERROR: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing or invalid.");
+  }
   return createSupabaseClient<any>(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });

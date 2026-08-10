@@ -1,187 +1,32 @@
-import { randomUUID } from "crypto";
-import { NextResponse, type NextRequest } from "next/server";
-import { z } from "@/lib/zod-lite";
-import { createService } from "@/lib/supabase/service";
-import { buildWhatsAppUrl, type WhatsAppCartItem } from "@/lib/whatsapp";
-import { products, type Product } from "@/lib/data/products";
+import { createApiHandler } from "@/lib/api-handler";
+import { OrderService } from "@/lib/services/order-service";
+import { z } from "zod";
 
-interface CartLine {
-  product_id?: string;
-  variant_id?: string | null;
-  name: string;
-  quantity?: number;
-  price_cents: number;
-  image_url?: string;
-  variant_name?: string;
-}
+const orderService = new OrderService();
 
-interface CreateOrderPayload {
-  customer_name: string;
-  customer_phone: string;
-  customer_email?: string | null;
-  address: string;
-  pincode: string;
-  notes?: string;
-  items: CartLine[];
-}
+const cartLineSchema = z.object({
+  product_id: z.string().optional(),
+  variant_id: z.string().optional().nullable(),
+  name: z.string().min(1),
+  quantity: z.number().int().min(1).max(100).optional(),
+  price_cents: z.number().min(0),
+  image_url: z.string().optional(),
+  variant_name: z.string().optional(),
+});
 
-const PhoneRe = /^\+?[0-9]{8,15}$/;
-const PincodeRe = /^[0-9A-Za-z\s-]{3,10}$/;
+const createOrderSchema = z.object({
+  customer_name: z.string().min(2),
+  customer_phone: z.string().regex(/^\+?[0-9]{8,15}$/),
+  customer_email: z.string().email().optional().nullable(),
+  address: z.string().min(6),
+  pincode: z.string().regex(/^[0-9A-Za-z\s-]{3,10}$/),
+  notes: z.string().optional(),
+  items: z.array(cartLineSchema).min(1),
+});
 
-function sanitize(str: string): string {
-  return str
-    .trim()
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#x27;");
-}
-
-function generateOrderNumber(): string {
-  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  const seq = Math.floor(100000 + Math.random() * 900000);
-  return `ORD-${dateStr}-${seq}`;
-}
-
-function validate(payload: any): payload is CreateOrderPayload {
-  if (typeof payload !== "object" || payload === null) return false;
-  if (typeof payload.customer_name !== "string" || payload.customer_name.trim().length < 2) return false;
-  if (typeof payload.customer_phone !== "string" || !PhoneRe.test(payload.customer_phone)) return false;
-  if (typeof payload.address !== "string" || payload.address.trim().length < 6) return false;
-  if (typeof payload.pincode !== "string" || !PincodeRe.test(payload.pincode)) return false;
-  if (!Array.isArray(payload.items) || payload.items.length === 0) return false;
-  for (const item of payload.items as CartLine[]) {
-    if (typeof item.name !== "string" || !item.name.trim()) return false;
-    if (typeof item.price_cents !== "number" || item.price_cents < 0) return false;
-    const qty = typeof item.quantity === "number" ? item.quantity : 1;
-    if (!Number.isInteger(qty) || qty < 1 || qty > 100) return false;
-  }
-  if ("customer_email" in payload && payload.customer_email !== null && payload.customer_email !== "") {
-    if (typeof payload.customer_email !== "string" || !z.email(payload.customer_email)) return false;
-  }
-  return true;
-}
-
-export async function POST(req: NextRequest) {
-  let payload: unknown;
-  try {
-    payload = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-  if (!validate(payload)) {
-    return NextResponse.json({ error: "Invalid order payload" }, { status: 400 });
-  }
-
-  const cleanName = sanitize(payload.customer_name);
-  const cleanPhone = sanitize(payload.customer_phone);
-  const cleanAddress = sanitize(payload.address);
-  const cleanPincode = sanitize(payload.pincode);
-  const cleanNotes = payload.notes ? sanitize(payload.notes) : undefined;
-  const cleanEmail = payload.customer_email ? sanitize(payload.customer_email) : null;
-
-  // 1. Generate unique Order ID and Human Readable Order Number
-  const generatedId = randomUUID();
-  const orderNumber = generateOrderNumber();
-
-  // 2. Validate prices server-side
-  const items = payload.items;
-  const quantities = items.map((i) => (typeof i.quantity === "number" ? i.quantity : 1));
-
-  const verifiedItems = items.map((item, idx) => {
-    const mockProd = products.find((p: Product) => p.id === item.product_id || p.slug === item.product_id);
-    const verifiedPrice = mockProd ? Math.round(mockProd.price * 100) : item.price_cents;
-    return {
-      ...item,
-      name: sanitize(item.name),
-      quantity: quantities[idx],
-      price_cents: verifiedPrice,
-    };
-  });
-
-  const totalCents = verifiedItems.reduce((sum, item) => sum + item.price_cents * item.quantity, 0);
-
-  const whatsappItems: WhatsAppCartItem[] = verifiedItems.map((item, idx) => ({
-    id: item.variant_id ?? item.product_id ?? `${item.name}-${idx}`,
-    productId: item.product_id!,
-    name: item.name,
-    price_cents: item.price_cents,
-    quantity: item.quantity,
-    image: item.image_url,
-    variantName: item.variant_name,
-  }));
-
-  // 3. Build formatted WhatsApp URL with Order Number
-  const waUrl = buildWhatsAppUrl({
-    orderId: generatedId,
-    orderNumber,
-    name: cleanName,
-    address: cleanAddress,
-    pincode: cleanPincode,
-    phone: cleanPhone,
-    items: whatsappItems,
-    totalRupees: totalCents / 100,
-    notes: cleanNotes,
-  });
-
-  // 4. Save Order in PostgreSQL FIRST (Source of Truth) before WhatsApp opens
-  let orderId: string | null = null;
-  try {
-    const { createBrowser } = await import("@/lib/supabase/client");
-    const client = createService() ?? createBrowser();
-    if (client) {
-      const orderInsert = {
-        id: generatedId,
-        order_number: orderNumber,
-        whatsapp_status: "SENT",
-        customer_name: cleanName,
-        customer_phone: cleanPhone,
-        customer_email: cleanEmail,
-        address: cleanAddress,
-        pincode: cleanPincode,
-        total_cents: totalCents,
-        status: "sent",
-        whatsapp_url: waUrl,
-        notes: cleanNotes ?? null,
-        metadata: {
-          order_number: orderNumber,
-          whatsapp_status: "SENT",
-          order_status: "WAITING_FOR_CONFIRMATION",
-        },
-      };
-      const itemInserts = verifiedItems.map((i) => ({
-        id: randomUUID(),
-        product_id: i.product_id ?? null,
-        variant_id: i.variant_id ?? null,
-        name: i.name,
-        quantity: i.quantity,
-        price_cents: i.price_cents,
-        image_url: i.image_url ?? null,
-      }));
-      
-      const { data, error: dbError } = await client.rpc("create_checkout_transaction", {
-        p_order: orderInsert,
-        p_items: itemInserts,
-      });
-
-      if (dbError) {
-        console.error("[api/orders/create] insert failed:", dbError.message);
-      } else if (data && data.success === false) {
-        console.error("[api/orders/create] RPC failed:", data.error);
-      } else {
-        orderId = generatedId;
-      }
-    }
-  } catch (e) {
-    console.error("[api/orders/create] Unexpected:", e);
-  }
-
-  return NextResponse.json({
-    ok: true,
-    whatsappUrl: waUrl,
-    orderId: generatedId,
-    orderNumber,
-    persisted: Boolean(orderId),
-  });
-}
+export const POST = createApiHandler({
+  bodySchema: createOrderSchema,
+  handler: async ({ body }) => {
+    return await orderService.publicCreateOrder(body);
+  },
+});

@@ -14,7 +14,9 @@ function isValidHttpUrl(url: string): boolean {
 }
 
 export async function createServer() {
-  if (!isValidHttpUrl(supabaseUrl) || !supabaseAnonKey) return null;
+  if (!isValidHttpUrl(supabaseUrl) || !supabaseAnonKey) {
+    throw new Error("❌ CRITICAL ERROR: NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY is missing or invalid.");
+  }
   const cookieStore = await cookies();
   return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {

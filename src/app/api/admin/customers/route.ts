@@ -1,37 +1,43 @@
-export const dynamic = "force-dynamic";
-import { type NextRequest } from "next/server";
+import { createApiHandler } from "@/lib/api-handler";
 import { CustomerService } from "@/lib/services/customer-service";
-import { ApiResponse, handleApiError } from "@/lib/api-response";
-import { requireAdminAuth } from "@/lib/auth-guard";
+import { z } from "zod";
 
 const customerService = new CustomerService();
 
-export async function GET(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
+export const GET = createApiHandler({
+  requireAdmin: true,
+  querySchema: z.object({
+    search: z.string().optional(),
+    sort: z.string().optional().default("last_order_at"),
+    limit: z.coerce.number().min(1).max(500).optional().default(100),
+  }),
+  handler: async ({ query }) => {
+    return await customerService.getCustomers({
+      search: query.search,
+      sortBy: query.sort as "total_spent" | "orders_count" | "last_order_at" | "created_at" | undefined,
+      limit: query.limit,
+    });
+  },
+});
 
-  const url = new URL(req.url);
-  const search = url.searchParams.get("search") || undefined;
-  const sortBy = url.searchParams.get("sort") || "last_order_at";
-  const limit = Math.min(Number(url.searchParams.get("limit") ?? 100), 500);
-
-  try {
-    const customers = await customerService.getCustomers({ search, sortBy, limit });
-    return ApiResponse.success(customers);
-  } catch (err: unknown) {
-    return handleApiError(err);
-  }
-}
-
-export async function POST(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
-
-  try {
-    const body = await req.json();
+export const POST = createApiHandler({
+  requireAdmin: true,
+  bodySchema: z.object({
+    id: z.string().optional(),
+    customer_phone: z.string().optional(),
+    customer_email: z.string().optional(),
+    customer_name: z.string().optional(),
+    vip: z.boolean().optional(),
+    blacklisted: z.boolean().optional(),
+    blacklist_reason: z.string().optional(),
+    notes: z.string().optional(),
+    favourite_products: z.array(z.string()).optional(),
+  }),
+  handler: async ({ body }) => {
     const id = body.id || body.customer_phone || body.customer_email || body.customer_name;
-    if (!id) throw new Error("Missing customer identifier");
-    
+    if (!id) {
+      throw new Error("Missing customer identifier");
+    }
     await customerService.updateCustomer(id, {
       customer_name: body.customer_name,
       customer_phone: body.customer_phone,
@@ -40,26 +46,19 @@ export async function POST(req: NextRequest) {
       blacklisted: body.blacklisted,
       blacklist_reason: body.blacklist_reason,
       notes: body.notes,
-      favourite_products: body.favourite_products
+      favourite_products: body.favourite_products,
     });
-    return ApiResponse.success({ success: true });
-  } catch (err: unknown) {
-    return handleApiError(err);
-  }
-}
+    return { success: true };
+  },
+});
 
-export async function DELETE(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
-
-  const url = new URL(req.url);
-  const id = url.searchParams.get("id");
-  if (!id) return ApiResponse.error("Missing id", "BAD_REQUEST", 400);
-
-  try {
-    await customerService.deleteCustomer(id);
-    return ApiResponse.success({ success: true });
-  } catch (err: unknown) {
-    return handleApiError(err);
-  }
-}
+export const DELETE = createApiHandler({
+  requireAdmin: true,
+  querySchema: z.object({
+    id: z.string().min(1, "Missing id"),
+  }),
+  handler: async ({ query }) => {
+    await customerService.deleteCustomer(query.id);
+    return { success: true };
+  },
+});

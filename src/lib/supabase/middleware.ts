@@ -21,11 +21,14 @@ export async function updateSession(request: NextRequest) {
   // Check for static admin authentication token in cookies or headers
   const adminCookie = request.cookies.get("snv_admin_token");
   const authHeader = request.headers.get("authorization");
+  const isDevAllowed = process.env.NODE_ENV !== "production";
+  const staticAdminToken = process.env.ADMIN_STATIC_ACCESS_TOKEN;
+  
   const isStaticAdmin =
-    adminCookie?.value === "snv_admin_token_static_dev" ||
-    adminCookie?.value === (process.env.ADMIN_STATIC_ACCESS_TOKEN ?? "") ||
-    authHeader === "Bearer snv_admin_token_static_dev" ||
-    authHeader === `Bearer ${process.env.ADMIN_STATIC_ACCESS_TOKEN ?? ""}`;
+    (staticAdminToken && adminCookie?.value === staticAdminToken) ||
+    (staticAdminToken && authHeader === `Bearer ${staticAdminToken}`) ||
+    (isDevAllowed && adminCookie?.value === "snv_admin_token_static_dev") ||
+    (isDevAllowed && authHeader === "Bearer snv_admin_token_static_dev");
 
   // If Supabase is unconfigured:
   if (!supabaseConfigured) {

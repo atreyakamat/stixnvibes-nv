@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import Image from "next/image";
 import { Trash2, Minus, Plus, ShoppingBag } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { Section } from "@/components/layout/section";
@@ -48,9 +49,9 @@ export default function CartPage() {
                       exit={{ opacity: 0, scale: 0.95 }}
                       className="flex items-center gap-4 rounded-2xl border border-white/5 bg-slate-900 p-4 shadow-sm sm:gap-6 sm:p-6"
                     >
-                      <div className="h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-slate-800">
+                      <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-slate-800">
                         {item.image ? (
-                          <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
+                          <Image src={item.image} alt={item.name} fill className="object-cover" />
                         ) : (
                           <div className="grid h-full w-full place-items-center bg-slate-800 text-slate-500">
                             <ShoppingBag className="size-8" />

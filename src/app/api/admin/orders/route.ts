@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { OrderService } from "@/lib/services/order-service";
 import { createApiHandler } from "@/lib/api-handler";
 import { z } from "zod";
-import type { OrderStatus } from "@/types/supabase";
+import { $Enums } from "@prisma/client";
 
 const orderService = new OrderService();
 
@@ -31,7 +31,7 @@ export const POST = createApiHandler({
   bodySchema: OrderPayloadSchema,
   handler: async ({ body }) => {
     if (body.status) {
-      return await orderService.updateOrderStatus(body.orderId, body.status as OrderStatus);
+      return await orderService.updateOrderStatus(body.orderId, body.status as $Enums.order_status);
     }
 
     if (body.notes !== undefined) {

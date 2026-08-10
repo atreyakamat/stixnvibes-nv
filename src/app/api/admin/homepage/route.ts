@@ -1,10 +1,8 @@
-export const dynamic = "force-dynamic";
-import { type NextRequest } from "next/server";
-import { SettingsRepository } from "@/lib/repositories/settings-repository";
-import { ApiResponse, handleApiError } from "@/lib/api-response";
-import { requireAdminAuth } from "@/lib/auth-guard";
+import { createApiHandler } from "@/lib/api-handler";
+import { SettingsService } from "@/lib/services/settings-service";
+import { z } from "zod";
 
-const settingsRepo = new SettingsRepository();
+const settingsService = new SettingsService();
 
 const DEFAULT_SECTIONS = [
   { id: "hero", name: "Hero Banner", enabled: true, sort_order: 1, headline: "Stick Loud. Vibe Harder.", subheadline: "Premium stickers, posters, Spotify cards & frames." },
@@ -19,38 +17,21 @@ const DEFAULT_SECTIONS = [
   { id: "newsletter", name: "Newsletter Signup", enabled: true, sort_order: 10 },
 ];
 
-export async function GET(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
+export const GET = createApiHandler({
+  requireAdmin: true,
+  handler: async () => {
+    const layout = await settingsService.getSetting("homepage_layout");
+    return layout ?? DEFAULT_SECTIONS;
+  },
+});
 
-  try {
-    const layout = await settingsRepo.get("homepage_layout");
-    return ApiResponse.success(layout ?? DEFAULT_SECTIONS);
-  } catch (err: unknown) {
-    return handleApiError(err);
-  }
-}
-
-export async function POST(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
-
-  let body: { sections?: unknown };
-  try {
-    body = await req.json();
-  } catch {
-    return ApiResponse.error("Invalid JSON body", "BAD_REQUEST", 400);
-  }
-
-  const { sections } = body;
-  if (!Array.isArray(sections)) {
-    return ApiResponse.error("Missing required 'sections' array", "BAD_REQUEST", 400);
-  }
-
-  try {
-    const updated = await settingsRepo.set("homepage_layout", sections, "cms", "Homepage sections layout configuration");
-    return ApiResponse.success({ saved: true, data: updated.value });
-  } catch (err: unknown) {
-    return handleApiError(err);
-  }
-}
+export const POST = createApiHandler({
+  requireAdmin: true,
+  bodySchema: z.object({
+    sections: z.array(z.any()),
+  }),
+  handler: async ({ body }) => {
+    const updated = await settingsService.setSetting("homepage_layout", body.sections, "cms", "Homepage sections layout configuration");
+    return { saved: true, data: updated.value };
+  },
+});

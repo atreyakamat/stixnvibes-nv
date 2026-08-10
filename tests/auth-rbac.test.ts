@@ -39,7 +39,7 @@ describe("admin auth hardening", () => {
     const response = await adminLogin(makeRequest("/api/admin/login", {
       email: "admin@stixnvibes.com",
       password: "stixnvibes123",
-    }) as NextRequest);
+    }) as NextRequest, {});
 
     expect(response.status).toBe(503);
     const body = await response.json();

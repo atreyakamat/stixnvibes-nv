@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { Product } from "@prisma/client";
+import { Prisma, type Product, $Enums } from "@prisma/client";
 
 export interface ProductListParams {
   search?: string;
@@ -19,7 +19,7 @@ export class ProductRepository {
     const sortField = params.sort ?? "createdAt"; // map created_at to createdAt
     const sortOrder = params.order ?? "desc";
     
-    let where: any = {};
+    let where: Prisma.ProductWhereInput = {};
     if (params.search) {
       where.OR = [
         { name: { contains: params.search, mode: 'insensitive' } },
@@ -37,7 +37,7 @@ export class ProductRepository {
     }
     
     if (params.type && params.type !== "all") {
-      where.type = params.type;
+      where.type = params.type as $Enums.product_type;
     }
     
     // Fallback sort field mapping
@@ -70,11 +70,11 @@ export class ProductRepository {
     return prisma.product.findUnique({ where: { slug } });
   }
 
-  async create(payload: any): Promise<Product> {
+  async create(payload: Prisma.ProductUncheckedCreateInput): Promise<Product> {
     return prisma.product.create({ data: payload });
   }
 
-  async update(id: string, payload: any): Promise<Product> {
+  async update(id: string, payload: Prisma.ProductUncheckedUpdateInput): Promise<Product> {
     return prisma.product.update({ where: { id }, data: payload });
   }
 

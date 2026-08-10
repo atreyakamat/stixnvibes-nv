@@ -1,98 +1,43 @@
-export const dynamic = "force-dynamic";
-import { type NextRequest } from "next/server";
+import { createApiHandler } from "@/lib/api-handler";
 import { MediaService } from "@/lib/services/media-service";
-import { ApiResponse, handleApiError } from "@/lib/api-response";
-import { requireAdminAuth } from "@/lib/auth-guard";
-import { createService } from "@/lib/supabase/service";
+import { z } from "zod";
 
 const mediaService = new MediaService();
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const ALLOWED_TYPES = new Set([
-  "image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml", "image/avif",
-]);
 
-export async function GET(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
+export const GET = createApiHandler({
+  requireAdmin: true,
+  handler: async () => {
+    return await mediaService.getMediaFiles();
+  },
+});
 
-  try {
-    const files = await mediaService.getMediaFiles();
-    return ApiResponse.success(files);
-  } catch (err: unknown) {
-    return handleApiError(err);
-  }
-}
+export const POST = createApiHandler({
+  requireAdmin: true,
+  handler: async ({ req }) => {
+    const formData = await req.formData().catch(() => {
+      throw new Error("Invalid form data. Use multipart/form-data.");
+    });
 
-export async function POST(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
+    const file = formData.get("file");
+    if (!file || typeof file === "string") {
+      throw new Error("Missing file upload. Attach a file under the 'file' field.");
+    }
 
-  const admin = createService();
-  if (!admin) return ApiResponse.unavailable("Storage service unconfigured or unavailable");
+    const result = await mediaService.uploadMediaFile(file as File);
+    return new Response(JSON.stringify({ ok: true, data: result }), {
+      status: 201,
+      headers: { "Content-Type": "application/json" },
+    });
+  },
+});
 
-  let formData: FormData;
-  try {
-    formData = await req.formData();
-  } catch {
-    return ApiResponse.error("Invalid form data. Use multipart/form-data.", "BAD_REQUEST", 400);
-  }
-
-  const file = formData.get("file");
-  if (!file || typeof file === "string") {
-    return ApiResponse.error("Missing file upload. Attach a file under the 'file' field.", "BAD_REQUEST", 400);
-  }
-
-  const blob = file as File;
-
-  if (blob.size > MAX_FILE_SIZE) {
-    return ApiResponse.error(`File too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)}MB.`, "BAD_REQUEST", 400);
-  }
-
-  if (!ALLOWED_TYPES.has(blob.type)) {
-    return ApiResponse.error(`Unsupported file type: ${blob.type}. Allowed: ${Array.from(ALLOWED_TYPES).join(", ")}`, "BAD_REQUEST", 400);
-  }
-
-  try {
-    const ext = blob.name.split(".").pop() || "png";
-    const filename = `upload_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
-
-    const buffer = Buffer.from(await blob.arrayBuffer());
-    const { data: uploadData, error: uploadErr } = await admin.storage
-      .from("media")
-      .upload(filename, buffer, {
-        contentType: blob.type,
-        upsert: true,
-      });
-
-    if (uploadErr) throw uploadErr;
-
-    const { data: publicUrlData } = admin.storage.from("media").getPublicUrl(uploadData.path);
-    return ApiResponse.success({
-      url: publicUrlData.publicUrl,
-      path: uploadData.path,
-      name: blob.name,
-      size: blob.size,
-      type: blob.type,
-    }, undefined, 201);
-  } catch (err: unknown) {
-    return handleApiError(err);
-  }
-}
-
-export async function DELETE(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
-
-  const url = new URL(req.url);
-  const path = url.searchParams.get("path");
-  if (!path) {
-    return ApiResponse.error("Missing required query parameter: path", "BAD_REQUEST", 400);
-  }
-
-  try {
-    await mediaService.deleteMediaFile(path);
-    return ApiResponse.success({ deleted: true, path });
-  } catch (err: unknown) {
-    return handleApiError(err);
-  }
-}
+export const DELETE = createApiHandler({
+  requireAdmin: true,
+  querySchema: z.object({
+    path: z.string().min(1, "Missing required query parameter: path"),
+  }),
+  handler: async ({ query }) => {
+    await mediaService.deleteMediaFile(query.path);
+    return { deleted: true, path: query.path };
+  },
+});

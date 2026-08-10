@@ -1,69 +1,49 @@
-export const dynamic = "force-dynamic";
-import { type NextRequest } from "next/server";
-import { SettingsRepository } from "@/lib/repositories/settings-repository";
-import { ApiResponse, handleApiError } from "@/lib/api-response";
-import { requireAdminAuth } from "@/lib/auth-guard";
+import { createApiHandler } from "@/lib/api-handler";
+import { SettingsService } from "@/lib/services/settings-service";
+import { z } from "zod";
 
-const settingsRepo = new SettingsRepository();
+const settingsService = new SettingsService();
 
-export async function GET(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
-
-  const url = new URL(req.url);
-  const category = url.searchParams.get("category") || undefined;
-  const key = url.searchParams.get("key") || undefined;
-
-  try {
-    if (key) {
-      const val = await settingsRepo.get(key);
-      return ApiResponse.success({ key, value: val });
+export const GET = createApiHandler({
+  requireAdmin: true,
+  querySchema: z.object({
+    category: z.string().optional(),
+    key: z.string().optional(),
+  }),
+  handler: async ({ query }) => {
+    if (query.key) {
+      const val = await settingsService.getSetting(query.key);
+      return { key: query.key, value: val };
     }
-    const settings = await settingsRepo.list(category);
-    return ApiResponse.success(settings);
-  } catch (err: unknown) {
-    return handleApiError(err);
-  }
-}
+    return await settingsService.listSettings(query.category);
+  },
+});
 
-export async function POST(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
+export const POST = createApiHandler({
+  requireAdmin: true,
+  bodySchema: z.object({
+    key: z.string().min(1, "Missing required setting key"),
+    value: z.any(),
+    category: z.string().optional(),
+    description: z.string().optional(),
+  }),
+  handler: async ({ body }) => {
+    return await settingsService.setSetting(
+      body.key,
+      body.value,
+      body.category,
+      body.description
+    );
+  },
+});
 
-  let body: { key?: string; value?: unknown; category?: string; description?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return ApiResponse.error("Invalid JSON body", "BAD_REQUEST", 400);
-  }
-
-  const { key, value, category, description } = body;
-  if (!key) {
-    return ApiResponse.error("Missing required setting key", "BAD_REQUEST", 400);
-  }
-
-  try {
-    const updated = await settingsRepo.set(key, value, category, description);
-    return ApiResponse.success(updated);
-  } catch (err: unknown) {
-    return handleApiError(err);
-  }
-}
-
-export async function DELETE(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
-
-  const url = new URL(req.url);
-  const key = url.searchParams.get("key");
-  if (!key) {
-    return ApiResponse.error("Missing setting key to delete", "BAD_REQUEST", 400);
-  }
-
-  try {
-    await settingsRepo.delete(key);
-    return ApiResponse.success({ deleted: true, key });
-  } catch (err: unknown) {
-    return handleApiError(err);
-  }
-}
+export const DELETE = createApiHandler({
+  requireAdmin: true,
+  querySchema: z.object({
+    key: z.string().min(1, "Missing setting key to delete"),
+  }),
+  handler: async ({ query }) => {
+    await settingsService.deleteSetting(query.key);
+    return { deleted: true, key: query.key };
+  },
+});

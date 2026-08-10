@@ -3,7 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
-const staticAdminToken = process.env.ADMIN_STATIC_ACCESS_TOKEN ?? "snv_admin_token_static_dev";
+const staticAdminToken = process.env.ADMIN_STATIC_ACCESS_TOKEN;
 
 function isValidHttpUrl(url: string): boolean {
   try {
@@ -30,13 +30,15 @@ export async function requireAdminAuth(req: NextRequest): Promise<NextResponse |
   // Step 1: Static token check (no Supabase network call needed)
   const authHeader = req.headers.get("authorization");
   const adminCookie = req.cookies.get("snv_admin_token");
+  const isDevTokenAllowed = process.env.NODE_ENV !== "production";
+  
   if (
-    authHeader === `Bearer ${staticAdminToken}` ||
-    authHeader === "Bearer snv_admin_token_static_dev" ||
-    adminCookie?.value === staticAdminToken ||
-    adminCookie?.value === "snv_admin_token_static_dev"
+    (staticAdminToken && authHeader === `Bearer ${staticAdminToken}`) ||
+    (staticAdminToken && adminCookie?.value === staticAdminToken) ||
+    (isDevTokenAllowed && authHeader === "Bearer snv_admin_token_static_dev") ||
+    (isDevTokenAllowed && adminCookie?.value === "snv_admin_token_static_dev")
   ) {
-    return null; // Authorized via Static Admin Token — no DB needed
+    return null; // Authorized via Static Admin Token
   }
 
   // Step 2: If Supabase is not configured, deny in production
@@ -53,8 +55,14 @@ export async function requireAdminAuth(req: NextRequest): Promise<NextResponse |
 
   // Step 3: Supabase JWT or session cookie validation
   try {
+    let token = "";
     if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
-      const token = authHeader.substring(7);
+      token = authHeader.substring(7);
+    } else if (adminCookie && adminCookie.value) {
+      token = adminCookie.value;
+    }
+
+    if (token) {
       const { createService } = await import("@/lib/supabase/service");
       const service = createService();
       if (service) {

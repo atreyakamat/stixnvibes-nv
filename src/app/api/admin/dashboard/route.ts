@@ -56,20 +56,20 @@ export const GET = createApiHandler({
         select: { id: true, metadata: true, customerName: true, totalCents: true, status: true, createdAt: true },
       }),
       prisma.order.count({
-        where: { status: { in: ["created", "sent"] as any } },
+        where: { status: { in: ["created", "sent"] } },
       }),
       prisma.order.count({
-        where: { status: { in: ["confirmed"] as any } },
+        where: { status: { in: ["confirmed"] } },
       }),
       prisma.order.count({
-        where: { status: { in: ["paid"] as any } },
+        where: { status: { in: ["paid"] } },
       }),
       prisma.order.count({
-        where: { status: { in: ["fulfilled"] as any } },
+        where: { status: { in: ["fulfilled"] } },
       }),
       prisma.order.count({
         where: { 
-          status: { notIn: ["cancelled", "refunded"] as any },
+          status: { notIn: ["cancelled", "refunded"] },
           createdAt: { lt: fortyEightHoursAgo }
         },
       }),

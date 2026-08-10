@@ -53,9 +53,9 @@ export const POST = createApiHandler({
     // Handle Single Product Create or Update
     let result;
     if (body.id) {
-      result = await productService.updateProduct(body.id, body as any);
+      result = await productService.updateProduct(body.id, body as unknown as Parameters<typeof productService.updateProduct>[1]);
     } else {
-      result = await productService.createProduct(body as any);
+      result = await productService.createProduct(body as unknown as Parameters<typeof productService.createProduct>[0]);
     }
     revalidatePath('/', 'layout');
     return result;

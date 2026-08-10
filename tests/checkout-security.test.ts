@@ -25,7 +25,7 @@ describe("Checkout Server-Side Price & Input Security (SEC-003)", () => {
       }),
     });
 
-    const res = await checkoutHandler(req);
+    const res = await checkoutHandler(req, {});
     const json = await res.json();
 
     expect(res.status).toBe(200);
@@ -58,7 +58,7 @@ describe("Checkout Server-Side Price & Input Security (SEC-003)", () => {
       }),
     });
 
-    const res = await checkoutHandler(req);
+    const res = await checkoutHandler(req, {});
     expect(res.status).toBe(200);
   });
 
@@ -76,7 +76,7 @@ describe("Checkout Server-Side Price & Input Security (SEC-003)", () => {
       }),
     });
 
-    const res = await checkoutHandler(req);
+    const res = await checkoutHandler(req, {});
     const json = await res.json();
 
     expect(res.status).toBe(400);

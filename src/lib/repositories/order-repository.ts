@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { Order, OrderItem } from "@prisma/client";
+import { Prisma, type Order, type OrderItem, $Enums } from "@prisma/client";
 
 export interface OrderListParams {
   search?: string;
@@ -17,7 +17,7 @@ export class OrderRepository {
     const sortField = params.sort === "total_cents" ? "totalCents" : "createdAt";
     const sortOrder = params.order ?? "desc";
 
-    let where: any = {};
+    let where: Prisma.OrderWhereInput = {};
     if (params.search) {
       where.OR = [
         { customerName: { contains: params.search, mode: 'insensitive' } },
@@ -31,7 +31,7 @@ export class OrderRepository {
     }
 
     if (params.status && params.status !== "all") {
-      where.status = params.status;
+      where.status = params.status as $Enums.order_status;
     }
 
     const [data, total] = await Promise.all([
@@ -55,7 +55,7 @@ export class OrderRepository {
     });
   }
 
-  async create(payload: any, items: any[]): Promise<Order> {
+  async create(payload: Prisma.OrderUncheckedCreateInput, items: Prisma.OrderItemUncheckedCreateWithoutOrderInput[]): Promise<Order> {
     return prisma.order.create({
       data: {
         ...payload,
@@ -66,7 +66,7 @@ export class OrderRepository {
     });
   }
 
-  async updateStatus(id: string, status: any): Promise<Order> {
+  async updateStatus(id: string, status: $Enums.order_status): Promise<Order> {
     return prisma.order.update({
       where: { id },
       data: { status },

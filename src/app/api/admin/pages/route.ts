@@ -1,69 +1,56 @@
-export const dynamic = "force-dynamic";
-import { type NextRequest } from "next/server";
+import { createApiHandler } from "@/lib/api-handler";
 import { PageService } from "@/lib/services/page-service";
-import { ApiResponse, handleApiError } from "@/lib/api-response";
-import { requireAdminAuth } from "@/lib/auth-guard";
+import { z } from "zod";
 
 const pageService = new PageService();
 
-export async function GET(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
-
-  const url = new URL(req.url);
-  const slug = url.searchParams.get("slug");
-
-  try {
-    if (slug) {
-      const page = await pageService.getPageBySlug(slug);
-      if (!page) return ApiResponse.notFound("Page not found");
-      return ApiResponse.success(page);
+export const GET = createApiHandler({
+  requireAdmin: true,
+  querySchema: z.object({
+    slug: z.string().optional(),
+  }),
+  handler: async ({ query }) => {
+    if (query.slug) {
+      const page = await pageService.getPageBySlug(query.slug);
+      if (!page) {
+        throw new Error("Page not found");
+      }
+      return page;
     }
-    const pages = await pageService.getPages();
-    return ApiResponse.success(pages);
-  } catch (err: unknown) {
-    return handleApiError(err);
-  }
-}
+    return await pageService.getPages();
+  },
+});
 
-export async function POST(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
+const pageSchema = z.object({
+  id: z.string().optional(),
+  title: z.string().min(1, "Title is required"),
+  slug: z.string().optional(),
+  content: z.any().optional(),
+  is_published: z.boolean().optional(),
+  seo_title: z.string().optional().nullable(),
+  seo_description: z.string().optional().nullable(),
+});
 
-  let body: any;
-  try {
-    body = await req.json();
-  } catch {
-    return ApiResponse.error("Invalid JSON body", "BAD_REQUEST", 400);
-  }
-
-  try {
+export const POST = createApiHandler({
+  requireAdmin: true,
+  bodySchema: pageSchema,
+  handler: async ({ body }) => {
     if (body.id) {
-      const updated = await pageService.updatePage(body.id, body);
-      return ApiResponse.success(updated);
+      return await pageService.updatePage(body.id, body);
     } else {
-      const created = await pageService.createPage(body);
-      return ApiResponse.success(created, undefined, 201);
+      const slug = body.slug || body.title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");
+      return await pageService.createPage({ ...body, slug });
     }
-  } catch (err: unknown) {
-    return handleApiError(err);
-  }
-}
+  },
+});
 
-export async function DELETE(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
-
-  const url = new URL(req.url);
-  const id = url.searchParams.get("id");
-  if (!id) {
-    return ApiResponse.error("Missing page ID", "BAD_REQUEST", 400);
-  }
-
-  try {
-    await pageService.deletePage(id);
-    return ApiResponse.success({ deleted: true, id });
-  } catch (err: unknown) {
-    return handleApiError(err);
-  }
-}
+export const DELETE = createApiHandler({
+  requireAdmin: true,
+  querySchema: z.object({
+    id: z.string().min(1, "Missing page ID"),
+  }),
+  handler: async ({ query }) => {
+    await pageService.deletePage(query.id);
+    return { deleted: true, id: query.id };
+  },
+});

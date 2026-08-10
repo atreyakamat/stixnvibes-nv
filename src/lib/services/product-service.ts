@@ -1,8 +1,8 @@
 import { ProductRepository, type ProductListParams } from "@/lib/repositories/product-repository";
-import type { Database } from "@/types/supabase";
+import { Prisma } from "@prisma/client";
 
-type ProductInsert = Database["public"]["Tables"]["products"]["Insert"];
-type ProductUpdate = Database["public"]["Tables"]["products"]["Update"];
+type ProductInsert = Prisma.ProductUncheckedCreateInput;
+type ProductUpdate = Prisma.ProductUncheckedUpdateInput;
 
 export class ProductService {
   private repo = new ProductRepository();
