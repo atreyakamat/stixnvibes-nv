@@ -23,7 +23,7 @@ export const POST = createApiHandler({
     const authBackendConfigured = Boolean(supabaseUrl && serviceRoleKey && !supabaseUrl.includes("YOUR_"));
 
     if (isProduction() && !authBackendConfigured) {
-      throw new Error("Server misconfigured: auth backend unavailable");
+      return new Response(JSON.stringify({ ok: false, error: "Server misconfigured: auth backend unavailable" }), { status: 503, headers: { "Content-Type": "application/json" } });
     }
 
     const isDevAllowed = !isProduction();

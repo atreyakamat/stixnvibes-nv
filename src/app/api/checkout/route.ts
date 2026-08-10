@@ -32,6 +32,10 @@ const checkoutSchema = z.object({
 export const POST = createApiHandler({
   bodySchema: checkoutSchema,
   handler: async ({ body }) => {
-    return await checkoutService.processCheckout(body);
+    const result = await checkoutService.processCheckout(body);
+    return new Response(JSON.stringify({ ok: true, ...result }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   },
 });

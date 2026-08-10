@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { createRazorpayOrder, isRazorpayConfigured, RAZORPAY_KEY_ID } from "@/lib/payment/razorpay";
 import { products, type Product } from "@/lib/data/products";
 import { prisma } from "@/lib/prisma";
+import { ValidationError } from "@/lib/errors";
 
 export interface CheckoutRequestBody {
   items: Array<{
@@ -47,7 +48,7 @@ export class CheckoutService {
 
     const cleanPincode = shippingAddress.pincode.trim();
     if (!/^\d{6}$/.test(cleanPincode)) {
-      throw new Error("Please enter a valid 6-digit Indian PIN code");
+      throw new ValidationError("Please enter a valid 6-digit Indian PIN code");
     }
 
     const cleanName = sanitize(shippingAddress.name);
