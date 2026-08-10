@@ -31,12 +31,21 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const { validateCollection } = await import("@/lib/validations/collection");
+    const validation = validateCollection(body);
+    
+    if (!validation.success) {
+      return ApiResponse.error("Validation failed", "VALIDATION_ERROR", 400, validation.error.flatten());
+    }
+
+    const validData = validation.data;
+
     if (body.id) {
-      const updated = await collectionService.updateCollection(body.id, body);
+      const updated = await collectionService.updateCollection(body.id, validData);
       revalidatePath('/', 'layout');
       return ApiResponse.success(updated);
     } else {
-      const created = await collectionService.createCollection(body);
+      const created = await collectionService.createCollection(validData);
       revalidatePath('/', 'layout');
       return ApiResponse.success(created, undefined, 201);
     }

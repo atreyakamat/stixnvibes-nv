@@ -43,8 +43,6 @@ model Product {
   images           Json            @default("[]")
   type             product_type
   categoryId       String?         @map("category_id") @db.Uuid
-  collectionId     String?         @map("collection_id") @db.Uuid
-  collection       Collection?     @relation(fields: [collectionId], references: [id], onUpdate: NoAction)
   tags             String[]        @default([])
   stock            Int             @default(0)
   isFeatured       Boolean         @default(false) @map("is_featured")
@@ -57,10 +55,12 @@ model Product {
   metadata         Json            @default("{}")
   createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  collectionId     String?         @map("collection_id") @db.Uuid
   customizations   Customization[]
   inventoryLogs    InventoryLog[]
   orderItems       OrderItem[]
   category         Category?       @relation(fields: [categoryId], references: [id], onUpdate: NoAction)
+  collection       Collection?     @relation(fields: [collectionId], references: [id], onUpdate: NoAction)
   reviews          Review[]
   variants         Variant[]
 
@@ -352,29 +352,6 @@ model admin_users {
   @@schema("public")
 }
 
-enum order_status {
-  created
-  sent
-  confirmed
-  paid
-  fulfilled
-  cancelled
-  refunded
-
-  @@schema("public")
-}
-
-enum product_type {
-  sticker
-  sticker_vinyl
-  poster
-  spotify_card
-  frame
-  mystery_pack
-
-  @@schema("public")
-}
-
 model Collection {
   id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name        String
@@ -457,12 +434,34 @@ model StoreSetting {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   key         String   @unique
   category    String   @default("general")
-  description String?
   value       Json     @default("{}")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  description String?
 
   @@map("settings")
   @@schema("public")
 }
 
+enum order_status {
+  created
+  sent
+  confirmed
+  paid
+  fulfilled
+  cancelled
+  refunded
+
+  @@schema("public")
+}
+
+enum product_type {
+  sticker
+  sticker_vinyl
+  poster
+  spotify_card
+  frame
+  mystery_pack
+
+  @@schema("public")
+}

@@ -63,9 +63,10 @@ export function isConnectionError(message: string): boolean {
 }
 
 export function handleApiError(err: unknown) {
+  console.error("[API ERROR]", err);
   const message = err instanceof Error ? err.message : String(err);
   if (isConnectionError(message)) {
     return ApiResponse.unavailable(`Database connection failed: ${message}`);
   }
-  return ApiResponse.internal(message);
+  return ApiResponse.internal(message, err instanceof Error ? err.stack : undefined);
 }

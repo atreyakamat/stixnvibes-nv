@@ -31,12 +31,21 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const { validateCategory } = await import("@/lib/validations/category");
+    const validation = validateCategory(body);
+    
+    if (!validation.success) {
+      return ApiResponse.error("Validation failed", "VALIDATION_ERROR", 400, validation.error.flatten());
+    }
+
+    const validData = validation.data;
+
     if (body.id) {
-      const updated = await categoryService.updateCategory(body.id, body);
+      const updated = await categoryService.updateCategory(body.id, validData);
       revalidatePath('/', 'layout');
       return ApiResponse.success(updated);
     } else {
-      const created = await categoryService.createCategory(body);
+      const created = await categoryService.createCategory(validData);
       revalidatePath('/', 'layout');
       return ApiResponse.success(created, undefined, 201);
     }
