@@ -41,7 +41,7 @@ export function createApiHandler<TBody = any, TQuery = any>(
         const searchParams = Object.fromEntries(new URL(req.url).searchParams.entries());
         const result = config.querySchema.safeParse(searchParams);
         if (!result.success) {
-          throw new ValidationError("Invalid query parameters", result.error.errors);
+          throw new ValidationError("Invalid query parameters", result.error.flatten());
         }
         query = result.data;
       }
@@ -60,7 +60,7 @@ export function createApiHandler<TBody = any, TQuery = any>(
         }
         const result = config.bodySchema.safeParse(rawBody);
         if (!result.success) {
-          throw new ValidationError("Invalid request body", result.error.errors);
+          throw new ValidationError("Invalid request body", result.error.flatten());
         }
         body = result.data;
       }
@@ -77,7 +77,8 @@ export function createApiHandler<TBody = any, TQuery = any>(
       if (data instanceof Response) {
         return data; // Allow returning raw responses if necessary
       }
-      return ApiResponse.success(data, undefined, req.method === "POST" ? 201 : 200);
+      // Return 200 by default for all verbs including POST unless otherwise needed
+      return ApiResponse.success(data, undefined, 200);
       
     } catch (error) {
       // 6. Error Handling

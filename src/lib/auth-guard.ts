@@ -25,7 +25,6 @@ function isValidHttpUrl(url: string): boolean {
  * 3. Supabase session cookie (requires network)
  */
 export async function requireAdminAuth(req: NextRequest): Promise<NextResponse | null> {
-  return null; // TEMPORARY BYPASS FOR DEBUGGING
   const supabaseConfigured = isValidHttpUrl(supabaseUrl) && Boolean(supabaseAnonKey) && !supabaseAnonKey.includes("YOUR_");
 
   // Step 1: Static token check (no Supabase network call needed)
@@ -54,7 +53,7 @@ export async function requireAdminAuth(req: NextRequest): Promise<NextResponse |
 
   // Step 3: Supabase JWT or session cookie validation
   try {
-    if (authHeader && authHeader.startsWith("Bearer ")) {
+    if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
       const token = authHeader.substring(7);
       const { createService } = await import("@/lib/supabase/service");
       const service = createService();

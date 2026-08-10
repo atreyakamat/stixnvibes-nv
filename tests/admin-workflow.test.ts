@@ -24,11 +24,11 @@ describe("admin workflow persistence", () => {
     const mod = await import("@/app/api/admin/inventory/route");
     
     // Seed a product for testing
-    const productId = "55555555-5555-5555-5555-555555555555";
+    const productId = "55555555-5555-4555-a555-555555555555";
     await prisma.product.upsert({
       where: { id: productId },
       update: { stock: 10 },
-      create: { id: productId, name: "Inventory Test Product", slug: "inv-test", priceCents: 100, stock: 10, currency: "INR", type: "sticker" }
+      create: { id: productId, name: "Inventory Test Product", slug: "inv-test-2", priceCents: 100, stock: 10, currency: "INR", type: "sticker" }
     });
 
     const response = await (mod as any).POST(makeRequest({

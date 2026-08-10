@@ -1,127 +1,73 @@
 export const dynamic = "force-dynamic";
-import { type NextRequest } from "next/server";
-import { revalidatePath } from "next/cache";
 import { ProductService } from "@/lib/services/product-service";
-import { ApiResponse, handleApiError } from "@/lib/api-response";
-import { requireAdminAuth } from "@/lib/auth-guard";
-import { createService } from "@/lib/supabase/service";
+import { createApiHandler } from "@/lib/api-handler";
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 const productService = new ProductService();
 
-export async function GET(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
-
-  const url = new URL(req.url);
-  const type = url.searchParams.get("type") || undefined;
-  const status = url.searchParams.get("status") || undefined;
-  const search = url.searchParams.get("search") || undefined;
-  const limit = Number(url.searchParams.get("limit") ?? 200);
-
-  try {
-    const { data, total } = await productService.getProducts({
-      type,
-      status,
-      search,
-      limit,
-    });
-    return ApiResponse.success(data, { total });
-  } catch (err: unknown) {
-    return handleApiError(err);
+export const GET = createApiHandler({
+  requireAdmin: true,
+  querySchema: z.object({
+    type: z.string().optional(),
+    status: z.string().optional(),
+    search: z.string().optional(),
+    limit: z.coerce.number().default(200),
+  }),
+  handler: async ({ query }) => {
+    return await productService.getProducts(query);
   }
-}
+});
 
-export async function POST(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
+const BulkOperationSchema = z.object({
+  bulkAction: z.enum(["delete", "status"]).optional(),
+  ids: z.array(z.string().uuid()).optional(),
+  status: z.string().optional(),
+});
 
-  let body: any;
-  try {
-    body = await req.json();
-  } catch {
-    return ApiResponse.error("Invalid JSON body", "BAD_REQUEST", 400);
-  }
+const ProductPayloadSchema = z.object({
+  bulkAction: z.enum(["delete", "status"]).optional(),
+  ids: z.array(z.string().uuid()).optional(),
+  status: z.string().optional(),
+  id: z.string().uuid().optional(),
+}).passthrough();
 
-  const admin = createService();
-
-  // Handle Bulk Operations
-  if (body?.bulkAction && Array.isArray(body?.ids)) {
-    const { bulkAction, ids, status } = body;
-    if (!admin) return ApiResponse.unavailable();
-
-    try {
-      if (bulkAction === "delete") {
-        const { error } = await admin.from("products").delete().in("id", ids);
-        if (error) throw error;
+export const POST = createApiHandler({
+  requireAdmin: true,
+  bodySchema: ProductPayloadSchema,
+  handler: async ({ body }) => {
+    // Handle Bulk Operations
+    if (body.bulkAction && body.ids) {
+      if (body.bulkAction === "delete") {
+        const count = await productService.bulkDeleteProducts(body.ids);
         revalidatePath('/', 'layout');
-        return ApiResponse.success({ deleted: true, count: ids.length });
+        return { deleted: true, count };
       }
-
-      if (bulkAction === "status" && status) {
-        const { error } = await admin
-          .from("products")
-          .update({ status })
-          .in("id", ids);
-        if (error) throw error;
+      if (body.bulkAction === "status" && body.status) {
+        const count = await productService.bulkUpdateProductStatus(body.ids, body.status);
         revalidatePath('/', 'layout');
-        return ApiResponse.success({ updated: true, count: ids.length, status });
+        return { updated: true, count, status: body.status };
       }
-
-      return ApiResponse.error("Unknown bulk action", "BAD_REQUEST", 400);
-    } catch (err: unknown) {
-      return handleApiError(err);
-    }
-  }
-
-  // Handle Single Product Create or Update
-  try {
-    const { validateProduct } = await import("@/lib/validations/product");
-    
-    // Format incoming data to map correctly to schema
-    const dataToValidate = {
-      ...body,
-      price_cents: Number(body.price_cents || 0),
-      compare_at_cents: body.compare_at_cents ? Number(body.compare_at_cents) : undefined,
-      stock: Number(body.stock || 0),
-    };
-    
-    const validation = validateProduct(dataToValidate);
-    if (!validation.success) {
-      return ApiResponse.error("Validation failed", "VALIDATION_ERROR", 400, validation.error.flatten());
     }
 
-    const validData = validation.data;
-
+    // Handle Single Product Create or Update
+    let result;
     if (body.id) {
-      const updated = await productService.updateProduct(body.id, validData);
-      revalidatePath('/', 'layout');
-      return ApiResponse.success(updated);
+      result = await productService.updateProduct(body.id, body as any);
     } else {
-      const created = await productService.createProduct(validData);
-      revalidatePath('/', 'layout');
-      return ApiResponse.success(created, undefined, 201);
+      result = await productService.createProduct(body as any);
     }
-  } catch (err: unknown) {
-    return handleApiError(err);
-  }
-}
-
-export async function DELETE(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
-
-  const url = new URL(req.url);
-  const id = url.searchParams.get("id");
-  if (!id) return ApiResponse.error("ID is required", "BAD_REQUEST", 400);
-
-  try {
-    const admin = createService();
-    if (!admin) return ApiResponse.unavailable();
-    const { error } = await admin.from("products").delete().eq("id", id);
-    if (error) throw error;
     revalidatePath('/', 'layout');
-    return ApiResponse.success({ deleted: true });
-  } catch (err: unknown) {
-    return handleApiError(err);
+    return result;
   }
-}
+});
+
+export const DELETE = createApiHandler({
+  requireAdmin: true,
+  querySchema: z.object({ id: z.string().uuid() }),
+  handler: async ({ query }) => {
+    await productService.deleteProduct(query.id);
+    revalidatePath('/', 'layout');
+    return { deleted: true };
+  }
+});

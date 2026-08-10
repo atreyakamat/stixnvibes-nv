@@ -1,67 +1,47 @@
 export const dynamic = "force-dynamic";
-import { type NextRequest } from "next/server";
 import { OrderService } from "@/lib/services/order-service";
-import { ApiResponse, handleApiError } from "@/lib/api-response";
-import { requireAdminAuth } from "@/lib/auth-guard";
+import { createApiHandler } from "@/lib/api-handler";
+import { z } from "zod";
 import type { OrderStatus } from "@/types/supabase";
 
 const orderService = new OrderService();
 
-export async function GET(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
-
-  const url = new URL(req.url);
-  const status = url.searchParams.get("status") || undefined;
-  const search = url.searchParams.get("search") || undefined;
-  const limit = Number(url.searchParams.get("limit") ?? 100);
-
-  try {
-    const { data, total } = await orderService.getOrders({
-      status,
-      search,
-      limit,
-    });
-    return ApiResponse.success(data, { total });
-  } catch (err: unknown) {
-    return handleApiError(err);
+export const GET = createApiHandler({
+  requireAdmin: true,
+  querySchema: z.object({
+    status: z.string().optional(),
+    search: z.string().optional(),
+    limit: z.coerce.number().default(100),
+  }),
+  handler: async ({ query }) => {
+    return await orderService.getOrders(query);
   }
-}
+});
 
-export async function POST(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
+const OrderPayloadSchema = z.object({
+  orderId: z.string().uuid(),
+  status: z.enum(["created", "sent", "confirmed", "paid", "fulfilled", "cancelled", "refunded"]).optional(),
+  notes: z.string().optional(),
+  tracking_number: z.string().optional(),
+  courier: z.string().optional(),
+});
 
-  let body: { orderId?: string; status?: OrderStatus; notes?: string; tracking_number?: string; courier?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return ApiResponse.error("Invalid JSON body", "BAD_REQUEST", 400);
-  }
-
-  const { orderId, status, notes, tracking_number, courier } = body;
-  if (!orderId) {
-    return ApiResponse.error("Missing required orderId", "BAD_REQUEST", 400);
-  }
-
-  try {
-    if (status) {
-      const updated = await orderService.updateOrderStatus(orderId, status);
-      return ApiResponse.success(updated);
+export const POST = createApiHandler({
+  requireAdmin: true,
+  bodySchema: OrderPayloadSchema,
+  handler: async ({ body }) => {
+    if (body.status) {
+      return await orderService.updateOrderStatus(body.orderId, body.status as OrderStatus);
     }
 
-    if (typeof notes === "string") {
-      const updated = await orderService.updateOrderNotes(orderId, notes);
-      return ApiResponse.success(updated);
+    if (body.notes !== undefined) {
+      return await orderService.updateOrderNotes(body.orderId, body.notes);
     }
 
-    if (tracking_number !== undefined || courier !== undefined) {
-      const updated = await orderService.updateTracking(orderId, tracking_number || "", courier || "");
-      return ApiResponse.success(updated);
+    if (body.tracking_number !== undefined || body.courier !== undefined) {
+      return await orderService.updateTracking(body.orderId, body.tracking_number || "", body.courier || "");
     }
 
-    return ApiResponse.error("No valid update operation specified", "BAD_REQUEST", 400);
-  } catch (err: unknown) {
-    return handleApiError(err);
+    throw new Error("No valid update operation specified");
   }
-}
+});

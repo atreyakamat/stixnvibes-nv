@@ -11,7 +11,7 @@ export const OrderSchema = z.object({
   totalCents: z.number().min(0, "Total must be at least 0"),
   status: OrderStatusSchema.optional().default("created"),
   notes: z.string().optional().nullable(),
-  metadata: z.record(z.any()).optional().default({}),
+  metadata: z.record(z.string(), z.any()).optional().default({}),
 });
 
 export function validateOrder(data: unknown) {

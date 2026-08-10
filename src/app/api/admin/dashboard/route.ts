@@ -1,20 +1,16 @@
 export const dynamic = "force-dynamic";
-import { type NextRequest } from "next/server";
-import { ApiResponse, handleApiError } from "@/lib/api-response";
-import { requireAdminAuth } from "@/lib/auth-guard";
+import { createApiHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
+export const GET = createApiHandler({
+  requireAdmin: true,
+  handler: async () => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
 
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
-
-  try {
     const [
       allOrders,
       allProducts,
@@ -110,7 +106,7 @@ export async function GET(req: NextRequest) {
     const avgOrderValue =
       allOrders.length > 0 ? Math.round(totalRevenue / allOrders.length) : 0;
 
-    return ApiResponse.success({
+    return {
       revenue: {
         total: totalRevenue,
         today: todayRevenue,
@@ -142,8 +138,6 @@ export async function GET(req: NextRequest) {
       },
       best_sellers: bestSellers,
       recent_orders: recentOrdersData,
-    });
-  } catch (err: unknown) {
-    return handleApiError(err);
+    };
   }
-}
+});
