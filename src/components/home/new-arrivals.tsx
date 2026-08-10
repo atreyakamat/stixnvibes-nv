@@ -7,10 +7,10 @@ import { SectionHeader } from "@/components/layout/section-header";
 import { Button } from "@/components/ui/button";
 import { ProductCard } from "@/components/product/product-card";
 import { StaggerGroup, StaggerItem } from "@/components/motion/reveal";
-import { getNewArrivals } from "@/lib/data/products";
+import { getNewArrivals, type Product } from "@/lib/data/products";
 
-export function NewArrivals() {
-  const items = getNewArrivals();
+export function NewArrivals({ products }: { products?: Product[] }) {
+  const items = products || getNewArrivals();
   return (
     <section className="relative py-20 md:py-24 lg:py-28">
       <Container>

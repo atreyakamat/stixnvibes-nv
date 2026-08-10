@@ -15,6 +15,10 @@ export class CollectionService {
     return this.repo.findById(id);
   }
 
+  async getCollectionBySlug(slug: string) {
+    return this.repo.findBySlug(slug);
+  }
+
   async createCollection(payload: CollectionInsert) {
     if (!payload.name) throw new Error("Collection name is required");
     const slug = payload.slug || payload.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");

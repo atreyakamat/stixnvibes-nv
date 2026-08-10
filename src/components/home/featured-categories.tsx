@@ -10,7 +10,16 @@ import { StaggerGroup, StaggerItem } from "@/components/motion/reveal";
 
 const iconMap = { Sticker, Poster: ImageIcon, Music, Frame, Gift };
 
-export function FeaturedCategories() {
+export function FeaturedCategories({ categories }: { categories?: any[] }) {
+  const items = categories ? categories.map((c, i) => ({
+    title: c.name,
+    description: c.description || "",
+    href: `/categories/${c.slug}`,
+    image: c.imageUrl || "/images/placeholder.webp",
+    gradient: ["from-brand-yellow/80", "from-purple-500/80", "from-brand-red/80", "from-orange-500/80", "from-blue-500/80"][i % 5],
+    icon: "Sticker"
+  })) : featuredCategories;
+
   return (
     <section className="relative py-20 md:py-24 lg:py-28">
       <Container>
@@ -20,7 +29,7 @@ export function FeaturedCategories() {
           description="Five loosely held worlds. One design language. Built for walls, laptops, helmets, fridge doors, and you."
         />
         <StaggerGroup className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {featuredCategories.map((cat, i) => {
+          {items.map((cat, i) => {
             const Icon = iconMap[cat.icon as keyof typeof iconMap];
             const isFeatured = i === 0 || i === 4;
             return (

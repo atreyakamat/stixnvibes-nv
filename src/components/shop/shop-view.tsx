@@ -36,15 +36,35 @@ const PRICE_BANDS = [
   { label: "₹500+", min: 500, max: Infinity },
 ];
 
-export function ShopView() {
+export function ShopView({
+  initialProducts = [],
+  collections = [],
+  materials = [],
+}: {
+  initialProducts?: Product[];
+  collections?: any[];
+  materials?: any[];
+}) {
   return (
     <React.Suspense fallback={null}>
-      <ShopClient />
+      <ShopClient
+        initialProducts={initialProducts}
+        collections={collections}
+        materials={materials}
+      />
     </React.Suspense>
   );
 }
 
-function ShopClient() {
+function ShopClient({
+  initialProducts,
+  collections,
+  materials,
+}: {
+  initialProducts: Product[];
+  collections: any[];
+  materials: any[];
+}) {
   const sp = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -83,59 +103,8 @@ function ShopClient() {
     [addItem]
   );
 
-  const [dbProducts, setDbProducts] = React.useState<Product[]>([]);
-  const [dbCollections, setDbCollections] = React.useState<any[]>([]);
-  const [dbMaterials, setDbMaterials] = React.useState<any[]>([]);
+  const allProducts = initialProducts.length > 0 ? initialProducts : mockProducts;
 
-  React.useEffect(() => {
-    // Fetch products
-    fetch("/api/admin/products")
-      .then((r) => r.json())
-      .then((json) => {
-        if (json?.ok && Array.isArray(json.data) && json.data.length > 0) {
-          const active = json.data
-            .filter((p: any) => p.status === "active" && p.visibility !== "hidden")
-            .map((p: any) => ({
-              id: p.id,
-              name: p.name,
-              slug: p.slug,
-              description: p.description || p.short_description || "",
-              price: (p.price_cents || 0) / 100,
-              compareAt: p.compare_at_cents ? p.compare_at_cents / 100 : undefined,
-              currency: p.currency || "INR",
-              image: p.image_url || (Array.isArray(p.images) && p.images[0]) || "/images/placeholder.webp",
-              images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [p.image_url || "/images/placeholder.webp"],
-              type: p.type === "sticker" ? "sticker_normal" : p.type,
-              category: p.collection || "Stickers",
-              collection: p.collection || "General",
-              tags: p.tags || [],
-              rating: p.rating || 5.0,
-              reviewCount: p.review_count || 0,
-              customizable: p.customizable ?? false,
-            }));
-          if (active.length > 0) setDbProducts(active);
-        }
-      })
-      .catch(() => {});
-
-    // Fetch collections
-    fetch("/api/admin/collections")
-      .then((r) => r.json())
-      .then((json) => {
-        if (json?.ok && Array.isArray(json.data)) setDbCollections(json.data);
-      })
-      .catch(() => {});
-
-    // Fetch materials
-    fetch("/api/admin/materials")
-      .then((r) => r.json())
-      .then((json) => {
-        if (json?.ok && Array.isArray(json.data)) setDbMaterials(json.data);
-      })
-      .catch(() => {});
-  }, []);
-
-  const allProducts = dbProducts.length > 0 ? dbProducts : mockProducts;
 
   const setParam = React.useCallback(
     (key: string, value?: string | null) => {
@@ -345,7 +314,7 @@ function ShopClient() {
           onClose={() => setDrawerOpen(false)}
           filter={{
             type, collection, priceBand, material,
-            collections: trendingCollections.map(c => c.title as string),
+            collections: collections.length > 0 ? collections.map(c => c.name) : trendingCollections.map(c => c.title as string),
             setParam,
           }}
         />

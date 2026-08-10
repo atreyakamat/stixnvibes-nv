@@ -19,11 +19,11 @@ export async function GET(req: NextRequest) {
       return ApiResponse.success({
         qcInspections: inspections.map((row) => ({
           id: row.id,
-          orderId: row.order_id ?? row.production_job_id ?? "",
+          orderId: row.productionJobId ?? "", // Map appropriately based on prisma schema
           operator: row.operator,
           result: row.result,
           checklist: (row.checklist as Record<string, boolean>) ?? {},
-          timestamp: row.created_at,
+          timestamp: row.createdAt,
         })),
       });
     } else {
@@ -31,15 +31,15 @@ export async function GET(req: NextRequest) {
       return ApiResponse.success({
         printBatches: batches.map((row) => ({
           id: row.id,
-          batchNumber: row.batch_number,
+          batchNumber: row.batchNumber,
           material: row.material,
           finish: row.finish,
           size: row.size,
-          orderCount: row.order_count,
+          orderCount: row.orderCount,
           status: row.status,
-          estTimeMins: row.est_time_mins,
+          estTimeMins: row.estTimeMins,
           operator: row.operator,
-          created_at: row.created_at,
+          created_at: row.createdAt,
         })),
       });
     }
@@ -99,8 +99,7 @@ export async function POST(req: NextRequest) {
       }
 
       const qc = await operationsRepo.recordQualityCheck({
-        orderId,
-        productionJobId: body.productionJobId || body.production_job_id || null,
+        productionJobId: body.productionJobId || body.production_job_id || orderId,
         operator,
         result,
         checklist,

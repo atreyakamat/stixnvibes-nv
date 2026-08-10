@@ -7,11 +7,10 @@ import { Container } from "@/components/layout/container";
 import { SectionHeader } from "@/components/layout/section-header";
 import { Button } from "@/components/ui/button";
 import { ProductCard } from "@/components/product/product-card";
-import { StaggerGroup, StaggerItem } from "@/components/motion/reveal";
-import { getBestSellers } from "@/lib/data/products";
+import { getBestSellers, type Product } from "@/lib/data/products";
 
-export function BestSellers() {
-  const items = getBestSellers();
+export function BestSellers({ products }: { products?: Product[] }) {
+  const items = products || getBestSellers();
   const scrollerRef = React.useRef<HTMLDivElement>(null);
 
   const scrollBy = (dir: 1 | -1) => {

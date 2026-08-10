@@ -1,33 +1,24 @@
-import { createService } from "@/lib/supabase/service";
-import type { Database } from "@/types/supabase";
+import { prisma } from "@/lib/prisma";
+import type { Category } from "@prisma/client";
 
-type CategoryRow = Database["public"]["Tables"]["categories"]["Row"];
-type CategoryInsert = Database["public"]["Tables"]["categories"]["Insert"];
-type CategoryUpdate = Database["public"]["Tables"]["categories"]["Update"];
-
-export interface CategoryNode extends CategoryRow {
+export interface CategoryNode extends Category {
   children: CategoryNode[];
 }
 
 export class CategoryRepository {
-  private getClient() {
-    const service = createService();
-    if (!service) throw new Error("Database service unavailable");
-    return service;
+  async listAll(): Promise<Category[]> {
+    return prisma.category.findMany({
+      orderBy: { sortOrder: "asc" },
+    });
   }
 
-  async listAll(): Promise<CategoryRow[]> {
-    const client = this.getClient();
-    const { data, error } = await client
-      .from("categories")
-      .select("*")
-      .order("sort_order", { ascending: true });
-
-    if (error) throw error;
-    return (data ?? []) as CategoryRow[];
+  async getBySlug(slug: string): Promise<Category | null> {
+    return prisma.category.findUnique({
+      where: { slug },
+    });
   }
 
-  async getTree(): Promise<{ flat: CategoryRow[]; tree: CategoryNode[] }> {
+  async getTree(): Promise<{ flat: Category[]; tree: CategoryNode[] }> {
     const flat = await this.listAll();
     const map = new Map<string, CategoryNode>();
     const tree: CategoryNode[] = [];
@@ -37,8 +28,8 @@ export class CategoryRepository {
     }
     for (const cat of flat) {
       const node = map.get(cat.id)!;
-      if (cat.parent_id && map.has(cat.parent_id)) {
-        map.get(cat.parent_id)!.children.push(node);
+      if (cat.parentId && map.has(cat.parentId)) {
+        map.get(cat.parentId)!.children.push(node);
       } else {
         tree.push(node);
       }
@@ -47,24 +38,23 @@ export class CategoryRepository {
     return { flat, tree };
   }
 
-  async create(payload: CategoryInsert): Promise<CategoryRow> {
-    const client = this.getClient();
-    const { data, error } = await client.from("categories").insert(payload).select().single();
-    if (error) throw error;
-    return data as CategoryRow;
+  async create(payload: any): Promise<Category> {
+    return prisma.category.create({
+      data: payload,
+    });
   }
 
-  async update(id: string, payload: CategoryUpdate): Promise<CategoryRow> {
-    const client = this.getClient();
-    const { data, error } = await client.from("categories").update(payload).eq("id", id).select().single();
-    if (error) throw error;
-    return data as CategoryRow;
+  async update(id: string, payload: any): Promise<Category> {
+    return prisma.category.update({
+      where: { id },
+      data: payload,
+    });
   }
 
   async delete(id: string): Promise<boolean> {
-    const client = this.getClient();
-    const { error } = await client.from("categories").delete().eq("id", id);
-    if (error) throw error;
+    await prisma.category.delete({
+      where: { id },
+    });
     return true;
   }
 }

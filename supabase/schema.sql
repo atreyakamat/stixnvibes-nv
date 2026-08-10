@@ -390,6 +390,23 @@ drop policy if exists "Auth users can upload to stixnvibes bucket" on storage.ob
 create policy "Auth users can upload to stixnvibes bucket" on storage.objects
   for insert with check (bucket_id = 'stixnvibes' and auth.role() = 'authenticated');
 
+insert into storage.buckets (id, name, public)
+values ('media', 'media', true)
+on conflict (id) do nothing;
+
+drop policy if exists "Public read for media bucket" on storage.objects;
+create policy "Public read for media bucket" on storage.objects
+  for select using (bucket_id = 'media');
+
+drop policy if exists "Auth users can upload to media bucket" on storage.objects;
+create policy "Auth users can upload to media bucket" on storage.objects
+  for insert with check (bucket_id = 'media' and auth.role() = 'authenticated');
+
+drop policy if exists "Auth users can delete from media bucket" on storage.objects;
+create policy "Auth users can delete from media bucket" on storage.objects
+  for delete using (bucket_id = 'media' and auth.role() = 'authenticated');
+
+
 -- ============================================================
 -- 10. inventory_logs
 -- ============================================================

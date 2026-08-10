@@ -7,7 +7,21 @@ import { Container } from "@/components/layout/container";
 import { SectionHeader } from "@/components/layout/section-header";
 import { StaggerGroup, StaggerItem } from "@/components/motion/reveal";
 
-export function TrendingCollections() {
+export function TrendingCollections({ collections }: { collections?: any[] }) {
+  const items = collections ? collections.map((c, i) => ({
+    title: c.name,
+    emoji: ["✨", "🔥", "🚀", "🎨", "🎮"][i % 5],
+    count: c._count?.products || 0,
+    href: `/collections/${c.slug}`,
+    gradient: [
+      "from-orange-500 to-red-500",
+      "from-brand-red to-rose-600",
+      "from-blue-500 to-indigo-600",
+      "from-emerald-500 to-teal-600",
+      "from-purple-500 to-fuchsia-600",
+    ][i % 5]
+  })) : trendingCollections;
+
   return (
     <section className="relative py-20 md:py-24 lg:py-28">
       <Container>
@@ -17,7 +31,7 @@ export function TrendingCollections() {
           description="Curated drops from each universe — anime, F1, gaming, football, marvel & more. The algorithm approves."
         />
         <StaggerGroup className="mt-12 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3">
-          {trendingCollections.map((c) => (
+          {items.map((c) => (
             <StaggerItem key={c.title}>
               <Link href={c.href} className="group block">
                 <motion.div

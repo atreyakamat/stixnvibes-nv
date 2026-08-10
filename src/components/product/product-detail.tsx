@@ -21,51 +21,49 @@ import { siteConfig } from "@/lib/site-config";
 const SIZES = ["A5", "A4", "A3", "Custom"];
 const FINISHES = ["Matte", "Glossy", "Premium"];
 
-export function ProductDetail({ product, related }: { product: Product; related: Product[] }) {
+export function ProductDetail({ 
+  product, 
+  related,
+  materials = [],
+  sizes = []
+}: { 
+  product: Product; 
+  related: Product[];
+  materials?: any[];
+  sizes?: any[];
+}) {
   const router = useRouter();
   const { addItem, items: cartItems } = useCart();
   const [selectedImage, setSelectedImage] = React.useState(0);
   const [size, setSize] = React.useState(SIZES[1]);
   const [finish, setFinish] = React.useState(FINISHES[0]);
-  const [dbMaterials, setDbMaterials] = React.useState<any[]>([]);
-  const [dbSizes, setDbSizes] = React.useState<any[]>([]);
+  const [dbMaterials, setDbMaterials] = React.useState<any[]>(materials);
+  const [dbSizes, setDbSizes] = React.useState<any[]>(sizes);
   const [qty, setQty] = React.useState(1);
   const [zoom, setZoom] = React.useState(false);
   const [added, setAdded] = React.useState(false);
 
   React.useEffect(() => {
-    // Fetch active materials
-    fetch("/api/admin/materials")
-      .then((r) => r.json())
-      .then((json) => {
-        if (json?.ok && Array.isArray(json.data) && json.data.length > 0) {
-          const active = json.data.filter((m: any) => m.is_active);
-          if (active.length > 0) {
-            setDbMaterials(active);
-            // Default material selection
-            const isPoster = product.type === "poster" || product.name.toLowerCase().includes("poster");
-            const defaultMat = active.find((m: any) =>
-              isPoster
-                ? m.name.toLowerCase().includes("paper") || m.name.toLowerCase().includes("glossy")
-                : m.name.toLowerCase().includes("vinyl") || m.name.toLowerCase().includes("premium")
-            );
-            if (defaultMat) setFinish(defaultMat.name);
-          }
-        }
-      })
-      .catch(() => {});
+    if (materials.length > 0) {
+      const active = materials.filter((m: any) => m.is_active || m.isActive);
+      if (active.length > 0) {
+        setDbMaterials(active);
+        // Default material selection
+        const isPoster = product.type === "poster" || product.name.toLowerCase().includes("poster");
+        const defaultMat = active.find((m: any) =>
+          isPoster
+            ? m.name.toLowerCase().includes("paper") || m.name.toLowerCase().includes("glossy")
+            : m.name.toLowerCase().includes("vinyl") || m.name.toLowerCase().includes("premium")
+        );
+        if (defaultMat) setFinish(defaultMat.name);
+      }
+    }
 
-    // Fetch active sizes
-    fetch("/api/admin/sizes")
-      .then((r) => r.json())
-      .then((json) => {
-        if (json?.ok && Array.isArray(json.data) && json.data.length > 0) {
-          const active = json.data.filter((s: any) => s.is_active);
-          if (active.length > 0) setDbSizes(active);
-        }
-      })
-      .catch(() => {});
-  }, [product.type, product.name]);
+    if (sizes.length > 0) {
+      const active = sizes.filter((s: any) => s.is_active || s.isActive);
+      if (active.length > 0) setDbSizes(active);
+    }
+  }, [product.type, product.name, materials, sizes]);
 
   const discount = product.compareAt
     ? Math.round(((product.compareAt - product.price) / product.compareAt) * 100)

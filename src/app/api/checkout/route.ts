@@ -89,26 +89,40 @@ export async function POST(req: NextRequest) {
     const verifiedItems: any[] = [];
 
     const productIds = items.map((i) => i.productId).filter(Boolean);
-    let dbProductsMap: Record<string, number> = {};
+    let dbProductsMap: Record<string, any> = {};
     
     if (productIds.length > 0) {
-      const dbProds = await prisma.product.findMany({
-        where: { id: { in: productIds } },
-        select: { id: true, priceCents: true, stock: true },
-      });
-      dbProductsMap = Object.fromEntries(dbProds.map((p) => [p.id, p.priceCents]));
+      const validUUIDs = productIds.filter(id => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/i.test(id));
+      const slugs = productIds.filter(id => !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/i.test(id));
+
+      const orConditions = [];
+      if (validUUIDs.length > 0) orConditions.push({ id: { in: validUUIDs } });
+      if (slugs.length > 0) orConditions.push({ slug: { in: slugs } });
+
+      if (orConditions.length > 0) {
+        const dbProds = await prisma.product.findMany({
+          where: { OR: orConditions },
+          select: { id: true, slug: true, priceCents: true, stock: true },
+        });
+        dbProds.forEach(p => {
+          dbProductsMap[p.id] = { priceCents: p.priceCents, stock: p.stock, id: p.id };
+          dbProductsMap[p.slug] = { priceCents: p.priceCents, stock: p.stock, id: p.id };
+        });
+      }
     }
 
     for (const item of items) {
       const qty = Math.max(1, Math.min(99, item.quantity));
       const mockProd = products.find((p: Product) => p.id === item.productId || p.slug === item.productId);
+      const dbProd = dbProductsMap[item.productId];
       const verifiedPriceCents =
-        dbProductsMap[item.productId] ??
+        dbProd ? dbProd.priceCents :
         (mockProd ? Math.round(mockProd.price * 100) : Math.max(0, item.price_cents));
 
       verifiedSubtotalCents += verifiedPriceCents * qty;
       verifiedItems.push({
         ...item,
+        productId: dbProd ? dbProd.id : item.productId,
         quantity: qty,
         price_cents: verifiedPriceCents,
       });
@@ -159,11 +173,12 @@ export async function POST(req: NextRequest) {
         // Create Items & Update Stock
         for (const it of verifiedItems) {
           const itemId = randomUUID();
+          const isValidUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/i.test(it.productId || "");
           await tx.orderItem.create({
             data: {
               id: itemId,
               orderId: dbOrderId,
-              productId: it.productId || null,
+              productId: isValidUUID ? it.productId : null,
               variantId: it.variantId || null,
               name: it.name,
               quantity: it.quantity,
@@ -173,7 +188,7 @@ export async function POST(req: NextRequest) {
           });
 
           // Decrement stock if it's a real product
-          if (it.productId && dbProductsMap[it.productId] !== undefined) {
+          if (isValidUUID && dbProductsMap[it.productId] !== undefined) {
             const product = await tx.product.findUnique({ where: { id: it.productId } });
             if (product && product.stock !== null) {
               if (product.stock < it.quantity) {

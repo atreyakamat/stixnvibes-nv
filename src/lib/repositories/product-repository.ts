@@ -1,9 +1,5 @@
-import { createService } from "@/lib/supabase/service";
-import type { Database } from "@/types/supabase";
-
-type ProductRow = Database["public"]["Tables"]["products"]["Row"];
-type ProductInsert = Database["public"]["Tables"]["products"]["Insert"];
-type ProductUpdate = Database["public"]["Tables"]["products"]["Update"];
+import { prisma } from "@/lib/prisma";
+import type { Product } from "@prisma/client";
 
 export interface ProductListParams {
   search?: string;
@@ -17,110 +13,79 @@ export interface ProductListParams {
 }
 
 export class ProductRepository {
-  private getClient() {
-    const service = createService();
-    if (!service) throw new Error("Database service unavailable");
-    return service;
-  }
-
-  async list(params: ProductListParams = {}): Promise<{ data: ProductRow[]; total: number }> {
-    const client = this.getClient();
+  async list(params: ProductListParams = {}): Promise<{ data: Product[]; total: number }> {
     const limit = Math.min(params.limit ?? 100, 500);
     const offset = params.offset ?? 0;
-    const sortField = params.sort ?? "created_at";
+    const sortField = params.sort ?? "createdAt"; // map created_at to createdAt
     const sortOrder = params.order ?? "desc";
-
-    let query = client.from("products").select("*", { count: "exact" });
-
+    
+    let where: any = {};
     if (params.search) {
-      const term = `%${params.search.toLowerCase()}%`;
-      query = query.or(`name.ilike.${term},sku.ilike.${term},type.ilike.${term}`);
+      where.OR = [
+        { name: { contains: params.search, mode: 'insensitive' } },
+        { type: { equals: params.search as any } }
+      ];
     }
-
+    
     if (params.type && params.type !== "all") {
-      query = query.eq("type", params.type);
+      where.type = params.type;
     }
-
-    if (params.status && params.status !== "all") {
-      query = query.eq("status", params.status);
-    }
-
-    if (params.visibility) {
-      query = query.eq("visibility", params.visibility);
-    }
-
-    query = query
-      .order(sortField, { ascending: sortOrder === "asc" })
-      .range(offset, offset + limit - 1);
-
-    const { data, count, error } = await query;
-    if (error) throw error;
-    return { data: (data ?? []) as ProductRow[], total: count ?? 0 };
+    
+    // Fallback sort field mapping
+    let prismaSortField = sortField;
+    if (sortField === "created_at") prismaSortField = "createdAt";
+    if (sortField === "price") prismaSortField = "priceCents";
+    
+    const [data, total] = await Promise.all([
+      prisma.product.findMany({
+        where,
+        take: limit,
+        skip: offset,
+        orderBy: { [prismaSortField]: sortOrder },
+        include: {
+          category: true,
+          collection: true,
+        }
+      }),
+      prisma.product.count({ where }),
+    ]);
+    
+    return { data, total };
   }
 
-  async findById(id: string): Promise<ProductRow | null> {
-    const client = this.getClient();
-    const { data, error } = await client
-      .from("products")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    if (error) {
-      if (error.code === "PGRST116") return null;
-      throw error;
-    }
-    return data as ProductRow;
+  async findById(id: string): Promise<Product | null> {
+    return prisma.product.findUnique({ where: { id } });
   }
 
-  async findBySlug(slug: string): Promise<ProductRow | null> {
-    const client = this.getClient();
-    const { data, error } = await client
-      .from("products")
-      .select("*")
-      .eq("slug", slug)
-      .single();
-
-    if (error) {
-      if (error.code === "PGRST116") return null;
-      throw error;
-    }
-    return data as ProductRow;
+  async findBySlug(slug: string): Promise<Product | null> {
+    return prisma.product.findUnique({ where: { slug } });
   }
 
-  async create(payload: ProductInsert): Promise<ProductRow> {
-    const client = this.getClient();
-    const { data, error } = await client
-      .from("products")
-      .insert(payload)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data as ProductRow;
+  async create(payload: any): Promise<Product> {
+    // Exclude invalid fields
+    const { status, visibility, sku, ...data } = payload;
+    return prisma.product.create({ data });
   }
 
-  async update(id: string, payload: ProductUpdate): Promise<ProductRow> {
-    const client = this.getClient();
-    const { data, error } = await client
-      .from("products")
-      .update(payload)
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data as ProductRow;
+  async update(id: string, payload: any): Promise<Product> {
+    const { status, visibility, sku, ...data } = payload;
+    return prisma.product.update({ where: { id }, data });
   }
 
   async delete(id: string): Promise<boolean> {
-    const client = this.getClient();
-    const { error } = await client.from("products").delete().eq("id", id);
-    if (error) throw error;
+    await prisma.product.delete({ where: { id } });
     return true;
   }
 
-  async setVisibility(id: string, visibility: "visible" | "hidden" | "archived"): Promise<ProductRow> {
-    return this.update(id, { visibility, status: visibility === "archived" ? "archived" : "active" });
+  async setVisibility(id: string, visibility: "visible" | "hidden" | "archived"): Promise<Product> {
+    // visibility is not in DB, we'll store it in metadata or just map to isFeatured for now
+    // Actually we can just update metadata
+    const product = await prisma.product.findUnique({ where: { id } });
+    if (!product) throw new Error("Product not found");
+    
+    const metadata = (product.metadata as any) || {};
+    metadata.visibility = visibility;
+    
+    return prisma.product.update({ where: { id }, data: { metadata } });
   }
 }

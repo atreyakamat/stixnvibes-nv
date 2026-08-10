@@ -43,7 +43,8 @@ model Product {
   images           Json            @default("[]")
   type             product_type
   categoryId       String?         @map("category_id") @db.Uuid
-  collection       String?
+  collectionId     String?         @map("collection_id") @db.Uuid
+  collection       Collection?     @relation(fields: [collectionId], references: [id], onUpdate: NoAction)
   tags             String[]        @default([])
   stock            Int             @default(0)
   isFeatured       Boolean         @default(false) @map("is_featured")
@@ -373,3 +374,95 @@ enum product_type {
 
   @@schema("public")
 }
+
+model Collection {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  slug        String    @unique
+  description String?
+  imageUrl    String?   @map("image_url")
+  isFeatured  Boolean   @default(false) @map("is_featured")
+  sortOrder   Int       @default(0) @map("sort_order")
+  metadata    Json      @default("{}")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  products    Product[]
+
+  @@map("collections")
+  @@schema("public")
+}
+
+model Material {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             String
+  slug             String   @unique
+  description      String?
+  properties       Json     @default("{}")
+  costPerUnitCents Int      @default(0) @map("cost_per_unit_cents")
+  isActive         Boolean  @default(true) @map("is_active")
+  sortOrder        Int      @default(0) @map("sort_order")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("materials")
+  @@schema("public")
+}
+
+model Size {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  slug      String   @unique
+  widthMm   Decimal? @map("width_mm") @db.Decimal
+  heightMm  Decimal? @map("height_mm") @db.Decimal
+  category  String?
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("sizes")
+  @@schema("public")
+}
+
+model Media {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  url       String
+  filename  String
+  mimeType  String   @map("mime_type")
+  sizeBytes Int      @map("size_bytes")
+  altText   String?  @map("alt_text")
+  folder    String   @default("general")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("media")
+  @@schema("public")
+}
+
+model Page {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String
+  slug        String   @unique
+  content     String
+  isPublished Boolean  @default(false) @map("is_published")
+  authorId    String?  @map("author_id") @db.Uuid
+  seoData     Json     @default("{}") @map("seo_data")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("pages")
+  @@schema("public")
+}
+
+model StoreSetting {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key         String   @unique
+  category    String   @default("general")
+  description String?
+  value       Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("settings")
+  @@schema("public")
+}
+

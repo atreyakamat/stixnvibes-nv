@@ -160,10 +160,32 @@ async function main() {
     console.log(`✓ Category upserted: ${created.name}`);
   }
 
+  // Seed Collections
+  const collectionsData = [
+    { name: "Anime", slug: "anime", sortOrder: 1, isFeatured: true },
+    { name: "Formula 1", slug: "formula-1", sortOrder: 2, isFeatured: false },
+    { name: "Gaming", slug: "gaming", sortOrder: 3, isFeatured: true },
+    { name: "Ready Designs", slug: "ready-designs", sortOrder: 4, isFeatured: false },
+    { name: "Customize", slug: "customize", sortOrder: 5, isFeatured: true },
+    { name: "Premium", slug: "premium", sortOrder: 6, isFeatured: false },
+  ];
+
+  const collectionMap = new Map<string, string>();
+  for (const coll of collectionsData) {
+    const created = await prisma.collection.upsert({
+      where: { slug: coll.slug },
+      update: { name: coll.name, sortOrder: coll.sortOrder, isFeatured: coll.isFeatured },
+      create: coll,
+    });
+    collectionMap.set(coll.name, created.id);
+    console.log(`✓ Collection upserted: ${created.name}`);
+  }
+
   // Seed Products
   for (const prod of mockProducts) {
-    const { categorySlug, ...prodData } = prod;
+    const { categorySlug, collection, ...prodData } = prod;
     const categoryId = categoryMap.get(categorySlug);
+    const collectionId = collectionMap.get(collection);
 
     const created = await prisma.product.upsert({
       where: { slug: prodData.slug },
@@ -177,10 +199,12 @@ async function main() {
         isFeatured: prodData.isFeatured,
         customizable: prodData.customizable,
         categoryId: categoryId ?? null,
+        collectionId: collectionId ?? null,
       },
       create: {
         ...prodData,
         categoryId: categoryId ?? null,
+        collectionId: collectionId ?? null,
       },
     });
     console.log(`✓ Product upserted: ${created.name} (₹${created.priceCents / 100})`);

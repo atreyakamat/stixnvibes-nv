@@ -7,6 +7,14 @@ type CategoryUpdate = Database["public"]["Tables"]["categories"]["Update"];
 export class CategoryService {
   private repo = new CategoryRepository();
 
+  async getCategories() {
+    return this.repo.listAll();
+  }
+
+  async getCategoryBySlug(slug: string) {
+    return this.repo.getBySlug(slug);
+  }
+
   async getCategoryTree() {
     return this.repo.getTree();
   }
