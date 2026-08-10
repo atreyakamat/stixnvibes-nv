@@ -45,6 +45,9 @@ model Product {
   categoryId       String?         @map("category_id") @db.Uuid
   tags             String[]        @default([])
   stock            Int             @default(0)
+  status           String          @default("active")
+  visibility       String          @default("visible")
+  sku              String?         @unique
   isFeatured       Boolean         @default(false) @map("is_featured")
   isBundle         Boolean         @default(false) @map("is_bundle")
   isLimited        Boolean         @default(false) @map("is_limited")
@@ -67,6 +70,9 @@ model Product {
   @@index([categoryId])
   @@index([slug])
   @@index([type])
+  @@index([status])
+  @@index([visibility])
+  @@index([sku])
   @@index([isFeatured], map: "products_featured_idx")
   @@index([tags], type: Gin)
   @@map("products")

@@ -23,8 +23,17 @@ export class ProductRepository {
     if (params.search) {
       where.OR = [
         { name: { contains: params.search, mode: 'insensitive' } },
+        { sku: { contains: params.search, mode: 'insensitive' } },
         { type: { equals: params.search as any } }
       ];
+    }
+    
+    if (params.status && params.status !== "all") {
+      where.status = params.status;
+    }
+
+    if (params.visibility && params.visibility !== "all") {
+      where.visibility = params.visibility;
     }
     
     if (params.type && params.type !== "all") {
@@ -62,14 +71,11 @@ export class ProductRepository {
   }
 
   async create(payload: any): Promise<Product> {
-    // Exclude invalid fields
-    const { status, visibility, sku, ...data } = payload;
-    return prisma.product.create({ data });
+    return prisma.product.create({ data: payload });
   }
 
   async update(id: string, payload: any): Promise<Product> {
-    const { status, visibility, sku, ...data } = payload;
-    return prisma.product.update({ where: { id }, data });
+    return prisma.product.update({ where: { id }, data: payload });
   }
 
   async delete(id: string): Promise<boolean> {
@@ -78,13 +84,7 @@ export class ProductRepository {
   }
 
   async setVisibility(id: string, visibility: "visible" | "hidden" | "archived"): Promise<Product> {
-    const product = await prisma.product.findUnique({ where: { id } });
-    if (!product) throw new Error("Product not found");
-    
-    const metadata = (product.metadata as any) || {};
-    metadata.visibility = visibility;
-    
-    return prisma.product.update({ where: { id }, data: { metadata } });
+    return prisma.product.update({ where: { id }, data: { visibility } });
   }
 
   async bulkDelete(ids: string[]): Promise<number> {
@@ -95,17 +95,10 @@ export class ProductRepository {
   }
 
   async bulkUpdateStatus(ids: string[], status: string): Promise<number> {
-    // We update status in metadata for now if status isn't a column
-    // Wait, the products table doesn't have a status column. Let's update metadata.
-    const products = await prisma.product.findMany({ where: { id: { in: ids } }});
-    
-    let updatedCount = 0;
-    for (const product of products) {
-      const metadata = (product.metadata as any) || {};
-      metadata.status = status;
-      await prisma.product.update({ where: { id: product.id }, data: { metadata }});
-      updatedCount++;
-    }
-    return updatedCount;
+    const { count } = await prisma.product.updateMany({
+      where: { id: { in: ids } },
+      data: { status }
+    });
+    return count;
   }
 }
