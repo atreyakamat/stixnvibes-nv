@@ -78,8 +78,6 @@ export class ProductRepository {
   }
 
   async setVisibility(id: string, visibility: "visible" | "hidden" | "archived"): Promise<Product> {
-    // visibility is not in DB, we'll store it in metadata or just map to isFeatured for now
-    // Actually we can just update metadata
     const product = await prisma.product.findUnique({ where: { id } });
     if (!product) throw new Error("Product not found");
     
@@ -87,5 +85,27 @@ export class ProductRepository {
     metadata.visibility = visibility;
     
     return prisma.product.update({ where: { id }, data: { metadata } });
+  }
+
+  async bulkDelete(ids: string[]): Promise<number> {
+    const { count } = await prisma.product.deleteMany({
+      where: { id: { in: ids } }
+    });
+    return count;
+  }
+
+  async bulkUpdateStatus(ids: string[], status: string): Promise<number> {
+    // We update status in metadata for now if status isn't a column
+    // Wait, the products table doesn't have a status column. Let's update metadata.
+    const products = await prisma.product.findMany({ where: { id: { in: ids } }});
+    
+    let updatedCount = 0;
+    for (const product of products) {
+      const metadata = (product.metadata as any) || {};
+      metadata.status = status;
+      await prisma.product.update({ where: { id: product.id }, data: { metadata }});
+      updatedCount++;
+    }
+    return updatedCount;
   }
 }

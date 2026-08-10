@@ -51,6 +51,8 @@ export class ApiResponse {
   }
 }
 
+import { AppError } from "./errors";
+
 export function isConnectionError(message: string): boolean {
   const msg = message.toLowerCase();
   return (
@@ -64,6 +66,11 @@ export function isConnectionError(message: string): boolean {
 
 export function handleApiError(err: unknown) {
   console.error("[API ERROR]", err);
+  
+  if (err instanceof AppError) {
+    return ApiResponse.error(err.message, err.code, err.statusCode, err.details);
+  }
+
   const message = err instanceof Error ? err.message : String(err);
   if (isConnectionError(message)) {
     return ApiResponse.unavailable(`Database connection failed: ${message}`);

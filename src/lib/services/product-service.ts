@@ -41,4 +41,12 @@ export class ProductService {
   async toggleVisibility(id: string, visibility: "visible" | "hidden" | "archived") {
     return this.repo.setVisibility(id, visibility);
   }
+
+  async bulkDeleteProducts(ids: string[]) {
+    return this.repo.bulkDelete(ids);
+  }
+
+  async bulkUpdateProductStatus(ids: string[], status: string) {
+    return this.repo.bulkUpdateStatus(ids, status);
+  }
 }

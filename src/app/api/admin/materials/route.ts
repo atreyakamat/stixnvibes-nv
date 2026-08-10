@@ -1,61 +1,39 @@
 export const dynamic = "force-dynamic";
-import { type NextRequest } from "next/server";
 import { MaterialService } from "@/lib/services/material-service";
-import { ApiResponse, handleApiError } from "@/lib/api-response";
-import { requireAdminAuth } from "@/lib/auth-guard";
+import { createApiHandler } from "@/lib/api-handler";
+import { MaterialSchema } from "@/lib/validations/material";
+import { z } from "zod";
 
 const materialService = new MaterialService();
 
-export async function GET(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
-
-  try {
-    const data = await materialService.getMaterials();
-    return ApiResponse.success(data);
-  } catch (err: unknown) {
-    return handleApiError(err);
+export const GET = createApiHandler({
+  requireAdmin: true,
+  handler: async () => {
+    return await materialService.getMaterials();
   }
-}
+});
 
-export async function POST(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
+const MaterialPayloadSchema = MaterialSchema.extend({
+  id: z.string().uuid().optional(),
+});
 
-  let body: any;
-  try {
-    body = await req.json();
-  } catch {
-    return ApiResponse.error("Invalid JSON body", "BAD_REQUEST", 400);
-  }
-
-  try {
+export const POST = createApiHandler({
+  requireAdmin: true,
+  bodySchema: MaterialPayloadSchema,
+  handler: async ({ body }) => {
     if (body.id) {
-      const updated = await materialService.updateMaterial(body.id, body);
-      return ApiResponse.success(updated);
+      return await materialService.updateMaterial(body.id, body);
     } else {
-      const created = await materialService.createMaterial(body);
-      return ApiResponse.success(created, undefined, 201);
+      return await materialService.createMaterial(body);
     }
-  } catch (err: unknown) {
-    return handleApiError(err);
   }
-}
+});
 
-export async function DELETE(req: NextRequest) {
-  const authErr = await requireAdminAuth(req);
-  if (authErr) return authErr;
-
-  const url = new URL(req.url);
-  const id = url.searchParams.get("id");
-  if (!id) {
-    return ApiResponse.error("Missing material ID", "BAD_REQUEST", 400);
+export const DELETE = createApiHandler({
+  requireAdmin: true,
+  querySchema: z.object({ id: z.string().uuid() }),
+  handler: async ({ query }) => {
+    await materialService.deleteMaterial(query.id);
+    return { deleted: true, id: query.id };
   }
-
-  try {
-    await materialService.deleteMaterial(id);
-    return ApiResponse.success({ deleted: true, id });
-  } catch (err: unknown) {
-    return handleApiError(err);
-  }
-}
+});
