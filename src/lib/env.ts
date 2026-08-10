@@ -2,10 +2,14 @@
 export function validateEnvironment() {
   const required = [
     "DATABASE_URL",
+    "DIRECT_URL",
     "NEXT_PUBLIC_SUPABASE_URL",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY",
     "SUPABASE_SERVICE_ROLE_KEY",
     "NEXT_PUBLIC_WHATSAPP_NUMBER",
+    "ADMIN_EMAIL",
+    "ADMIN_PASSWORD",
+    "ADMIN_STATIC_ACCESS_TOKEN",
   ];
 
   const missing = required.filter((key) => !process.env[key]);

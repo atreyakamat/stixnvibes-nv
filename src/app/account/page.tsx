@@ -14,7 +14,6 @@ export default function AccountPage() {
     e.preventDefault();
     if (orderNumber) {
       // Mock tracking logic since we can't use alert
-      console.log(`Tracking order: ${orderNumber}`);
     }
   };
 
