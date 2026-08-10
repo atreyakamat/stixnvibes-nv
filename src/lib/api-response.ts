@@ -8,11 +8,9 @@ export interface ApiSuccessResponse<T = unknown> {
 
 export interface ApiErrorResponse {
   ok: false;
-  error: {
-    code: string;
-    message: string;
-    details?: unknown;
-  };
+  error: string;
+  code?: string;
+  details?: unknown;
 }
 
 export class ApiResponse {
@@ -25,7 +23,9 @@ export class ApiResponse {
   static error(message: string, code = "BAD_REQUEST", status = 400, details?: unknown) {
     const payload: ApiErrorResponse = {
       ok: false,
-      error: { code, message, details },
+      error: message,
+      code,
+      details,
     };
     return NextResponse.json(payload, { status });
   }

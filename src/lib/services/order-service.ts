@@ -1,6 +1,7 @@
 import { OrderRepository, type OrderListParams } from "@/lib/repositories/order-repository";
 import { validateStateTransition } from "@/lib/orders/state-machine";
 import { $Enums } from "@prisma/client";
+import { NotFoundError } from "@/lib/errors";
 
 export class OrderService {
   private repo = new OrderRepository();
@@ -201,7 +202,7 @@ export class OrderService {
       console.warn("[orders/track] Supabase lookup error:", err);
     }
 
-    throw new Error(`No order found matching "${query}". Please check your Order ID or registered mobile number. Tracking becomes available after the order is saved in the live system.`);
+    throw new NotFoundError(`No order found matching "${query}". Please check your Order ID or registered mobile number. Tracking becomes available after the order is saved in the live system.`);
   }
 }
 

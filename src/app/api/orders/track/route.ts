@@ -9,6 +9,20 @@ export const GET = createApiHandler({
     query: z.string().min(1, "Order ID or phone number is required"),
   }),
   handler: async ({ query }) => {
-    return await orderService.trackOrder(query.query);
+    try {
+      const result = await orderService.trackOrder(query.query);
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (e: any) {
+      if (e.name === "NotFoundError") {
+        return new Response(JSON.stringify({ found: false, error: e.message }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw e;
+    }
   },
 });

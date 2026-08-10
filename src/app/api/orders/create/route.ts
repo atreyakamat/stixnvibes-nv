@@ -27,6 +27,10 @@ const createOrderSchema = z.object({
 export const POST = createApiHandler({
   bodySchema: createOrderSchema,
   handler: async ({ body }) => {
-    return await orderService.publicCreateOrder(body);
+    const result = await orderService.publicCreateOrder(body);
+    return new Response(JSON.stringify({ ok: true, ...result }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   },
 });

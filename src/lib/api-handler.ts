@@ -38,8 +38,14 @@ export function createApiHandler<TBody = any, TQuery = any>(
       // 2. Validation (Query)
       let query = {} as TQuery;
       if (config.querySchema) {
-        const searchParams = Object.fromEntries(new URL(req.url).searchParams.entries());
-        const result = config.querySchema.safeParse(searchParams);
+        let searchParamsObj: Record<string, string> = {};
+        if (req.nextUrl && req.nextUrl.searchParams) {
+          searchParamsObj = Object.fromEntries(req.nextUrl.searchParams.entries());
+        } else if (req.url) {
+          searchParamsObj = Object.fromEntries(new URL(req.url).searchParams.entries());
+        }
+        
+        const result = config.querySchema.safeParse(searchParamsObj);
         if (!result.success) {
           throw new ValidationError("Invalid query parameters", result.error.flatten());
         }
