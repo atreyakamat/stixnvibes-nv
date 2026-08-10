@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import { type NextRequest } from "next/server";
+import { revalidatePath } from "next/cache";
 import { ProductService } from "@/lib/services/product-service";
 import { ApiResponse, handleApiError } from "@/lib/api-response";
 import { requireAdminAuth } from "@/lib/auth-guard";
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
       if (bulkAction === "delete") {
         const { error } = await admin.from("products").delete().in("id", ids);
         if (error) throw error;
+        revalidatePath('/', 'layout');
         return ApiResponse.success({ deleted: true, count: ids.length });
       }
 
@@ -61,6 +63,7 @@ export async function POST(req: NextRequest) {
           .update({ status })
           .in("id", ids);
         if (error) throw error;
+        revalidatePath('/', 'layout');
         return ApiResponse.success({ updated: true, count: ids.length, status });
       }
 
@@ -91,11 +94,33 @@ export async function POST(req: NextRequest) {
 
     if (body.id) {
       const updated = await productService.updateProduct(body.id, validData);
+      revalidatePath('/', 'layout');
       return ApiResponse.success(updated);
     } else {
       const created = await productService.createProduct(validData);
+      revalidatePath('/', 'layout');
       return ApiResponse.success(created, undefined, 201);
     }
+  } catch (err: unknown) {
+    return handleApiError(err);
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  const authErr = await requireAdminAuth(req);
+  if (authErr) return authErr;
+
+  const url = new URL(req.url);
+  const id = url.searchParams.get("id");
+  if (!id) return ApiResponse.error("ID is required", "BAD_REQUEST", 400);
+
+  try {
+    const admin = createService();
+    if (!admin) return ApiResponse.unavailable();
+    const { error } = await admin.from("products").delete().eq("id", id);
+    if (error) throw error;
+    revalidatePath('/', 'layout');
+    return ApiResponse.success({ deleted: true });
   } catch (err: unknown) {
     return handleApiError(err);
   }

@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import { type NextRequest } from "next/server";
+import { revalidatePath } from "next/cache";
 import { CategoryService } from "@/lib/services/category-service";
 import { ApiResponse, handleApiError } from "@/lib/api-response";
 import { requireAdminAuth } from "@/lib/auth-guard";
@@ -32,9 +33,11 @@ export async function POST(req: NextRequest) {
   try {
     if (body.id) {
       const updated = await categoryService.updateCategory(body.id, body);
+      revalidatePath('/', 'layout');
       return ApiResponse.success(updated);
     } else {
       const created = await categoryService.createCategory(body);
+      revalidatePath('/', 'layout');
       return ApiResponse.success(created, undefined, 201);
     }
   } catch (err: unknown) {
@@ -54,6 +57,7 @@ export async function DELETE(req: NextRequest) {
 
   try {
     await categoryService.deleteCategory(id);
+    revalidatePath('/', 'layout');
     return ApiResponse.success({ deleted: true, id });
   } catch (err: unknown) {
     return handleApiError(err);
