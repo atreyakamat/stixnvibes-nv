@@ -22,7 +22,7 @@ function capture() {
 }
 
 beforeEach(() => {
-  process.env.NEXT_PUBLIC_WHATSAPP_NUMBER = "919999999999";
+  process.env.NEXT_PUBLIC_WHATSAPP_NUMBER = "917744020601";
 });
 
 afterEach(() => {
@@ -71,7 +71,7 @@ describe("POST /api/orders/create", () => {
   it("rejects an invalid pincode", async () => {
     const r = await call({
       customer_name: "Aarav",
-      customer_phone: "+919999999999",
+      customer_phone: "+917744020601",
       address: "Somewhere",
       pincode: "x".repeat(20),
       items: [{ name: "P", price_cents: 100, quantity: 1 }],
@@ -82,7 +82,7 @@ describe("POST /api/orders/create", () => {
   it("rejects an empty items list", async () => {
     const r = await call({
       customer_name: "Aarav",
-      customer_phone: "+919999999999",
+      customer_phone: "+917744020601",
       address: "Somewhere",
       pincode: "560001",
       items: [],
@@ -93,7 +93,7 @@ describe("POST /api/orders/create", () => {
   it("accepts valid orders and returns a wa.me url", async () => {
     const r = await call({
       customer_name: "Aarav",
-      customer_phone: "+919999999999",
+      customer_phone: "+917744020601",
       address: "12 MG Road, Bengaluru",
       pincode: "560001",
       items: [
@@ -103,7 +103,7 @@ describe("POST /api/orders/create", () => {
     });
     expect(r.status).toBe(200);
     expect(r.json?.ok).toBe(true);
-    expect(r.json?.whatsappUrl).toContain("https://wa.me/919999999999");
+    expect(r.json?.whatsappUrl).toContain("https://wa.me/917744020601");
     const decoded = decodeURIComponent((r.json?.whatsappUrl as string).split("text=")[1]);
     expect(decoded).toContain("Anime Pack");
     expect(decoded).toContain("×2");
@@ -138,7 +138,7 @@ describe("POST /api/orders/create", () => {
     const mod = await import("@/app/api/orders/create/route");
     const req = makeRequest({
       customer_name: "Aarav",
-      customer_phone: "+919999999999",
+      customer_phone: "+917744020601",
       address: "Somewhere",
       pincode: "560001",
       items: [{ product_id: "s1", name: "Sticker", price_cents: 4900, quantity: 1 }],

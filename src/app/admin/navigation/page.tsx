@@ -221,7 +221,7 @@ export default function NavigationBuilderPage() {
                 <Input
                   value={socials.whatsapp}
                   onChange={(e) => setSocials({ ...socials, whatsapp: e.target.value })}
-                  placeholder="https://wa.me/919999999999"
+                  placeholder="https://wa.me/917744020601"
                   className="text-xs mt-1 font-mono"
                 />
               </div>

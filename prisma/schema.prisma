@@ -45,9 +45,6 @@ model Product {
   categoryId       String?         @map("category_id") @db.Uuid
   tags             String[]        @default([])
   stock            Int             @default(0)
-  status           String          @default("active")
-  visibility       String          @default("visible")
-  sku              String?         @unique
   isFeatured       Boolean         @default(false) @map("is_featured")
   isBundle         Boolean         @default(false) @map("is_bundle")
   isLimited        Boolean         @default(false) @map("is_limited")
@@ -59,6 +56,9 @@ model Product {
   createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   collectionId     String?         @map("collection_id") @db.Uuid
+  sku              String?         @unique
+  status           String          @default("active")
+  visibility       String          @default("visible")
   customizations   Customization[]
   inventoryLogs    InventoryLog[]
   orderItems       OrderItem[]

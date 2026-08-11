@@ -12,11 +12,11 @@ export const siteConfig = {
     twitter: "https://twitter.com/stixnvibes",
     youtube: "https://youtube.com/@stixnvibes",
     tiktok: "https://tiktok.com/@stixnvibes",
-    whatsapp: "https://wa.me/919999999999",
+    whatsapp: "https://wa.me/917744020601",
     email: "hello@stixnvibes.com",
   },
   contact: {
-    phone: "+91 99999 99999",
+    phone: "+91 77440 20601",
     hours: "Mon–Sat, 10:00 AM – 7:00 PM IST",
     address: "Bengaluru, India",
   },

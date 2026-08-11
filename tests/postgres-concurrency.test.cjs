@@ -65,7 +65,7 @@ async function runConcurrencyTests() {
     p_order: {
       id: failedOrderId,
       customer_name: 'Rollback Test',
-      customer_phone: '9999999999',
+      customer_phone: '7744020601',
       address: 'Test Addr',
       pincode: '110001',
       total_cents: 1000,

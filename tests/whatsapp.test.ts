@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 // Stub env before importing the module under test.
 beforeEach(() => {
   vi.resetModules();
-  process.env.NEXT_PUBLIC_WHATSAPP_NUMBER = "919999999999";
+  process.env.NEXT_PUBLIC_WHATSAPP_NUMBER = "917744020601";
 });
 
 afterEach(() => {
@@ -27,7 +27,7 @@ describe("buildWhatsAppUrl", () => {
       ],
       totalRupees: 398,
     });
-    expect(url).toContain("https://wa.me/919999999999?text=");
+    expect(url).toContain("https://wa.me/917744020601?text=");
     const decoded = decodeURIComponent(url.split("text=")[1]);
     expect(decoded).toContain("Aarav Mehta");
     expect(decoded).toContain("Anime Pack ×2");
