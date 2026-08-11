@@ -85,12 +85,12 @@ export class OrderService {
       if (orConditions.length > 0) {
         const dbProds = await prisma.product.findMany({
           where: { OR: orConditions },
-          select: { id: true, slug: true, priceCents: true, stock: true },
+          include: { variants: true },
         });
         dbProds.forEach(p => {
-          dbProductsMap[p.id] = { priceCents: p.priceCents, stock: p.stock, id: p.id };
+          dbProductsMap[p.id] = p;
           if (p.slug) {
-            dbProductsMap[p.slug] = { priceCents: p.priceCents, stock: p.stock, id: p.id };
+            dbProductsMap[p.slug] = p;
           }
         });
       }
@@ -105,6 +105,14 @@ export class OrderService {
       let verifiedPrice = 0;
       if (dbProd) {
         verifiedPrice = dbProd.priceCents;
+        if (item.variant_id) {
+          const variant = dbProd.variants.find((v: any) => v.id === item.variant_id);
+          if (variant) {
+            verifiedPrice += variant.priceModifierCents;
+          } else {
+            throw new ValidationError(`Variant ${item.variant_id} not found for product ${item.product_id}`);
+          }
+        }
       } else if (mockProd) {
         verifiedPrice = Math.round(mockProd.price * 100);
       } else if (item.product_id === "spotify_acrylic_card") {
@@ -115,6 +123,11 @@ export class OrderService {
         verifiedPrice = item.price_cents;
       } else {
         throw new ValidationError(`Product ${item.product_id} not found in catalog.`);
+      }
+
+      if (item.price_cents !== verifiedPrice && dbProd) {
+         // Optionally, we could throw an error. For WhatsApp checkout we auto-correct it.
+         item.price_cents = verifiedPrice;
       }
 
       verifiedItems.push({

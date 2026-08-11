@@ -2,6 +2,8 @@ import { createApiHandler } from "@/lib/api-handler";
 import { SettingsService } from "@/lib/services/settings-service";
 import { z } from "zod";
 
+import { revalidatePath } from "next/cache";
+
 const settingsService = new SettingsService();
 
 const DEFAULT_SECTIONS = [
@@ -32,6 +34,7 @@ export const POST = createApiHandler({
   }),
   handler: async ({ body }) => {
     const updated = await settingsService.setSetting("homepage_layout", body.sections, "cms", "Homepage sections layout configuration");
+    revalidatePath('/', 'layout');
     return { saved: true, data: updated.value };
   },
 });

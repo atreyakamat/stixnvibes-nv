@@ -2,6 +2,8 @@ import { createApiHandler } from "@/lib/api-handler";
 import { SettingsService } from "@/lib/services/settings-service";
 import { z } from "zod";
 
+import { revalidatePath } from "next/cache";
+
 const settingsService = new SettingsService();
 
 export const GET = createApiHandler({
@@ -28,12 +30,14 @@ export const POST = createApiHandler({
     description: z.string().optional(),
   }),
   handler: async ({ body }) => {
-    return await settingsService.setSetting(
+    const result = await settingsService.setSetting(
       body.key,
       body.value,
       body.category,
       body.description
     );
+    revalidatePath('/', 'layout');
+    return result;
   },
 });
 
@@ -44,6 +48,7 @@ export const DELETE = createApiHandler({
   }),
   handler: async ({ query }) => {
     await settingsService.deleteSetting(query.key);
+    revalidatePath('/', 'layout');
     return { deleted: true, key: query.key };
   },
 });

@@ -74,12 +74,12 @@ export class CheckoutService {
       if (orConditions.length > 0) {
         const dbProds = await prisma.product.findMany({
           where: { OR: orConditions },
-          select: { id: true, slug: true, priceCents: true, stock: true },
+          include: { variants: true },
         });
         dbProds.forEach(p => {
-          dbProductsMap[p.id] = { priceCents: p.priceCents, stock: p.stock, id: p.id };
+          dbProductsMap[p.id] = p;
           if (p.slug) {
-            dbProductsMap[p.slug] = { priceCents: p.priceCents, stock: p.stock, id: p.id };
+            dbProductsMap[p.slug] = p;
           }
         });
       }
@@ -94,6 +94,14 @@ export class CheckoutService {
 
       if (dbProd) {
         verifiedPriceCents = dbProd.priceCents;
+        if (item.variantId) {
+          const variant = dbProd.variants.find((v: any) => v.id === item.variantId);
+          if (variant) {
+            verifiedPriceCents += variant.priceModifierCents;
+          } else {
+            throw new ValidationError(`Variant ${item.variantId} not found for product ${item.productId}`);
+          }
+        }
       } else if (mockProd) {
         verifiedPriceCents = Math.round(mockProd.price * 100);
       } else if (item.productId === "spotify_acrylic_card") {
@@ -106,6 +114,11 @@ export class CheckoutService {
         verifiedPriceCents = item.price_cents;
       } else {
         throw new ValidationError(`Product ${item.productId} not found in catalog.`);
+      }
+
+      if (item.price_cents !== verifiedPriceCents && dbProd) {
+         // Auto-correct or reject tampered client totals
+         item.price_cents = verifiedPriceCents;
       }
 
       verifiedSubtotalCents += verifiedPriceCents * qty;

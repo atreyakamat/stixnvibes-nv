@@ -46,8 +46,9 @@ export class InvalidStateTransitionError extends Error {
 }
 
 export function validateStateTransition(current: string, next: string): void {
-  // Allow all transitions for the new extended statuses
-  return;
+  if (!canTransition(current, next)) {
+    throw new InvalidStateTransitionError(current, next);
+  }
 }
 
 export function canTransition(current: string, next: string): boolean {

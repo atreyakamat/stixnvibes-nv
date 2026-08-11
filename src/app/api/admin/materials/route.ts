@@ -4,6 +4,8 @@ import { createApiHandler } from "@/lib/api-handler";
 import { MaterialSchema } from "@/lib/validations/material";
 import { z } from "zod";
 
+import { revalidatePath } from "next/cache";
+
 const materialService = new MaterialService();
 
 export const GET = createApiHandler({
@@ -21,11 +23,14 @@ export const POST = createApiHandler({
   requireAdmin: true,
   bodySchema: MaterialPayloadSchema,
   handler: async ({ body }) => {
+    let result;
     if (body.id) {
-      return await materialService.updateMaterial(body.id, body);
+      result = await materialService.updateMaterial(body.id, body);
     } else {
-      return await materialService.createMaterial(body);
+      result = await materialService.createMaterial(body);
     }
+    revalidatePath('/', 'layout');
+    return result;
   }
 });
 
@@ -34,6 +39,7 @@ export const DELETE = createApiHandler({
   querySchema: z.object({ id: z.string().uuid() }),
   handler: async ({ query }) => {
     await materialService.deleteMaterial(query.id);
+    revalidatePath('/', 'layout');
     return { deleted: true, id: query.id };
   }
 });

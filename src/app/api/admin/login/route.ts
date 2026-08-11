@@ -42,7 +42,7 @@ export const POST = createApiHandler({
         status: 200,
         headers: {
           "Content-Type": "application/json",
-          "Set-Cookie": `snv_admin_token=${tokenToUse}; Path=/; HttpOnly; SameSite=Lax`,
+          "Set-Cookie": `snv_admin_token=${tokenToUse}; Path=/; HttpOnly; SameSite=Lax${isProduction() ? '; Secure' : ''}`,
         },
       });
     }
@@ -67,7 +67,7 @@ export const POST = createApiHandler({
             status: 200,
             headers: {
               "Content-Type": "application/json",
-              "Set-Cookie": `snv_admin_token=${json.access_token}; Path=/; HttpOnly; SameSite=Lax`,
+              "Set-Cookie": `snv_admin_token=${json.access_token}; Path=/; HttpOnly; SameSite=Lax${isProduction() ? '; Secure' : ''}`,
             },
           });
         }

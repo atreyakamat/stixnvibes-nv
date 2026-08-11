@@ -2,6 +2,8 @@ import { createApiHandler } from "@/lib/api-handler";
 import { SettingsService } from "@/lib/services/settings-service";
 import { z } from "zod";
 
+import { revalidatePath } from "next/cache";
+
 const settingsService = new SettingsService();
 
 export const GET = createApiHandler({
@@ -29,6 +31,7 @@ export const POST = createApiHandler({
   bodySchema: postBodySchema,
   handler: async ({ body }) => {
     const updated = await settingsService.setNavigation(body.navigation);
+    revalidatePath('/', 'layout');
     return { saved: true, data: updated };
   },
 });

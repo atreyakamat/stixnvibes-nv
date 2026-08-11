@@ -71,9 +71,15 @@ export function handleApiError(err: unknown) {
     return ApiResponse.error(err.message, err.code, err.statusCode, err.details);
   }
 
+  const isProd = process.env.NODE_ENV === "production";
   const message = err instanceof Error ? err.message : String(err);
+  
   if (isConnectionError(message)) {
-    return ApiResponse.unavailable(`Database connection failed: ${message}`);
+    return ApiResponse.unavailable(isProd ? "Database service currently unavailable" : `Database connection failed: ${message}`);
   }
-  return ApiResponse.internal(message, err instanceof Error ? err.stack : undefined);
+  
+  return ApiResponse.internal(
+    isProd ? "Internal server error" : message, 
+    isProd ? undefined : (err instanceof Error ? err.stack : undefined)
+  );
 }

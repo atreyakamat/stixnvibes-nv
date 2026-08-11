@@ -4,6 +4,8 @@ import { createApiHandler } from "@/lib/api-handler";
 import { SizeSchema } from "@/lib/validations/size";
 import { z } from "zod";
 
+import { revalidatePath } from "next/cache";
+
 const sizeService = new SizeService();
 
 export const GET = createApiHandler({
@@ -22,11 +24,14 @@ export const POST = createApiHandler({
   requireAdmin: true,
   bodySchema: SizePayloadSchema,
   handler: async ({ body }) => {
+    let result;
     if (body.id) {
-      return await sizeService.updateSize(body.id, body);
+      result = await sizeService.updateSize(body.id, body);
     } else {
-      return await sizeService.createSize(body);
+      result = await sizeService.createSize(body);
     }
+    revalidatePath('/', 'layout');
+    return result;
   }
 });
 
@@ -35,6 +40,7 @@ export const DELETE = createApiHandler({
   querySchema: z.object({ id: z.string().uuid() }),
   handler: async ({ query }) => {
     await sizeService.deleteSize(query.id);
+    revalidatePath('/', 'layout');
     return { deleted: true, id: query.id };
   }
 });
