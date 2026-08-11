@@ -6,6 +6,8 @@ import { products } from "@/lib/data/products";
 import { buildWhatsAppUrl } from "@/lib/whatsapp";
 import { createService } from "@/lib/supabase/service";
 import { randomUUID } from "crypto";
+import { prisma } from "@/lib/prisma";
+import { ValidationError } from "@/lib/errors";
 
 export class OrderService {
   private repo = new OrderRepository();
@@ -69,16 +71,59 @@ export class OrderService {
     const items = payload.items;
     const quantities = items.map((i: any) => (typeof i.quantity === "number" ? i.quantity : 1));
 
-    const verifiedItems = items.map((item: any, idx: number) => {
+    const productIds = items.map((i) => i.product_id).filter(Boolean);
+    let dbProductsMap: Record<string, any> = {};
+
+    if (productIds.length > 0) {
+      const validUUIDs = productIds.filter(id => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/i.test(id!));
+      const slugs = productIds.filter(id => !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/i.test(id!));
+
+      const orConditions = [];
+      if (validUUIDs.length > 0) orConditions.push({ id: { in: validUUIDs as string[] } });
+      if (slugs.length > 0) orConditions.push({ slug: { in: slugs as string[] } });
+
+      if (orConditions.length > 0) {
+        const dbProds = await prisma.product.findMany({
+          where: { OR: orConditions },
+          select: { id: true, slug: true, priceCents: true, stock: true },
+        });
+        dbProds.forEach(p => {
+          dbProductsMap[p.id] = { priceCents: p.priceCents, stock: p.stock, id: p.id };
+          if (p.slug) {
+            dbProductsMap[p.slug] = { priceCents: p.priceCents, stock: p.stock, id: p.id };
+          }
+        });
+      }
+    }
+
+    const verifiedItems = [];
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx];
       const mockProd = products.find((p: any) => p.id === item.product_id || p.slug === item.product_id);
-      const verifiedPrice = mockProd ? Math.round(mockProd.price * 100) : item.price_cents;
-      return {
+      const dbProd = dbProductsMap[item.product_id ?? ""];
+      
+      let verifiedPrice = 0;
+      if (dbProd) {
+        verifiedPrice = dbProd.priceCents;
+      } else if (mockProd) {
+        verifiedPrice = Math.round(mockProd.price * 100);
+      } else if (item.product_id === "spotify_acrylic_card") {
+        if (item.price_cents < 99900) throw new ValidationError("Invalid price for custom Spotify card");
+        verifiedPrice = item.price_cents;
+      } else if (item.product_id === "custom_sticker_studio") {
+        if (item.price_cents < 4900) throw new ValidationError("Invalid price for custom sticker");
+        verifiedPrice = item.price_cents;
+      } else {
+        throw new ValidationError(`Product ${item.product_id} not found in catalog.`);
+      }
+
+      verifiedItems.push({
         ...item,
         name: sanitize(item.name),
         quantity: quantities[idx],
         price_cents: verifiedPrice,
-      };
-    });
+      });
+    }
 
     const totalCents = verifiedItems.reduce((sum: number, item: any) => sum + item.price_cents * item.quantity, 0);
 

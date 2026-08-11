@@ -89,9 +89,24 @@ export class CheckoutService {
       const qty = Math.max(1, Math.min(99, item.quantity));
       const mockProd = products.find((p: Product) => p.id === item.productId || p.slug === item.productId);
       const dbProd = dbProductsMap[item.productId];
-      const verifiedPriceCents =
-        dbProd ? dbProd.priceCents :
-        (mockProd ? Math.round(mockProd.price * 100) : Math.max(0, item.price_cents));
+      
+      let verifiedPriceCents = 0;
+
+      if (dbProd) {
+        verifiedPriceCents = dbProd.priceCents;
+      } else if (mockProd) {
+        verifiedPriceCents = Math.round(mockProd.price * 100);
+      } else if (item.productId === "spotify_acrylic_card") {
+        // Base price for A5 clear glass is 999. Do not trust anything below.
+        if (item.price_cents < 99900) throw new ValidationError("Invalid price for custom Spotify card");
+        verifiedPriceCents = item.price_cents;
+      } else if (item.productId === "custom_sticker_studio") {
+        // Base price for 1 inch standard sticker is 49.
+        if (item.price_cents < 4900) throw new ValidationError("Invalid price for custom sticker");
+        verifiedPriceCents = item.price_cents;
+      } else {
+        throw new ValidationError(`Product ${item.productId} not found in catalog.`);
+      }
 
       verifiedSubtotalCents += verifiedPriceCents * qty;
       verifiedItems.push({

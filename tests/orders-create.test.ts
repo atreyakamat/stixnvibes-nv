@@ -97,7 +97,7 @@ describe("POST /api/orders/create", () => {
       address: "12 MG Road, Bengaluru",
       pincode: "560001",
       items: [
-        { product_id: "custom-sticker-id", variant_id: "v1", name: "Anime Pack", price_cents: 29900, quantity: 2, variant_name: "Standard" },
+        { product_id: "s1", variant_id: "v1", name: "Anime Pack", price_cents: 19900, quantity: 2, variant_name: "Standard" },
       ],
       notes: "Gift wrap",
     });
@@ -107,7 +107,7 @@ describe("POST /api/orders/create", () => {
     const decoded = decodeURIComponent((r.json?.whatsappUrl as string).split("text=")[1]);
     expect(decoded).toContain("Anime Pack");
     expect(decoded).toContain("×2");
-    expect(decoded).toContain("₹598");
+    expect(decoded).toContain("₹398");
     expect(r.json?.persisted).toBe(false);
   });
 
@@ -141,7 +141,7 @@ describe("POST /api/orders/create", () => {
       customer_phone: "+919999999999",
       address: "Somewhere",
       pincode: "560001",
-      items: [{ name: "Sticker", price_cents: 1000, quantity: 1 }],
+      items: [{ product_id: "s1", name: "Sticker", price_cents: 4900, quantity: 1 }],
     });
 
     const res = (await (mod as any).POST(req)) as any;
