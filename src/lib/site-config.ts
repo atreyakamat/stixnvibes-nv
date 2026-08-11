@@ -12,11 +12,11 @@ export const siteConfig = {
     twitter: "https://twitter.com/stixnvibes",
     youtube: "https://youtube.com/@stixnvibes",
     tiktok: "https://tiktok.com/@stixnvibes",
-    whatsapp: "https://wa.me/917744020601",
+    whatsapp: `https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "917744020601"}`,
     email: "hello@stixnvibes.com",
   },
   contact: {
-    phone: "+91 77440 20601",
+    phone: `+${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.slice(0, 2) || "91"} ${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.slice(2, 7) || "77440"} ${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.slice(7) || "20601"}`,
     hours: "Mon–Sat, 10:00 AM – 7:00 PM IST",
     address: "Bengaluru, India",
   },
