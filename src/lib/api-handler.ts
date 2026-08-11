@@ -55,14 +55,11 @@ export function createApiHandler<TBody = any, TQuery = any>(
       // 3. Validation (Body)
       let body = {} as TBody;
       if (config.bodySchema) {
-        if (!req.body) {
-          throw new ValidationError("Missing request body");
-        }
         let rawBody;
         try {
           rawBody = await req.json();
         } catch {
-          throw new ValidationError("Invalid JSON body");
+          throw new ValidationError("Invalid request: Missing request body");
         }
         const result = config.bodySchema.safeParse(rawBody);
         if (!result.success) {

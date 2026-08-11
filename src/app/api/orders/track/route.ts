@@ -16,7 +16,7 @@ export const GET = createApiHandler({
         headers: { "Content-Type": "application/json" },
       });
     } catch (e: any) {
-      if (e.name === "NotFoundError") {
+      if (e.code === "NOT_FOUND" || e.name === "NotFoundError") {
         return new Response(JSON.stringify({ found: false, error: e.message }), {
           status: 404,
           headers: { "Content-Type": "application/json" },

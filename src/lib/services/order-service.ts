@@ -2,6 +2,10 @@ import { OrderRepository, type OrderListParams } from "@/lib/repositories/order-
 import { validateStateTransition } from "@/lib/orders/state-machine";
 import { $Enums } from "@prisma/client";
 import { NotFoundError } from "@/lib/errors";
+import { products } from "@/lib/data/products";
+import { buildWhatsAppUrl } from "@/lib/whatsapp";
+import { createService } from "@/lib/supabase/service";
+import { randomUUID } from "crypto";
 
 export class OrderService {
   private repo = new OrderRepository();
@@ -48,11 +52,6 @@ export class OrderService {
       variant_name?: string;
     }>;
   }) {
-    const { randomUUID } = require("crypto");
-    const { products } = require("@/lib/data/products");
-    const { buildWhatsAppUrl } = require("@/lib/whatsapp");
-    const { createService } = require("@/lib/supabase/service");
-
     const sanitize = (str: string) => str.trim().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
 
     const cleanName = sanitize(payload.customer_name);
@@ -165,11 +164,8 @@ export class OrderService {
   }
 
   async trackOrder(query: string) {
-    const { createService } = require("@/lib/supabase/service");
     const admin = createService();
-    if (!admin) {
-      throw new Error("Unable to track order at this time. Database connection not configured.");
-    }
+    if (admin) {
 
     try {
       const { data, error } = await admin
@@ -200,6 +196,7 @@ export class OrderService {
       }
     } catch (err) {
       console.warn("[orders/track] Supabase lookup error:", err);
+    }
     }
 
     throw new NotFoundError(`No order found matching "${query}". Please check your Order ID or registered mobile number. Tracking becomes available after the order is saved in the live system.`);
