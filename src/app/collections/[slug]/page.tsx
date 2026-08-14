@@ -55,8 +55,8 @@ export default async function CollectionPage({ params }: PageProps) {
       category: p.collection?.name || "Stickers",
       collection: p.collection?.name || "General",
       tags: p.tags || [],
-      rating: p.rating || 5.0,
-      reviewCount: p.review_count || 0,
+      rating: p.rating ? Number(p.rating) : 5.0,
+      reviewCount: p.review_count ? Number(p.review_count) : 0,
       customizable: p.customizable ?? false,
     }));
 
