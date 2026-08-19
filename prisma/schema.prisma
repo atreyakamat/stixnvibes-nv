@@ -66,6 +66,8 @@ model Product {
   collection       Collection?     @relation(fields: [collectionId], references: [id], onUpdate: NoAction)
   reviews          Review[]
   variants         Variant[]
+  inventoryReservations InventoryReservation[]
+  inventoryLedger       InventoryLedgerEntry[]
 
   @@index([categoryId])
   @@index([slug])
@@ -116,6 +118,50 @@ model InventoryLog {
   @@schema("public")
 }
 
+model InventoryReservation {
+  id          String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId   String             @map("product_id") @db.Uuid
+  variantId   String?            @map("variant_id") @db.Uuid
+  orderId     String?            @map("order_id") @db.Uuid
+  quantity    Int
+  status      reservation_status @default(active)
+  expiresAt   DateTime           @map("expires_at") @db.Timestamptz(6)
+  releasedAt  DateTime?          @map("released_at") @db.Timestamptz(6)
+  createdAt   DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  product     Product            @relation(fields: [productId], references: [id], onUpdate: NoAction)
+  order       Order?             @relation(fields: [orderId], references: [id], onUpdate: NoAction)
+
+  @@index([status, expiresAt])
+  @@index([productId])
+  @@index([orderId])
+  @@map("inventory_reservations")
+  @@schema("public")
+}
+
+model InventoryLedgerEntry {
+  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId     String           @map("product_id") @db.Uuid
+  variantId     String?          @map("variant_id") @db.Uuid
+  orderId       String?          @map("order_id") @db.Uuid
+  entryType     ledger_entry_type @map("entry_type")
+  quantity      Int
+  previousStock Int              @map("previous_stock")
+  newStock      Int              @map("new_stock")
+  reason        String?
+  operator      String           @default("system")
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  product       Product          @relation(fields: [productId], references: [id], onUpdate: NoAction)
+  order         Order?           @relation(fields: [orderId], references: [id], onUpdate: NoAction)
+
+  @@index([productId, createdAt])
+  @@index([orderId])
+  @@map("inventory_ledger")
+  @@schema("public")
+}
+
 model Order {
   id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   user_id           String?      @db.Uuid
@@ -135,6 +181,9 @@ model Order {
   items             OrderItem[]
   users             users?       @relation(fields: [user_id], references: [id], onUpdate: NoAction)
   shipment          Shipment?
+  reservations          InventoryReservation[]
+  inventoryLedger       InventoryLedgerEntry[]
+  payments              Payment[]
 
   @@index([status])
   @@index([createdAt(sort: Desc)])
@@ -153,6 +202,18 @@ model OrderItem {
   priceCents             Int                     @map("price_cents")
   imageUrl               String?                 @map("image_url")
   metadata               Json                    @default("{}")
+  // === Price Snapshot (captured at purchase time) ===
+  unitPriceCents      Int?     @map("unit_price_cents")
+  materialModCents    Int?     @default(0) @map("material_mod_cents")
+  sizeModCents        Int?     @default(0) @map("size_mod_cents")
+  discountCents       Int?     @default(0) @map("discount_cents")
+  taxCents            Int?     @default(0) @map("tax_cents")
+  lineTotalCents      Int?     @map("line_total_cents")
+  productNameSnapshot String?  @map("product_name_snapshot")
+  variantNameSnapshot String?  @map("variant_name_snapshot")
+  materialName        String?  @map("material_name")
+  sizeName            String?  @map("size_name")
+  customizationData   Json?    @map("customization_data")
   createdAt              DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
   customizationSnapshots CustomizationSnapshot[]
   order                  Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
@@ -457,6 +518,16 @@ enum order_status {
   fulfilled
   cancelled
   refunded
+  production
+  printing
+  qc
+  qc_failed
+  packing
+  shipped
+  delivered
+  payment_failed
+  return_requested
+  returned
 
   @@schema("public")
 }
@@ -469,5 +540,62 @@ enum product_type {
   frame
   mystery_pack
 
+  @@schema("public")
+}
+
+enum reservation_status {
+  active
+  committed
+  released
+  expired
+
+  @@schema("public")
+}
+
+enum ledger_entry_type {
+  reservation
+  release
+  commitment
+  adjustment
+  return_restock
+  checkout_decrement
+
+  @@schema("public")
+}
+
+model PaymentWebhookEvent {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventId     String   @unique @map("event_id")
+  eventType   String   @map("event_type")
+  payload     Json
+  status      String   @default("processing")
+  processedAt DateTime? @map("processed_at") @db.Timestamptz(6)
+  error       String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([status])
+  @@map("payment_webhook_events")
+  @@schema("public")
+}
+
+model Payment {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId           String   @map("order_id") @db.Uuid
+  provider          String   @default("razorpay")
+  providerOrderId   String?  @map("provider_order_id")
+  providerPaymentId String?  @map("provider_payment_id")
+  amountCents       Int      @map("amount_cents")
+  currency          String   @default("INR")
+  status            String   @default("pending")
+  paidAt            DateTime? @map("paid_at") @db.Timestamptz(6)
+  failureReason     String?  @map("failure_reason")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  order             Order    @relation(fields: [orderId], references: [id], onUpdate: NoAction)
+
+  @@index([providerOrderId])
+  @@index([orderId])
+  @@map("payments")
   @@schema("public")
 }

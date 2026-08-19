@@ -1,5 +1,5 @@
 import { OrderRepository, type OrderListParams } from "@/lib/repositories/order-repository";
-import { validateStateTransition } from "@/lib/orders/state-machine";
+import { validateStateTransition } from "@/lib/state-machine/order-state-machine";
 import { $Enums } from "@prisma/client";
 import { NotFoundError } from "@/lib/errors";
 import { products } from "@/lib/data/products";
@@ -25,6 +25,16 @@ export class OrderService {
     if (!existing) throw new Error("Order not found");
 
     validateStateTransition(existing.status, nextStatus);
+
+    // Import lazily to avoid circular dependencies if any
+    const { requiresInventoryRelease } = await import("@/lib/state-machine/order-state-machine");
+    const { releaseOrderReservations } = await import("@/lib/services/inventory-atomic.service");
+
+    if (requiresInventoryRelease(existing.status as any, nextStatus as any)) {
+      await releaseOrderReservations(id, `Order transitioned to ${nextStatus}`);
+    }
+
+    // Phase 3: Other side effects can be added here if needed
 
     return this.repo.updateStatus(id, nextStatus);
   }

@@ -26,11 +26,14 @@ export type RazorpayOrder = {
   created_at: number;
 };
 
+import { prisma } from "@/lib/prisma";
+
 /**
  * Creates a Razorpay order via the Orders API.
  * Call this from a server action / route handler, NEVER from the client.
  */
 export async function createRazorpayOrder(params: {
+  orderId?: string;
   amountInRupees: number;
   receipt: string;
   notes?: Record<string, string>;
@@ -38,8 +41,35 @@ export async function createRazorpayOrder(params: {
   if (!isRazorpayConfigured()) {
     throw new Error("Razorpay not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.");
   }
+
+  // Phase 2: Idempotency check — retrieve real provider order if already created
+  if (params.orderId) {
+    const existingPayment = await prisma.payment.findFirst({
+      where: { orderId: params.orderId, provider: "razorpay", providerOrderId: { not: null } },
+    });
+    if (existingPayment?.providerOrderId) {
+      const auth = Buffer.from(
+        `${process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID || RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`
+      ).toString("base64");
+
+      const existingRes = await fetch(
+        `https://api.razorpay.com/v1/orders/${existingPayment.providerOrderId}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Basic ${auth}`,
+          },
+        }
+      );
+
+      if (existingRes.ok) {
+        return (await existingRes.json()) as RazorpayOrder;
+      }
+    }
+  }
+
   const auth = Buffer.from(
-    `${process.env.RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`
+    `${process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`
   ).toString("base64");
 
   const res = await fetch("https://api.razorpay.com/v1/orders", {
@@ -60,7 +90,23 @@ export async function createRazorpayOrder(params: {
     const text = await res.text();
     throw new Error(`Razorpay order creation failed: ${res.status} ${text}`);
   }
-  return res.json() as Promise<RazorpayOrder>;
+  
+  const rzpOrder = (await res.json()) as RazorpayOrder;
+
+  if (params.orderId) {
+    await prisma.payment.create({
+      data: {
+        orderId: params.orderId,
+        provider: "razorpay",
+        providerOrderId: rzpOrder.id,
+        amountCents: Math.round(params.amountInRupees * 100),
+        currency: "INR",
+        status: "pending",
+      },
+    });
+  }
+
+  return rzpOrder;
 }
 
 

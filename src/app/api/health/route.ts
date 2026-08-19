@@ -1,37 +1,39 @@
-import { createApiHandler } from "@/lib/api-handler";
-import { createService } from "@/lib/supabase/service";
+/**
+ * Health check endpoint.
+ * GET /api/health
+ *
+ * Returns system health status including database connectivity.
+ */
+import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
 
-export const GET = createApiHandler({
-  handler: async () => {
-    const uptime = process.uptime();
-    const memory = process.memoryUsage();
-    const dbConfigured = Boolean(createService());
+export async function GET() {
+  const checks: Record<string, { status: string; latencyMs?: number }> = {};
 
-    return {
-      status: "ok",
-      version: "1.0.0",
-      timestamp: new Date().toISOString(),
-      uptimeSeconds: Math.floor(uptime),
-      dbConfigured,
-      observability: {
-        metrics: {
-          apiLatencyTargetMs: 100,
-          queueDepth: 0,
-          activeSessions: 1,
-          checkoutSuccessRatePercent: 99.8,
-          paymentFailuresRatePercent: 0.2,
-        },
-        alertThresholds: {
-          maxMemoryMb: 512,
-          maxLatencyMs: 500,
-          maxErrorRatePercent: 1.0,
-        },
-      },
-      memory: {
-        rssMB: Math.round(memory.rss / (1024 * 1024)),
-        heapTotalMB: Math.round(memory.heapTotal / (1024 * 1024)),
-        heapUsedMB: Math.round(memory.heapUsed / (1024 * 1024)),
-      },
-    };
+  // Database check
+  const dbStart = Date.now();
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    checks.database = { status: "healthy", latencyMs: Date.now() - dbStart };
+  } catch {
+    checks.database = { status: "unhealthy", latencyMs: Date.now() - dbStart };
   }
-});
+
+  // App check
+  checks.app = { status: "healthy" };
+
+  const allHealthy = Object.values(checks).every(
+    (c) => c.status === "healthy"
+  );
+
+  return NextResponse.json(
+    {
+      status: allHealthy ? "healthy" : "degraded",
+      checks,
+      version: process.env.APP_VERSION ?? "dev",
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+    },
+    { status: allHealthy ? 200 : 503 }
+  );
+}

@@ -3,6 +3,7 @@ import { createRazorpayOrder, isRazorpayConfigured, RAZORPAY_KEY_ID } from "@/li
 import { products, type Product } from "@/lib/data/products";
 import { prisma } from "@/lib/prisma";
 import { ValidationError } from "@/lib/errors";
+import { reserveStock } from "@/lib/services/inventory-atomic.service";
 
 export interface CheckoutRequestBody {
   items: Array<{
@@ -148,7 +149,29 @@ export class CheckoutService {
     const totalRupees = totalCents / 100;
 
     const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 899 + 100)}`;
-    const dbOrderId = randomUUID();
+    let dbOrderId = randomUUID();
+
+    const reservationIds: string[] = [];
+    for (const it of verifiedItems) {
+      const isValidUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/i.test(it.productId || "");
+      
+      if (isValidUUID && dbProductsMap[it.productId] !== undefined) {
+        // Use atomic reserveStock instead of stale read
+        const reserveResult = await reserveStock(
+          it.productId,
+          it.quantity,
+          undefined,
+          30 // 30 minutes expiry
+        );
+
+        if (!reserveResult.success) {
+           throw new Error(reserveResult.error || `Insufficient stock for product ${it.name}`);
+        }
+        if (reserveResult.reservationId) {
+          reservationIds.push(reserveResult.reservationId);
+        }
+      }
+    }
 
     await prisma.$transaction(async (tx) => {
       await tx.order.create({
@@ -166,43 +189,46 @@ export class CheckoutService {
         },
       });
 
-      const orderItemsData = verifiedItems.map(it => ({
-        id: randomUUID(),
-        orderId: dbOrderId,
-        productId: /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/i.test(it.productId || "") ? it.productId : null,
-        variantId: it.variantId || null,
-        name: it.name,
-        quantity: it.quantity,
-        priceCents: it.price_cents,
-        imageUrl: it.image || null,
-      }));
+      if (reservationIds.length > 0) {
+        await tx.inventoryReservation.updateMany({
+          where: { id: { in: reservationIds } },
+          data: { orderId: dbOrderId },
+        });
+        await tx.inventoryLedgerEntry.updateMany({
+          where: { orderId: null, productId: { in: verifiedItems.map(i => i.productId).filter(Boolean) } },
+          data: { orderId: dbOrderId, reason: `Stock reserved for order ${dbOrderId}` },
+        });
+      }
+
+      const orderItemsData = verifiedItems.map(it => {
+        const dbProd = dbProductsMap[it.productId];
+        const isCustomSticker = it.productId === "custom_sticker_studio";
+        const isSpotify = it.productId === "spotify_acrylic_card";
+        
+        return {
+          id: randomUUID(),
+          orderId: dbOrderId,
+          productId: /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/i.test(it.productId || "") ? it.productId : null,
+          variantId: it.variantId || null,
+          name: it.name,
+          quantity: it.quantity,
+          priceCents: it.price_cents, // Legacy compatibility
+          imageUrl: it.image || null,
+          // Phase 1: Price Snapshots
+          unitPriceCents: dbProd ? dbProd.priceCents : (isSpotify ? 99900 : (isCustomSticker ? 4900 : it.price_cents)),
+          materialModCents: 0, // Mocked for now, need actual pricing service integration later
+          sizeModCents: 0, 
+          discountCents: discountCents > 0 ? Math.floor(discountCents / verifiedItems.length) : 0, // Simplified distribution
+          taxCents: 0,
+          lineTotalCents: it.price_cents * it.quantity,
+          productNameSnapshot: dbProd ? dbProd.name : it.name,
+          variantNameSnapshot: it.variantName || null,
+        };
+      });
 
       await tx.orderItem.createMany({
         data: orderItemsData,
       });
-
-      const stockUpdates = [];
-      for (const it of verifiedItems) {
-        const isValidUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/i.test(it.productId || "");
-        
-        if (isValidUUID && dbProductsMap[it.productId] !== undefined) {
-          const currentStock = dbProductsMap[it.productId].stock;
-          if (currentStock !== null && currentStock < it.quantity) {
-            throw new Error(`Insufficient stock for product ${it.name}`);
-          }
-          
-          stockUpdates.push(
-            tx.product.update({
-              where: { id: it.productId },
-              data: { stock: { decrement: it.quantity } },
-            })
-          );
-        }
-      }
-
-      if (stockUpdates.length > 0) {
-        await Promise.all(stockUpdates);
-      }
     });
 
     let razorpayOrderId: string | null = null;
@@ -211,6 +237,7 @@ export class CheckoutService {
     if (paymentMethod === "razorpay" && isRazorpayConfigured()) {
       try {
         const rzpOrder = await createRazorpayOrder({
+          orderId: dbOrderId,
           amountInRupees: totalRupees,
           receipt: orderNumber,
           notes: {
