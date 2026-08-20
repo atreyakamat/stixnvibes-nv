@@ -26,9 +26,15 @@ export async function POST(
     if (error instanceof AppError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
-    if (error instanceof Error && error.name === 'InvalidStateTransitionError') {
-       return NextResponse.json({ error: error.message }, { status: 400 });
+    if (
+      (error instanceof Error && error.name === 'InvalidStateTransitionError') ||
+      (error instanceof Error && error.message.includes('Invalid order state transition'))
+    ) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Internal server error" },
+      { status: 500 }
+    );
   }
 }

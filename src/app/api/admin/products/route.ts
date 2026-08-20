@@ -36,16 +36,22 @@ export const POST = createApiHandler({
   requireAdmin: true,
   bodySchema: ProductPayloadSchema,
   handler: async ({ body }) => {
+    const safeRevalidate = () => {
+      try {
+        revalidatePath('/', 'layout');
+      } catch {}
+    };
+
     // Handle Bulk Operations
     if (body.bulkAction && body.ids) {
       if (body.bulkAction === "delete") {
         const count = await productService.bulkDeleteProducts(body.ids);
-        revalidatePath('/', 'layout');
+        safeRevalidate();
         return { deleted: true, count };
       }
       if (body.bulkAction === "status" && body.status) {
         const count = await productService.bulkUpdateProductStatus(body.ids, body.status);
-        revalidatePath('/', 'layout');
+        safeRevalidate();
         return { updated: true, count, status: body.status };
       }
     }
@@ -53,11 +59,16 @@ export const POST = createApiHandler({
     // Handle Single Product Create or Update
     let result;
     if (body.id) {
-      result = await productService.updateProduct(body.id, body as unknown as Parameters<typeof productService.updateProduct>[1]);
+      const existing = await productService.getProductById(body.id);
+      if (existing) {
+        result = await productService.updateProduct(body.id, body as unknown as Parameters<typeof productService.updateProduct>[1]);
+      } else {
+        result = await productService.createProduct(body as unknown as Parameters<typeof productService.createProduct>[0]);
+      }
     } else {
       result = await productService.createProduct(body as unknown as Parameters<typeof productService.createProduct>[0]);
     }
-    revalidatePath('/', 'layout');
+    safeRevalidate();
     return result;
   }
 });
@@ -67,7 +78,9 @@ export const DELETE = createApiHandler({
   querySchema: z.object({ id: z.string().uuid() }),
   handler: async ({ query }) => {
     await productService.deleteProduct(query.id);
-    revalidatePath('/', 'layout');
+    try {
+      revalidatePath('/', 'layout');
+    } catch {}
     return { deleted: true };
   }
 });

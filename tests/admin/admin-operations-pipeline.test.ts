@@ -65,8 +65,8 @@ describe("Phase 4: Admin Operations Pipeline API Tests", () => {
 
   afterAll(async () => {
     try {
-      await prisma.qualityCheck.deleteMany({});
-      await prisma.shipmentEvent.deleteMany({});
+      await prisma.qualityCheck.deleteMany({ where: { productionJob: { orderItemId: testOrderItemId } } });
+      await prisma.shipmentEvent.deleteMany({ where: { shipment: { orderId: testOrderId } } });
       await prisma.shipment.deleteMany({ where: { orderId: testOrderId } });
       await prisma.productionJob.deleteMany({ where: { orderItemId: testOrderItemId } });
       await prisma.orderItem.deleteMany({ where: { orderId: testOrderId } });

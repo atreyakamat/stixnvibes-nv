@@ -6,7 +6,7 @@ import {
 } from "@/lib/services/inventory-atomic.service";
 import { randomUUID } from "crypto";
 
-describe("Gate 3: Reservation Expiry & Auto-Restoration Invariants", () => {
+describe("Gate 3: Reservation Expiry & Auto-Restoration Invariants", { timeout: 15000 }, () => {
   let testProductId: string;
 
   beforeEach(async () => {

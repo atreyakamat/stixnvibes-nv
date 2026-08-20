@@ -84,7 +84,7 @@ describe("Phase 4: Admin Order Operations & Command Center TDD Suite", () => {
 
   afterAll(async () => {
     try {
-      await prisma.qualityCheck.deleteMany({});
+      await prisma.qualityCheck.deleteMany({ where: { productionJob: { orderItemId: testOrderItemId } } });
       await prisma.shipment.deleteMany({ where: { orderId: testOrderId } });
       await prisma.productionJob.deleteMany({ where: { orderItemId: testOrderItemId } });
       await prisma.payment.deleteMany({ where: { orderId: testOrderId } });

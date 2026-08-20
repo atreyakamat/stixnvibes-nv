@@ -232,42 +232,108 @@ export class OrderService {
   }
 
   async trackOrder(query: string) {
-    const admin = createService();
-    if (admin) {
+    const cleanQuery = query.trim();
 
+    // 1. Primary PostgreSQL persistence lookup via Prisma
     try {
-      const { data, error } = await admin
-        .from("orders")
-        .select("id, created_at, customer_name, customer_phone, total_cents, status, address, pincode, whatsapp_url, order_items(*), shipments(*)")
-        .or(`id.eq.${query},customer_phone.eq.${query}`)
-        .order("created_at", { ascending: false })
-        .limit(5);
+      const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/i.test(cleanQuery);
+      const orConditions: any[] = [{ customerPhone: cleanQuery }];
+      if (isUUID) {
+        orConditions.push({ id: cleanQuery });
+      }
 
-      if (!error && data && data.length > 0) {
-        const primary = data[0];
-        const shipment = primary.shipments && primary.shipments.length > 0 ? primary.shipments[0] : null;
+      const order = await prisma.order.findFirst({
+        where: { OR: orConditions },
+        include: {
+          items: true,
+          shipment: {
+            include: {
+              events: {
+                orderBy: { timestamp: "desc" },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (order) {
+        const shipment = order.shipment;
+        const events = shipment?.events && shipment.events.length > 0
+          ? shipment.events.map((e) => ({
+              status: e.status,
+              location: e.location || "",
+              timestamp: e.timestamp,
+              description: e.description || "",
+            }))
+          : [
+              {
+                status: order.status,
+                location: "Warehouse Facility",
+                timestamp: order.updatedAt,
+                description: `Order is currently in ${order.status} stage`,
+              },
+            ];
 
         return {
           found: true,
-          data: {
-            orderId: primary.id,
-            customerName: primary.customer_name,
-            placedDate: new Date(primary.created_at).toLocaleDateString("en-IN", { dateStyle: "medium" }),
-            estimatedDelivery: shipment ? "2-4 Business Days" : "Pending Dispatch",
-            courier: shipment ? shipment.courier : "TBD",
-            awb: shipment ? shipment.awb : "TBD",
-            currentStatus: shipment ? shipment.status : primary.status,
-            destination: `${primary.address} (${primary.pincode})`,
-            items: primary.order_items || [],
-          },
+          orderId: order.id,
+          orderNumber: (order.metadata as any)?.orderNumber || `ORD-${order.id.slice(0, 8)}`,
+          status: shipment ? shipment.status : order.status,
+          courier: shipment ? shipment.courier : "Pending Dispatch",
+          trackingNumber: shipment ? shipment.awb : "TBD",
+          estimatedDelivery: shipment ? "2-4 Business Days" : "Pending Dispatch",
+          events,
+          items: order.items.map((i) => ({
+            name: i.productNameSnapshot || i.name,
+            quantity: i.quantity,
+          })),
         };
       }
     } catch (err) {
-      console.warn("[orders/track] Supabase lookup error:", err);
-    }
+      console.warn("[orders/track] Prisma lookup error:", err);
     }
 
-    throw new NotFoundError(`No order found matching "${query}". Please check your Order ID or registered mobile number. Tracking becomes available after the order is saved in the live system.`);
+    // 2. Fallback Supabase lookup if configured
+    const admin = createService();
+    if (admin) {
+      try {
+        const { data, error } = await admin
+          .from("orders")
+          .select("id, created_at, customer_name, customer_phone, total_cents, status, address, pincode, whatsapp_url, order_items(*), shipments(*)")
+          .or(`id.eq.${cleanQuery},customer_phone.eq.${cleanQuery}`)
+          .order("created_at", { ascending: false })
+          .limit(5);
+
+        if (!error && data && data.length > 0) {
+          const primary = data[0];
+          const shipment = primary.shipments && primary.shipments.length > 0 ? primary.shipments[0] : null;
+
+          return {
+            found: true,
+            orderId: primary.id,
+            orderNumber: `ORD-${primary.id.slice(0, 8)}`,
+            status: shipment ? shipment.status : primary.status,
+            courier: shipment ? shipment.courier : "TBD",
+            trackingNumber: shipment ? shipment.awb : "TBD",
+            estimatedDelivery: shipment ? "2-4 Business Days" : "Pending Dispatch",
+            events: [
+              {
+                status: shipment ? shipment.status : primary.status,
+                location: "Warehouse Facility",
+                timestamp: new Date(primary.created_at),
+                description: `Order status is ${primary.status}`,
+              },
+            ],
+            items: primary.order_items || [],
+          };
+        }
+      } catch (err) {
+        console.warn("[orders/track] Supabase lookup error:", err);
+      }
+    }
+
+    throw new NotFoundError(`No order found matching "${query}". Please check your Order ID or registered mobile number.`);
   }
 }
 
