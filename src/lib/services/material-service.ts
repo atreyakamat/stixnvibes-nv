@@ -11,6 +11,10 @@ export class MaterialService {
     return this.repo.list();
   }
 
+  async getMaterialById(id: string) {
+    return this.repo.findById(id);
+  }
+
   async createMaterial(payload: MaterialInsert) {
     if (!payload.name) throw new Error("Material name is required");
     const slug = payload.slug || payload.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");

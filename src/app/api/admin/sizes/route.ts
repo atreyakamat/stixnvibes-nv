@@ -24,13 +24,24 @@ export const POST = createApiHandler({
   requireAdmin: true,
   bodySchema: SizePayloadSchema,
   handler: async ({ body }) => {
+    const safeRevalidate = () => {
+      try {
+        revalidatePath('/', 'layout');
+      } catch {}
+    };
+
     let result;
     if (body.id) {
-      result = await sizeService.updateSize(body.id, body);
+      const existing = await sizeService.getSizeById(body.id);
+      if (existing) {
+        result = await sizeService.updateSize(body.id, body);
+      } else {
+        result = await sizeService.createSize(body);
+      }
     } else {
       result = await sizeService.createSize(body);
     }
-    revalidatePath('/', 'layout');
+    safeRevalidate();
     return result;
   }
 });
@@ -40,7 +51,9 @@ export const DELETE = createApiHandler({
   querySchema: z.object({ id: z.string().uuid() }),
   handler: async ({ query }) => {
     await sizeService.deleteSize(query.id);
-    revalidatePath('/', 'layout');
+    try {
+      revalidatePath('/', 'layout');
+    } catch {}
     return { deleted: true, id: query.id };
   }
 });

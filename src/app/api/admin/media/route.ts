@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { createApiHandler } from "@/lib/api-handler";
 import { MediaService } from "@/lib/services/media-service";
 import { z } from "zod";

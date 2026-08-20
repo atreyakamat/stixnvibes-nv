@@ -14,6 +14,12 @@ export class PageRepository {
     });
   }
 
+  async findById(id: string): Promise<Page | null> {
+    return prisma.page.findUnique({
+      where: { id },
+    });
+  }
+
   async create(payload: any): Promise<Page> {
     return prisma.page.create({
       data: payload,

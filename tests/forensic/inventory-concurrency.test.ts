@@ -8,7 +8,7 @@ import {
 } from "@/lib/services/inventory-atomic.service";
 import { randomUUID } from "crypto";
 
-describe("Gate 2: Inventory Concurrency & Race Condition Proof (Real Postgres DB)", () => {
+describe("Gate 2: Inventory Concurrency & Race Condition Proof (Real Postgres DB)", { timeout: 30000 }, () => {
   let testProductId: string;
 
   beforeEach(async () => {

@@ -98,7 +98,8 @@ export async function reserveStock(
       return { success: true, reservationId: reservation.id };
     },
     {
-      timeout: 10000,
+      maxWait: 15000,
+      timeout: 15000,
     }
   );
 }
@@ -151,7 +152,7 @@ export async function releaseReservation(
         operator: "system",
       },
     });
-  });
+  }, { maxWait: 15000, timeout: 15000 });
 }
 
 /**

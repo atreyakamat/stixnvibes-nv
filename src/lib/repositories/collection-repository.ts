@@ -47,6 +47,10 @@ export class CollectionRepository {
   }
 
   async delete(id: string): Promise<boolean> {
+    const productCount = await prisma.product.count({ where: { collectionId: id } });
+    if (productCount > 0) {
+      throw new Error(`Cannot delete collection: ${productCount} products are currently assigned to it.`);
+    }
     await prisma.collection.delete({
       where: { id },
     });

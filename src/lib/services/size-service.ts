@@ -11,6 +11,10 @@ export class SizeService {
     return this.repo.list(category);
   }
 
+  async getSizeById(id: string) {
+    return this.repo.findById(id);
+  }
+
   async createSize(payload: SizeInsert) {
     if (!payload.name) throw new Error("Size name is required");
     const slug = payload.slug || payload.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");

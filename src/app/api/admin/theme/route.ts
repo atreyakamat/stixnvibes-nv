@@ -1,7 +1,7 @@
+export const dynamic = "force-dynamic";
 import { createApiHandler } from "@/lib/api-handler";
 import { SettingsService } from "@/lib/services/settings-service";
 import { z } from "zod";
-
 import { revalidatePath } from "next/cache";
 
 const settingsService = new SettingsService();
@@ -20,7 +20,9 @@ export const POST = createApiHandler({
   }),
   handler: async ({ body }) => {
     const updated = await settingsService.setTheme(body.theme);
-    revalidatePath('/', 'layout');
+    try {
+      revalidatePath('/', 'layout');
+    } catch {}
     return { saved: true, data: updated };
   },
 });

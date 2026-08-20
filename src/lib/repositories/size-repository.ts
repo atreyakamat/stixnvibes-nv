@@ -11,14 +11,37 @@ export class SizeRepository {
 
   async create(payload: any): Promise<Size> {
     return prisma.size.create({
-      data: payload,
+      data: {
+        id: payload.id,
+        name: payload.name,
+        slug: payload.slug,
+        widthMm: payload.widthMm ?? payload.width_mm,
+        heightMm: payload.heightMm ?? payload.height_mm,
+        category: payload.category,
+        isActive: payload.isActive ?? payload.is_active ?? true,
+        sortOrder: payload.sortOrder ?? payload.sort_order ?? 0,
+      },
+    });
+  }
+
+  async findById(id: string): Promise<Size | null> {
+    return prisma.size.findUnique({
+      where: { id },
     });
   }
 
   async update(id: string, payload: any): Promise<Size> {
     return prisma.size.update({
       where: { id },
-      data: payload,
+      data: {
+        name: payload.name,
+        slug: payload.slug,
+        widthMm: payload.widthMm ?? payload.width_mm,
+        heightMm: payload.heightMm ?? payload.height_mm,
+        category: payload.category,
+        isActive: payload.isActive ?? payload.is_active,
+        sortOrder: payload.sortOrder ?? payload.sort_order,
+      },
     });
   }
 

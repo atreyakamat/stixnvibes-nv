@@ -15,6 +15,10 @@ export class PageService {
     return this.repo.findBySlug(slug);
   }
 
+  async getPageById(id: string) {
+    return this.repo.findById(id);
+  }
+
   async createPage(payload: PageInsert) {
     if (!payload.title) throw new Error("Page title is required");
     const slug = payload.slug || payload.title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");

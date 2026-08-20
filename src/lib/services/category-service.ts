@@ -15,6 +15,10 @@ export class CategoryService {
     return this.repo.getBySlug(slug);
   }
 
+  async getCategoryById(id: string) {
+    return this.repo.findById(id);
+  }
+
   async getCategoryTree() {
     return this.repo.getTree();
   }

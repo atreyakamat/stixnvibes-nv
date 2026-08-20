@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { createApiHandler } from "@/lib/api-handler";
 import { PageService } from "@/lib/services/page-service";
 import { z } from "zod";
@@ -36,7 +37,13 @@ export const POST = createApiHandler({
   bodySchema: pageSchema,
   handler: async ({ body }) => {
     if (body.id) {
-      return await pageService.updatePage(body.id, body);
+      const existing = await pageService.getPageById(body.id).catch(() => null);
+      if (existing) {
+        return await pageService.updatePage(body.id, body);
+      } else {
+        const slug = body.slug || body.title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");
+        return await pageService.createPage({ ...body, slug });
+      }
     } else {
       const slug = body.slug || body.title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");
       return await pageService.createPage({ ...body, slug });

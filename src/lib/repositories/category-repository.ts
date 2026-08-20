@@ -51,7 +51,21 @@ export class CategoryRepository {
     });
   }
 
+  async findById(id: string): Promise<Category | null> {
+    return prisma.category.findUnique({
+      where: { id },
+    });
+  }
+
   async delete(id: string): Promise<boolean> {
+    const productCount = await prisma.product.count({ where: { categoryId: id } });
+    if (productCount > 0) {
+      throw new Error(`Cannot delete category: ${productCount} products are currently assigned to it.`);
+    }
+    const childCount = await prisma.category.count({ where: { parentId: id } });
+    if (childCount > 0) {
+      throw new Error(`Cannot delete category: ${childCount} child categories exist under it.`);
+    }
     await prisma.category.delete({
       where: { id },
     });

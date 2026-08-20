@@ -23,13 +23,24 @@ export const POST = createApiHandler({
   requireAdmin: true,
   bodySchema: MaterialPayloadSchema,
   handler: async ({ body }) => {
+    const safeRevalidate = () => {
+      try {
+        revalidatePath('/', 'layout');
+      } catch {}
+    };
+
     let result;
     if (body.id) {
-      result = await materialService.updateMaterial(body.id, body);
+      const existing = await materialService.getMaterialById(body.id);
+      if (existing) {
+        result = await materialService.updateMaterial(body.id, body);
+      } else {
+        result = await materialService.createMaterial(body);
+      }
     } else {
       result = await materialService.createMaterial(body);
     }
-    revalidatePath('/', 'layout');
+    safeRevalidate();
     return result;
   }
 });
@@ -39,7 +50,9 @@ export const DELETE = createApiHandler({
   querySchema: z.object({ id: z.string().uuid() }),
   handler: async ({ query }) => {
     await materialService.deleteMaterial(query.id);
-    revalidatePath('/', 'layout');
+    try {
+      revalidatePath('/', 'layout');
+    } catch {}
     return { deleted: true, id: query.id };
   }
 });
