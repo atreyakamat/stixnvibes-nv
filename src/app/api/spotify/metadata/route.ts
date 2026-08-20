@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { createApiHandler } from "@/lib/api-handler";
 import { SpotifyService } from "@/lib/services/spotify-service";
 import { z } from "zod";

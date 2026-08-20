@@ -74,8 +74,8 @@ describe("admin workflow persistence", () => {
       await prisma.users.upsert({ where: { id: customerId }, update: {}, create: { id: customerId, email: "test@t.com" } });
       await prisma.order.upsert({
         where: { id: orderId },
-        update: {},
-        create: { id: orderId, user_id: customerId, customerName: "T", customerPhone: "1", address: "A", pincode: "1", totalCents: 100 }
+        update: { status: "qc" },
+        create: { id: orderId, user_id: customerId, customerName: "T", customerPhone: "1", address: "A", pincode: "1", totalCents: 100, status: "qc" }
       });
       await prisma.orderItem.upsert({
         where: { id: orderItemId },

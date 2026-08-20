@@ -12,6 +12,9 @@ export const GET = createApiHandler({
     status: z.string().optional(),
     search: z.string().optional(),
     limit: z.coerce.number().default(100),
+    offset: z.coerce.number().default(0),
+    sort: z.enum(["created_at", "total_cents"]).optional(),
+    order: z.enum(["asc", "desc"]).optional(),
   }),
   handler: async ({ query }) => {
     return await orderService.getOrders(query);
@@ -20,7 +23,25 @@ export const GET = createApiHandler({
 
 const OrderPayloadSchema = z.object({
   orderId: z.string().uuid(),
-  status: z.enum(["created", "sent", "confirmed", "paid", "fulfilled", "cancelled", "refunded"]).optional(),
+  status: z.enum([
+    "created",
+    "sent",
+    "confirmed",
+    "paid",
+    "production",
+    "printing",
+    "qc",
+    "qc_failed",
+    "packing",
+    "shipped",
+    "delivered",
+    "payment_failed",
+    "cancelled",
+    "return_requested",
+    "returned",
+    "refunded",
+    "fulfilled",
+  ]).optional(),
   notes: z.string().optional(),
   tracking_number: z.string().optional(),
   courier: z.string().optional(),

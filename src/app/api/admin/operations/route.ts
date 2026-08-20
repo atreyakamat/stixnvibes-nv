@@ -44,7 +44,14 @@ export const GET = createApiHandler({
 });
 
 const OperationsActionSchema = z.object({
-  action: z.enum(["create_batch", "update_batch_status", "submit_qc", "qc_inspection"]),
+  action: z.enum([
+    "create_batch",
+    "update_batch_status",
+    "submit_qc",
+    "qc_inspection",
+    "create_shipment",
+    "confirm_delivery",
+  ]),
   material: z.string().optional(),
   finish: z.string().optional(),
   size: z.string().optional(),
@@ -57,8 +64,11 @@ const OperationsActionSchema = z.object({
   productionJobId: z.string().optional(),
   order_id: z.string().optional(),
   production_job_id: z.string().optional(),
-  result: z.enum(["pass", "fail"]).optional(),
+  result: z.enum(["pass", "fail", "passed", "failed"]).optional(),
   checklist: z.record(z.string(), z.boolean()).optional(),
+  courier: z.string().optional(),
+  awb: z.string().optional(),
+  failureReason: z.string().optional(),
 });
 
 export const POST = createApiHandler({
@@ -96,20 +106,53 @@ export const POST = createApiHandler({
 
     if (action === "submit_qc" || action === "qc_inspection") {
       const orderId = body.orderId || body.productionJobId || body.order_id || body.production_job_id;
-      const operator = body.operator || "Operator";
-      const result = body.result;
+      const operator = body.operator || "Inspector";
+      const rawResult = body.result;
       const checklist = body.checklist || {};
-      if (!result) {
+      if (!rawResult) {
         throw new Error("Missing required QC result");
       }
 
-      const qc = await operationsRepo.recordQualityCheck({
-        productionJobId: body.productionJobId || body.production_job_id || orderId || "",
+      const normalizedResult: "passed" | "failed" =
+        rawResult === "pass" || rawResult === "passed" ? "passed" : "failed";
+
+      const { QcService } = await import("@/lib/services/qc.service");
+      const qcService = new QcService();
+      
+      const jobId = body.productionJobId || body.production_job_id || orderId || "";
+      const qc = await qcService.recordQcResult(
+        jobId,
         operator,
-        result,
-        checklist,
-      });
+        normalizedResult,
+        body.failureReason
+      );
       return { recorded: true, qc };
+    }
+
+    if (action === "create_shipment") {
+      const orderId = body.orderId || body.order_id;
+      const courier = body.courier;
+      const awb = body.awb;
+      if (!orderId || !courier || !awb) {
+        throw new Error("Missing required shipment fields: orderId, courier, awb");
+      }
+
+      const { ShippingService } = await import("@/lib/services/shipping.service");
+      const shippingService = new ShippingService();
+      const shipment = await shippingService.createShipment(orderId, courier, awb);
+      return { created: true, shipment };
+    }
+
+    if (action === "confirm_delivery") {
+      const orderId = body.orderId || body.order_id;
+      if (!orderId) {
+        throw new Error("Missing orderId for delivery confirmation");
+      }
+
+      const { ShippingService } = await import("@/lib/services/shipping.service");
+      const shippingService = new ShippingService();
+      const order = await shippingService.confirmDelivery(orderId);
+      return { confirmed: true, order };
     }
 
     throw new Error("Unknown action");

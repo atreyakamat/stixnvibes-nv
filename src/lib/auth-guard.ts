@@ -29,7 +29,7 @@ export async function requireAdminAuth(req: NextRequest): Promise<NextResponse |
 
   // Step 1: Static token check (no Supabase network call needed)
   const authHeader = req.headers.get("authorization");
-  const adminCookie = req.cookies.get("snv_admin_token");
+  const adminCookie = req.cookies?.get("snv_admin_token");
   const isDevTokenAllowed = process.env.NODE_ENV !== "production";
   
   if (
@@ -75,7 +75,7 @@ export async function requireAdminAuth(req: NextRequest): Promise<NextResponse |
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
         getAll() {
-          return req.cookies.getAll();
+          return req.cookies?.getAll ? req.cookies.getAll() : [];
         },
         setAll() {},
       },

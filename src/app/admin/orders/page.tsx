@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Eye, Send, ShoppingBag } from "lucide-react";
@@ -32,19 +32,8 @@ const formatDate = (dateString: string) => {
 export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const { orders, loading, updateOrderStatus, updateOrderTracking, updateOrderNotes } = useOrders(statusFilter);
+  const { orders, totalCount, loading, refresh } = useOrders(statusFilter, searchQuery);
   const [selectedOrder, setSelectedOrder] = useState<OrderRecord | null>(null);
-
-  const filteredOrders = useMemo(() => {
-    if (!searchQuery) return orders;
-    const query = searchQuery.toLowerCase();
-    return orders.filter(o => 
-      o.id.toLowerCase().includes(query) ||
-      o.customer_name?.toLowerCase().includes(query) ||
-      o.customer_phone?.toLowerCase().includes(query) ||
-      o.customer_email?.toLowerCase().includes(query)
-    );
-  }, [orders, searchQuery]);
 
   const columns = [
     {
@@ -65,7 +54,7 @@ export default function OrdersPage() {
       cell: (row: OrderRecord) => (
         <div>
           <p className="font-semibold text-slate-100">{row.customer_name || "Guest"}</p>
-          <p className="text-[10px] text-muted-foreground">{row.customer_phone || "No phone"}</p>
+          <p className="text-[10px] text-muted-foreground">{row.customer_phone || row.customer_email || "No contact"}</p>
         </div>
       ),
     },
@@ -73,7 +62,7 @@ export default function OrdersPage() {
       id: "total",
       header: "Total",
       sortable: true,
-      cell: (row: OrderRecord) => <span className="font-bold text-brand-yellow">{formatINR(row.total_cents)}</span>,
+      cell: (row: OrderRecord) => <span className="font-bold text-brand-yellow font-mono">{formatINR(row.total_cents)}</span>,
     },
     {
       id: "status",
@@ -89,13 +78,18 @@ export default function OrdersPage() {
       header: <span className="sr-only">Actions</span>,
       cell: (row: OrderRecord) => (
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => setSelectedOrder(row)}>
-            <Eye className="w-4 h-4 text-slate-400 hover:text-white" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelectedOrder(row)}
+            className="h-8 px-2 text-xs text-slate-300 hover:text-white bg-slate-900 border border-slate-800"
+          >
+            <Eye className="w-3.5 h-3.5 mr-1" /> View Command Center
           </Button>
           {row.whatsapp_url && (
             <a href={row.whatsapp_url} target="_blank" rel="noopener noreferrer">
-              <Button variant="ghost" size="icon" className="text-emerald-400 hover:text-emerald-300">
-                <Send className="w-4 h-4" />
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-400 hover:text-emerald-300">
+                <Send className="w-3.5 h-3.5" />
               </Button>
             </a>
           )}
@@ -107,57 +101,62 @@ export default function OrdersPage() {
   return (
     <div className="flex flex-col space-y-6 p-6 pb-20 relative bg-slate-950 min-h-screen text-slate-50">
       <AdminPageHeader 
-        title="Orders Manager"
-        description="Review, approve, and transition customer orders."
+        title="Order Operations Control Center"
+        description="Inspect orders, audit price snapshots, track stock reservations, and execute domain-authorized transitions."
         actions={
-          <Badge variant="outline" className="text-xs bg-slate-900/60 px-3 py-1">
-            <ShoppingBag className="w-3 h-3 mr-2" />
-            {orders.length} Total Orders
+          <Badge variant="outline" className="text-xs bg-slate-900/80 border-slate-800 px-3 py-1 text-slate-200">
+            <ShoppingBag className="w-3.5 h-3.5 mr-2 text-brand-yellow" />
+            {totalCount} Total Matching Orders
           </Badge>
         }
       />
 
-      <div className="p-4 bg-slate-900/60 border border-border/80 rounded-xl flex flex-col gap-4">
+      <div className="p-4 bg-slate-900/60 border border-slate-800 rounded-xl flex flex-col gap-4">
         <FilterBar 
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          searchPlaceholder="Search orders by customer, phone or ID..."
+          searchPlaceholder="Search orders by customer name, phone, email, or order ID..."
           filters={[
             { 
               id: "status", 
-              placeholder: "All Statuses", 
+              placeholder: "All Pipeline Queues", 
               options: [
-                { label: "Created", value: "created" },
-                { label: "Sent", value: "sent" },
+                { label: "All Statuses", value: "all" },
+                { label: "Created / Sent (New)", value: "created" },
                 { label: "Confirmed", value: "confirmed" },
-                { label: "Paid", value: "paid" },
-                { label: "Artwork Review", value: "artwork_review" },
-                { label: "Production", value: "production" },
-                { label: "Shipped", value: "shipped" },
+                { label: "Paid / Production Queue", value: "paid" },
+                { label: "In Production", value: "production" },
+                { label: "Printing Queue", value: "printing" },
+                { label: "Quality Check (QC)", value: "qc" },
+                { label: "QC Failed / Rework", value: "qc_failed" },
+                { label: "Packing Queue", value: "packing" },
+                { label: "Shipped / In Transit", value: "shipped" },
                 { label: "Delivered", value: "delivered" },
-                { label: "Cancelled", value: "cancelled" }
+                { label: "Payment Failed", value: "payment_failed" },
+                { label: "Cancelled", value: "cancelled" },
+                { label: "Return Requested", value: "return_requested" },
+                { label: "Returned", value: "returned" },
+                { label: "Refunded", value: "refunded" }
               ] 
             }
           ]}
-          filterValues={{ status: statusFilter === "all" ? "" : statusFilter }}
+          filterValues={{ status: statusFilter }}
           onFilterChange={(id, val) => setStatusFilter(val || "all")}
         />
       </div>
 
       <DataTable
         columns={columns}
-        data={filteredOrders}
+        data={orders}
         getRowId={(row) => row.id}
         isLoading={loading}
-        emptyMessage={loading ? "Loading orders..." : "No orders found."}
+        emptyMessage={loading ? "Loading order command center..." : "No orders found matching the filter criteria."}
       />
 
       <OrderDetailsDialog
         order={selectedOrder}
         onClose={() => setSelectedOrder(null)}
-        onUpdateStatus={updateOrderStatus}
-        onUpdateTracking={updateOrderTracking}
-        onUpdateNotes={updateOrderNotes}
+        onRefresh={refresh}
       />
     </div>
   );

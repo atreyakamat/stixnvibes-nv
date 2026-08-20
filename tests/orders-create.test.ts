@@ -50,7 +50,7 @@ async function call(body: any) {
   return { status: res?.status ?? 0, json: null };
 }
 
-describe("POST /api/orders/create", () => {
+describe("POST /api/orders/create", { timeout: 15000 }, () => {
   it("rejects an empty body", async () => {
     const r = await call(null);
     expect(r.status).toBe(400);

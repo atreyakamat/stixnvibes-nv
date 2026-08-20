@@ -19,10 +19,14 @@ export const GET = createApiHandler({
       lastMonthOrders,
       lowStockData,
       recentOrdersData,
-      artworkCount,
-      printCount,
-      qcCount,
-      packingCount,
+      paymentQueueCount,
+      productionQueueCount,
+      qcQueueCount,
+      packingQueueCount,
+      shippingQueueCount,
+      deliveredCount,
+      cancelledCount,
+      activeReservationsCount,
       delayedCount,
       bestSellers
     ] = await Promise.all([
@@ -55,21 +59,41 @@ export const GET = createApiHandler({
         take: 10,
         select: { id: true, metadata: true, customerName: true, totalCents: true, status: true, createdAt: true },
       }),
+      // Payment Queue
       prisma.order.count({
-        where: { status: { in: ["created", "sent"] } },
+        where: { status: { in: ["created", "sent", "confirmed", "payment_failed"] } },
       }),
+      // Production Queue
       prisma.order.count({
-        where: { status: { in: ["confirmed"] } },
+        where: { status: { in: ["paid", "production", "printing"] } },
       }),
+      // QC Queue
       prisma.order.count({
-        where: { status: { in: ["paid"] } },
+        where: { status: { in: ["qc", "qc_failed"] } },
       }),
+      // Packing Queue
       prisma.order.count({
-        where: { status: { in: ["fulfilled"] } },
+        where: { status: { in: ["packing"] } },
+      }),
+      // Shipping Queue
+      prisma.order.count({
+        where: { status: { in: ["shipped"] } },
+      }),
+      // Delivered
+      prisma.order.count({
+        where: { status: { in: ["delivered"] } },
+      }),
+      // Cancelled
+      prisma.order.count({
+        where: { status: { in: ["cancelled", "refunded"] } },
+      }),
+      // Active Reservations
+      prisma.inventoryReservation.count({
+        where: { status: "active" },
       }),
       prisma.order.count({
         where: { 
-          status: { notIn: ["cancelled", "refunded"] },
+          status: { notIn: ["cancelled", "refunded", "delivered", "fulfilled"] },
           createdAt: { lt: fortyEightHoursAgo }
         },
       }),
@@ -120,15 +144,17 @@ export const GET = createApiHandler({
         today: todayOrders.length,
         this_month: thisMonthOrders.length,
         status_breakdown: statusBreakdown,
-        pending: artworkCount,
+        delivered: deliveredCount,
+        cancelled: cancelledCount,
         delayed: delayedCount,
       },
-      production_queue: {
-        artwork_review: artworkCount,
-        printing: printCount,
-        qc: qcCount,
-        packing: packingCount,
-        delayed: delayedCount,
+      operational_queues: {
+        payment_pending: paymentQueueCount,
+        production_active: productionQueueCount,
+        qc_inspection: qcQueueCount,
+        ready_to_pack: packingQueueCount,
+        in_transit: shippingQueueCount,
+        active_reservations: activeReservationsCount,
       },
       products: {
         total: allProducts.length,
