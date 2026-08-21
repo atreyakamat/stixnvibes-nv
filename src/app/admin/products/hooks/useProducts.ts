@@ -15,10 +15,18 @@ export function useProducts() {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (res.ok) {
-        const data = await res.json();
-        if (data?.ok) setProducts(data.data || []);
+        const json = await res.json();
+        const raw = json?.data;
+        if (raw?.data && Array.isArray(raw.data)) {
+          setProducts(raw.data);
+        } else if (Array.isArray(raw)) {
+          setProducts(raw);
+        } else {
+          setProducts([]);
+        }
       } else {
         setError("Failed to fetch products");
+        setProducts([]);
       }
     } catch (err: unknown) {
       setError((err as Error).message || "Failed to fetch products");

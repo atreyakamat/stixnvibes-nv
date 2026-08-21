@@ -14,13 +14,9 @@ export const GET = createApiHandler({
   }
 });
 
-const CollectionPayloadSchema = CollectionSchema.extend({
-  id: z.string().uuid().optional(),
-});
-
 export const POST = createApiHandler({
   requireAdmin: true,
-  bodySchema: CollectionPayloadSchema,
+  bodySchema: CollectionSchema,
   handler: async ({ body }) => {
     const safeRevalidate = () => {
       try {
@@ -29,15 +25,26 @@ export const POST = createApiHandler({
     };
 
     let result;
-    if (body.id) {
-      const existing = await collectionService.getCollectionById(body.id);
+    const cleanId = body.id || undefined;
+    const cleanPayload = {
+      name: body.name,
+      slug: body.slug || body.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-"),
+      description: body.description ?? null,
+      image_url: body.image_url ?? null,
+      is_active: body.is_active ?? true,
+      sort_order: body.sort_order ?? 0,
+      metadata: body.metadata ?? {},
+    };
+
+    if (cleanId) {
+      const existing = await collectionService.getCollectionById(cleanId).catch(() => null);
       if (existing) {
-        result = await collectionService.updateCollection(body.id, body);
+        result = await collectionService.updateCollection(cleanId, cleanPayload);
       } else {
-        result = await collectionService.createCollection(body);
+        result = await collectionService.createCollection({ ...cleanPayload, id: cleanId });
       }
     } else {
-      result = await collectionService.createCollection(body);
+      result = await collectionService.createCollection(cleanPayload);
     }
     safeRevalidate();
     return result;

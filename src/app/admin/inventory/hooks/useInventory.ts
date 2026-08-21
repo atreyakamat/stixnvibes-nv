@@ -22,8 +22,13 @@ export function useInventory() {
       });
       if (res.ok) {
         const json = await res.json();
-        if (json?.ok) {
-          setProducts(json.data || []);
+        const raw = json?.data;
+        if (raw?.data && Array.isArray(raw.data)) {
+          setProducts(raw.data);
+        } else if (Array.isArray(raw)) {
+          setProducts(raw);
+        } else {
+          setProducts([]);
         }
       }
     } catch {

@@ -51,10 +51,20 @@ export default function AdminPagesPage() {
   const fetchPages = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/admin/pages");
-      const json = await res.json();
-      if (json.success) {
-        setPages(json.data);
+      const token = typeof window !== "undefined" ? localStorage.getItem("snv.admin.accessToken") : null;
+      const res = await fetch("/api/admin/pages", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const raw = json?.data;
+        if (Array.isArray(raw)) {
+          setPages(raw);
+        } else if (raw?.data && Array.isArray(raw.data)) {
+          setPages(raw.data);
+        } else {
+          setPages([]);
+        }
       }
     } catch (err) {
       console.error(err);

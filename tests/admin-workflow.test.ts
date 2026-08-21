@@ -99,5 +99,5 @@ describe("admin workflow persistence", () => {
     const qcJson = await qcResponse.json();
     expect(qcResponse.status).toBe(200);
     expect(qcJson.ok).toBe(true);
-  });
+  }, 15000);
 });

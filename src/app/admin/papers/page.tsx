@@ -50,7 +50,14 @@ export default function PapersPage() {
       });
       if (res.ok) {
         const json = await res.json();
-        if (json?.ok) setPapers(json.data || []);
+        const raw = json?.data;
+        if (Array.isArray(raw)) {
+          setPapers(raw);
+        } else if (raw?.data && Array.isArray(raw.data)) {
+          setPapers(raw.data);
+        } else {
+          setPapers([]);
+        }
       }
     } catch {
       // Handled gracefully

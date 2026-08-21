@@ -42,7 +42,14 @@ export default function SizesPage() {
       });
       if (res.ok) {
         const json = await res.json();
-        if (json?.ok) setSizes(json.data || []);
+        const raw = json?.data;
+        if (Array.isArray(raw)) {
+          setSizes(raw);
+        } else if (raw?.data && Array.isArray(raw.data)) {
+          setSizes(raw.data);
+        } else {
+          setSizes([]);
+        }
       }
     } catch {
       // Handled gracefully

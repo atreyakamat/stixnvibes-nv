@@ -95,8 +95,8 @@ export default function DashboardPage() {
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchDashboard = useCallback(async (silent = false) => {
-    if (!silent) return;
-    setRefreshing(true);
+    if (silent) setRefreshing(true);
+    else setLoading(true);
     try {
       const token =
         typeof window !== "undefined" ? localStorage.getItem("snv.admin.accessToken") : null;
@@ -111,6 +111,7 @@ export default function DashboardPage() {
       // Handled gracefully
     } finally {
       setRefreshing(false);
+      setLoading(false);
     }
   }, []);
 

@@ -7,8 +7,9 @@ import {
   Package, FolderTree, Tags as TagsIcon, Layers, Box,
   BarChart3, Users, ShoppingBag, FileText, Sliders,
   Activity, ShoppingCart, Printer, ShieldCheck, QrCode, Truck,
-  Menu, LogOut, LayoutTemplate, Image as ImageIcon, Palette, Navigation as NavIcon
+  Menu, LogOut, LayoutTemplate, Image as ImageIcon, Palette, Navigation as NavIcon, Zap
 } from "lucide-react";
+import { BackendDiagnosticsModal } from "@/components/admin/BackendDiagnosticsModal";
 
 class AdminErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
   constructor(props: { children: React.ReactNode }) {
@@ -50,6 +51,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const [authed, setAuthed] = React.useState(false);
   const [checkingAuth, setCheckingAuth] = React.useState(true);
   const [sidebarOpen, setSidebarOpen] = React.useState(true);
+  const [diagnosticsOpen, setDiagnosticsOpen] = React.useState(false);
 
   React.useEffect(() => {
     const token = typeof window !== "undefined" ? localStorage.getItem("snv.admin.accessToken") : null;
@@ -222,9 +224,36 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
 
-        <div className="border-t border-border/60 pt-3 shrink-0">
+        <div className="border-t border-border/60 pt-3 shrink-0 space-y-2">
+          {/* Test Backend Button */}
           {sidebarOpen ? (
-            <div className="flex items-center justify-between px-2">
+            <button
+              type="button"
+              onClick={() => setDiagnosticsOpen(true)}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-border/60 text-xs font-semibold transition-colors group"
+            >
+              <div className="flex items-center gap-2 text-slate-200 group-hover:text-brand-yellow">
+                <Zap className="size-3.5 text-brand-yellow" />
+                <span>Test Backend</span>
+              </div>
+              <span className="flex size-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full size-2 bg-emerald-500"></span>
+              </span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setDiagnosticsOpen(true)}
+              className="w-full flex justify-center py-2 text-brand-yellow hover:bg-slate-800 rounded-lg"
+              title="Test Backend & System Diagnostics"
+            >
+              <Zap className="size-4" />
+            </button>
+          )}
+
+          {sidebarOpen ? (
+            <div className="flex items-center justify-between px-2 pt-1">
               <div className="truncate">
                 <p className="text-xs font-bold truncate">Admin User</p>
                 <p className="text-[10px] text-muted-foreground truncate">admin@stixnvibes.com</p>
@@ -246,6 +275,11 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
           {children}
         </AdminErrorBoundary>
       </main>
+
+      <BackendDiagnosticsModal
+        open={diagnosticsOpen}
+        onOpenChange={setDiagnosticsOpen}
+      />
     </div>
   );
 }

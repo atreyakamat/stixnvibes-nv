@@ -50,7 +50,14 @@ export default function MaterialsPage() {
       });
       if (res.ok) {
         const json = await res.json();
-        if (json?.ok) setMaterials(json.data || []);
+        const raw = json?.data;
+        if (Array.isArray(raw)) {
+          setMaterials(raw);
+        } else if (raw?.data && Array.isArray(raw.data)) {
+          setMaterials(raw.data);
+        } else {
+          setMaterials([]);
+        }
       }
     } catch {
       // Handled gracefully

@@ -39,7 +39,14 @@ export default function CollectionsPage() {
       });
       if (res.ok) {
         const json = await res.json();
-        if (json?.ok) setCollections(json.data || []);
+        const raw = json?.data;
+        if (Array.isArray(raw)) {
+          setCollections(raw);
+        } else if (raw?.data && Array.isArray(raw.data)) {
+          setCollections(raw.data);
+        } else {
+          setCollections([]);
+        }
       }
     } catch {
       // Handled gracefully
@@ -79,7 +86,7 @@ export default function CollectionsPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("snv.admin.accessToken")}`,
         },
-        body: JSON.stringify({ id: editingId, ...formData }),
+        body: JSON.stringify({ id: editingId || undefined, ...formData }),
       });
       if (res.ok) {
         setIsModalOpen(false);

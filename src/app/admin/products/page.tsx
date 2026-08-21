@@ -38,7 +38,8 @@ export default function ProductsAdminPage() {
 
   // Derived Data
   const filteredProducts = useMemo(() => {
-    return products.filter((p) => {
+    const list = Array.isArray(products) ? products : [];
+    return list.filter((p) => {
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         const matchesName = p.name.toLowerCase().includes(query);

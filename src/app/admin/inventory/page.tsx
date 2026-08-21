@@ -12,9 +12,10 @@ export default function InventoryPage() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredProducts = useMemo(() => {
-    if (!searchQuery) return products;
+    const list = Array.isArray(products) ? products : [];
+    if (!searchQuery) return list;
     const term = searchQuery.toLowerCase();
-    return products.filter((p) => 
+    return list.filter((p) => 
       p.name.toLowerCase().includes(term) || 
       (p.sku && p.sku.toLowerCase().includes(term))
     );
