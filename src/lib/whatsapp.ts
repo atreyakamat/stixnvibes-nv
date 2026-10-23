@@ -1,5 +1,6 @@
 import { formatINR } from "./money";
-import type { AppliedOffer, OrderLine } from "./types";
+import { formatPhone } from "./phone";
+import type { Address, AppliedOffer, Fulfilment, OrderLine } from "./types";
 
 export const DEFAULT_WHATSAPP = "917744020601";
 
@@ -16,10 +17,17 @@ export type MessageInput = {
   totalPaise: number;
   offers: Pick<AppliedOffer, "name" | "discountPaise">[];
   customerName?: string;
+  customerPhone?: string;
+  fulfilment?: Fulfilment;
+  address?: Address;
   customerNote?: string;
   /** null = no free shipping threshold, so no shipping line. */
   freeShippingAbovePaise?: number | null;
+  /** The customer's order page. */
+  link?: string;
 };
+
+export const addressText = (a: Address) => [a.line, a.city, [a.state, a.pincode].filter(Boolean).join(" ")].filter(Boolean).join(", ");
 
 /** The order as a WhatsApp message the customer sends to the shop. */
 export function orderMessage(o: MessageInput): string {
@@ -35,12 +43,18 @@ export function orderMessage(o: MessageInput): string {
     for (const a of o.offers) out.push(`${a.name}: −${formatINR(a.discountPaise)}`);
   }
   out.push(`Total: ${formatINR(o.totalPaise)}`);
-  if (o.freeShippingAbovePaise != null) {
+  const pickup = o.fulfilment === "pickup";
+  if (o.freeShippingAbovePaise != null && !pickup) {
     out.push(o.totalPaise >= o.freeShippingAbovePaise ? "Shipping: free" : "Shipping: please share the charge for my area");
   }
-  if (o.customerName) out.push("", `Name: ${o.customerName}`);
+  if (o.customerName || o.customerPhone) out.push("");
+  if (o.customerName) out.push(`Name: ${o.customerName}`);
+  if (o.customerPhone) out.push(`Phone: ${formatPhone(o.customerPhone)}`);
+  if (pickup) out.push("Pickup: at your next stall");
+  else if (o.address && addressText(o.address)) out.push(`Deliver to: ${addressText(o.address)}`);
   if (o.customerNote) out.push(`Note: ${o.customerNote}`);
   if (o.number) out.push("", `Order ref: ${o.number}`);
+  if (o.link) out.push(`Order page: ${o.link}`);
   return out.join("\n");
 }
 

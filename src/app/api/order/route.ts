@@ -1,5 +1,5 @@
 import { handleError, json, readJson } from "@/lib/api";
-import { createOrder } from "@/lib/orders";
+import { createOrder, orderPath } from "@/lib/orders";
 import { rateLimit } from "@/lib/rate-limit";
 import { getStoreOrNull } from "@/lib/store";
 import { orderSchema } from "@/lib/validation";
@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   try {
     const { order, whatsappUrl } = await createOrder(parsed.data);
     await getStoreOrNull()?.track([{ type: "order_click", productId: null, path: "/cart" }]).catch(() => {});
-    return json({ number: order.number, totalPaise: order.totalPaise, whatsappUrl });
+    return json({ number: order.number, totalPaise: order.totalPaise, whatsappUrl, orderPath: orderPath(order) });
   } catch (err) {
     return handleError(err, "order");
   }

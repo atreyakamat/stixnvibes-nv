@@ -5,12 +5,13 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { login, logout, requireAdmin } from "@/lib/admin/session";
 import { ORDER_NUMBER_RE } from "@/lib/constants";
-import { rupeesToPaise } from "@/lib/money";
+import { istInputToIso, rupeesToPaise } from "@/lib/money";
 import { rateLimit } from "@/lib/rate-limit";
 import { getStore } from "@/lib/store";
 import { TEMPLATES } from "@/lib/store/seed";
 import type { ProductInput } from "@/lib/store/types";
 import { CUSTOM_FIELD_KINDS, OFFER_KINDS, ORDER_STATUSES, PRODUCT_STATUSES, PRODUCT_TYPE_IDS, type Product, type Settings } from "@/lib/types";
+import { UPI_ID_RE } from "@/lib/upi";
 
 export type FormState = { ok?: boolean; error?: string; message?: string };
 
@@ -392,20 +393,40 @@ const offerSchema = z.object({
   productType: z.union([z.literal(""), z.enum(PRODUCT_TYPE_IDS)]),
   buy: z.coerce.number().int().min(1, "Buy must be at least 1.").max(100),
   free: z.coerce.number().int().min(1, "Free must be at least 1.").max(100).catch(1),
+  percent: z.coerce.number().int().min(1, "% off must be 1 to 90.").max(90, "% off must be 1 to 90.").nullable().catch(null),
   price: money,
   sortOrder: z.coerce.number().int().min(-999).max(999),
+  banner: z.string().trim().max(160).catch(""),
 });
 
 export async function saveOfferAction(_: FormState, form: FormData): Promise<FormState> {
   await requireAdmin();
-  const parsed = offerSchema.safeParse({ ...Object.fromEntries(form), price: form.get("price") ?? "", sortOrder: form.get("sortOrder") || 0 });
+  const kind = form.get("kind");
+  const parsed = offerSchema.safeParse({
+    ...Object.fromEntries(form),
+    // % off offers have no buy/free; store 1 so the columns stay valid.
+    buy: kind === "percent" ? 1 : form.get("buy"),
+    percent: kind === "percent" ? form.get("percent") : null,
+    price: form.get("price") ?? "",
+    sortOrder: form.get("sortOrder") || 0,
+    banner: form.get("banner") ?? "",
+  });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the fields." };
-  const { id, productType, price, ...rest } = parsed.data;
+  const { id, productType, price, percent, banner, ...rest } = parsed.data;
   if (rest.kind === "volume" && price === null) return { error: "Set the price each item drops to." };
+  if (rest.kind === "percent" && percent === null) return { error: "Set the % off, 1 to 90." };
+  const startsAt = istInputToIso(String(form.get("startsAt") ?? ""));
+  const endsAt = istInputToIso(String(form.get("endsAt") ?? ""));
+  if (startsAt === undefined || endsAt === undefined) return { error: "Pick start and end dates with the date picker, or leave them blank." };
+  if (startsAt && endsAt && endsAt <= startsAt) return { error: "The end has to be after the start." };
   await getStore().saveOffer(id || null, {
     ...rest,
-    free: rest.kind === "volume" ? 1 : rest.free,
+    free: rest.kind === "bxgy" ? rest.free : 1,
     pricePaise: rest.kind === "volume" ? price : null,
+    percent: rest.kind === "percent" ? percent : null,
+    startsAt,
+    endsAt,
+    banner: rest.kind === "percent" ? banner : "",
     productType: productType || null,
     active: form.get("active") === "on",
   });
@@ -434,6 +455,13 @@ export async function saveSettingsAction(_: FormState, form: FormData): Promise<
   const freeAbove = rupeesToPaise(text("freeShippingAbove", 12));
   if (Number.isNaN(freeAbove)) return { error: "Free shipping amount must be a number like 250, or blank." };
 
+  const upiId = text("upiId", 100).replace(/\s/g, "");
+  if (upiId && !UPI_ID_RE.test(upiId)) return { error: "UPI ID should look like yourname@okicici, or leave it blank." };
+
+  const markupText = text("mrpMarkupPercent", 3);
+  const markup = markupText === "" ? null : Number(markupText);
+  if (markup !== null && (!Number.isInteger(markup) || markup < 0 || markup > 100)) return { error: "MRP markup is a whole % from 0 to 100, or blank." };
+
   const settings: Settings = {
     storeOpen: form.get("storeOpen") === "on",
     announcement: text("announcement", 200),
@@ -442,6 +470,9 @@ export async function saveSettingsAction(_: FormState, form: FormData): Promise<
     deliveryNote: text("deliveryNote", 200),
     bulkNote: text("bulkNote", 300),
     freeShippingAbovePaise: freeAbove,
+    upiId,
+    upiName: text("upiName", 60) || "Stix N Vibes",
+    mrpMarkupPercent: markup,
   };
   await getStore().saveSettings(settings);
   refreshShop();

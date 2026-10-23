@@ -20,7 +20,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/admin/ord
     <div className="space-y-6">
       <h1 className="display text-5xl">Orders</h1>
       <p className="max-w-2xl text-sm text-mute">
-        Every tap on &ldquo;Checkout on WhatsApp&rdquo; lands here with its ref (SNV-…). Match it to the WhatsApp chat, then move it along as you confirm, get paid and ship.
+        Every tap on &ldquo;Place order on WhatsApp&rdquo; lands here with its ref (SNV-…). Match it to the WhatsApp chat, then move it along as you confirm, get paid and ship.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <Link href="/admin/orders" className={chip(!status)}>
@@ -33,7 +33,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/admin/ord
         ))}
         <form className="ml-auto">
           {status && <input type="hidden" name="status" value={status} />}
-          <input name="q" defaultValue={q} placeholder="Search ref or name" className="field !py-2 text-sm" aria-label="Search orders" />
+          <input name="q" defaultValue={q} placeholder="Search ref, name or phone" className="field !py-2 text-sm" aria-label="Search orders" />
         </form>
       </div>
       <OrdersTable orders={orders} />

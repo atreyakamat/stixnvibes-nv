@@ -34,6 +34,7 @@ export type ShopConfig = {
   orderNote: string;
   bulkNote: string;
   freeShippingAbovePaise: number | null;
+  mrpMarkupPercent: number | null;
 };
 
 type CartContextValue = {
