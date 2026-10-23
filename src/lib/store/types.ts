@@ -5,7 +5,14 @@ export type CollectionInput = Omit<Collection, "id" | "createdAt">;
 export type OfferInput = Omit<Offer, "id">;
 export type NewOrder = Omit<Order, "id" | "createdAt" | "updatedAt" | "status" | "adminNote">;
 export type OrderPatch = Partial<Pick<Order, "status" | "adminNote">>;
-export type OrderFilter = { status?: OrderStatus; search?: string; limit?: number };
+export type OrderFilter = {
+  status?: OrderStatus;
+  /** Matches order number, customer name or phone. */
+  search?: string;
+  limit?: number;
+  /** Only orders changed after this ISO time (for the InWoice sync). */
+  updatedSince?: string;
+};
 export type TrackEvent = { type: EventType; productId: string | null; path: string };
 
 /**

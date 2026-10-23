@@ -11,7 +11,7 @@ export const policies: Policy[] = [
     slug: "ordering",
     title: "How ordering works",
     body: (s) => [
-      "Add what you like to your cart, then tap \"Checkout on WhatsApp\". Your order opens as a ready-to-send WhatsApp message to us.",
+      "Add what you like to your cart, fill in your name, WhatsApp number and address (or pick up at a stall), then tap \"Place order on WhatsApp\". Your order opens as a ready-to-send WhatsApp message to us, and you get an order page to track it.",
       s.orderNote,
       s.deliveryNote,
       s.freeShippingAbovePaise !== null ? `Shipping is free on orders above ₹${s.freeShippingAbovePaise / 100}. Below that, we share the delivery charge for your area on WhatsApp.` : "",
@@ -32,7 +32,7 @@ export const policies: Policy[] = [
     slug: "privacy",
     title: "Privacy",
     body: () => [
-      "When you order, we keep a copy of the order (items, options, the name and note you typed) so we can make it. Your phone number reaches us through WhatsApp, not this site.",
+      "When you order, we keep a copy of the order (items, options, your name, phone number, delivery address and note) so we can make and deliver it. We use these only for your orders and never sell or share them.",
       "Photos you upload for a music card or custom print are kept privately and used only to make your order.",
       "We count page views and button taps without cookies or personal data, to see which designs people like.",
       "Your cart is saved in your browser only. We don't use advertising trackers.",

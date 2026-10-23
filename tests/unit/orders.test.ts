@@ -1,8 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { orderNumber, priceLines } from "@/lib/orders";
+import { customersFromOrders, customerTag } from "@/lib/customers";
+import { orderNumber, priceLines, viewKeyMatches } from "@/lib/orders";
+import { normalizePhone } from "@/lib/phone";
 import { MemoryStore } from "@/lib/store/memory";
 import { demoProducts, seedOffers } from "@/lib/store/seed";
+import type { Order } from "@/lib/types";
+import { upiLink } from "@/lib/upi";
+import { orderSchema } from "@/lib/validation";
 import { orderMessage, waLink } from "@/lib/whatsapp";
+
+const details = {
+  viewKey: "k".repeat(22),
+  customerName: "Riya",
+  customerPhone: "9876543210",
+  fulfilment: "delivery" as const,
+  address: { line: "12 Rua de Ourem, Fontainhas", city: "Panaji", state: "Goa", pincode: "403001" },
+  customerNote: "",
+};
 
 const products = demoProducts();
 const offers = seedOffers();
@@ -76,7 +90,7 @@ describe("memory store stats", () => {
       { type: "order_click", productId: null, path: "/cart" },
     ]);
     const r = priceLines([{ productId: "p-lofi-01", qty: 3, selections: {}, custom: {} }], await store.listProducts(), offers);
-    await store.createOrder({ number: "SNV-AAAAAA", customerName: "", customerNote: "", lines: r.lines, subtotalPaise: r.subtotalPaise, discountPaise: 0, totalPaise: r.totalPaise, offers: [] });
+    await store.createOrder({ ...details, number: "SNV-AAAAAA", lines: r.lines, subtotalPaise: r.subtotalPaise, discountPaise: 0, totalPaise: r.totalPaise, offers: [] });
     const s = await store.stats(new Date(Date.now() - 86400000).toISOString());
     expect(s).toMatchObject({ views: 2, addToCart: 1, orderClicks: 1, orders: 1, orderValuePaise: 3000 });
     expect(s.topViewed[0]).toEqual({ productId: "p-lofi-01", count: 2 });
@@ -87,5 +101,85 @@ describe("memory store stats", () => {
     const store = new MemoryStore();
     await store.deleteCollection("c-lofi");
     expect((await store.listProducts()).some((p) => p.collectionIds.includes("c-lofi"))).toBe(false);
+  });
+});
+
+describe("checkout details", () => {
+  const base = { lines: [{ productId: "p-lofi-01", qty: 1 }], customerName: "Riya" };
+
+  it("cleans up Indian mobile numbers", () => {
+    for (const p of ["9876543210", "+91 98765 43210", "098765-43210", "919876543210"]) expect(normalizePhone(p)).toBe("9876543210");
+    for (const p of ["12345", "5876543210", "98765432101"]) expect(normalizePhone(p)).toBeNull();
+  });
+
+  it("needs an address for delivery but not for pickup", () => {
+    const delivery = orderSchema.safeParse({ ...base, customerPhone: "98765 43210", fulfilment: "delivery", address: { line: "x", city: "", state: "", pincode: "12" } });
+    expect(delivery.success).toBe(false);
+    expect(delivery.error?.issues.map((i) => i.path.join("."))).toEqual(["address.line", "address.city", "address.pincode"]);
+
+    const pickup = orderSchema.safeParse({ ...base, customerPhone: "+919876543210", fulfilment: "pickup", address: { line: "ignored", city: "x", state: "", pincode: "" } });
+    expect(pickup.success).toBe(true);
+    expect(pickup.data).toMatchObject({ customerPhone: "9876543210", fulfilment: "pickup", address: { line: "", city: "", state: "", pincode: "" } });
+  });
+
+  it("rejects a missing name or phone", () => {
+    expect(orderSchema.safeParse({ ...base, customerName: "", customerPhone: "9876543210", fulfilment: "pickup" }).success).toBe(false);
+    expect(orderSchema.safeParse({ ...base, customerPhone: "123", fulfilment: "pickup" }).success).toBe(false);
+  });
+
+  it("puts the details and the order page in the WhatsApp message", () => {
+    const text = orderMessage({ lines: [], subtotalPaise: 1000, discountPaise: 0, totalPaise: 1000, offers: [], ...details, number: "SNV-ABC234", link: "https://shop.stixnvibes.com/order/SNV-ABC234?k=x" });
+    expect(text).toContain("Phone: 98765 43210");
+    expect(text).toContain("Deliver to: 12 Rua de Ourem, Fontainhas, Panaji, Goa 403001");
+    expect(text).toContain("Order page: https://shop.stixnvibes.com/order/SNV-ABC234?k=x");
+    const pickup = orderMessage({ lines: [], subtotalPaise: 1000, discountPaise: 0, totalPaise: 1000, offers: [], ...details, fulfilment: "pickup", freeShippingAbovePaise: 25000 });
+    expect(pickup).toContain("Pickup: at your next stall");
+    expect(pickup).not.toContain("Shipping");
+  });
+
+  it("checks the order page key", () => {
+    expect(viewKeyMatches({ viewKey: "abc" }, "abc")).toBe(true);
+    expect(viewKeyMatches({ viewKey: "abc" }, "abd")).toBe(false);
+    expect(viewKeyMatches({ viewKey: "abc" }, undefined)).toBe(false);
+    expect(viewKeyMatches({ viewKey: "" }, "")).toBe(false);
+  });
+
+  it("builds UPI links with or without an amount", () => {
+    expect(upiLink({ upiId: "snv@okicici", name: "Stix N Vibes", amountPaise: 4500, note: "Stix N Vibes SNV-ABC234" })).toBe(
+      "upi://pay?pa=snv%40okicici&pn=Stix%20N%20Vibes&cu=INR&tn=Stix%20N%20Vibes%20SNV-ABC234&am=45.00",
+    );
+    expect(upiLink({ upiId: "snv@okicici", name: "S", amountPaise: null, note: "x" })).not.toContain("am=");
+  });
+});
+
+describe("customers", () => {
+  const order = (o: Partial<Order>): Order => ({
+    id: Math.random().toString(),
+    number: "SNV-AAAAAA",
+    status: "new",
+    adminNote: "",
+    lines: [],
+    subtotalPaise: 0,
+    discountPaise: 0,
+    totalPaise: 1000,
+    offers: [],
+    createdAt: "2026-10-01T00:00:00Z",
+    updatedAt: "2026-10-01T00:00:00Z",
+    ...details,
+    ...o,
+  });
+
+  it("groups orders by phone and keeps the latest name and address", () => {
+    const list = customersFromOrders([
+      order({ createdAt: "2026-10-03T00:00:00Z", customerName: "Riya K", totalPaise: 3000, status: "paid", fulfilment: "pickup", address: { line: "", city: "", state: "", pincode: "" } }),
+      order({ createdAt: "2026-10-01T00:00:00Z", totalPaise: 2000, status: "cancelled" }),
+      order({ customerPhone: "9123456789", customerName: "Arjun" }),
+      order({ customerPhone: "", customerName: "Old order" }),
+    ]);
+    expect(list).toHaveLength(2);
+    const riya = list.find((c) => c.phone === "9876543210")!;
+    expect(riya).toMatchObject({ name: "Riya K", orders: 2, spentPaise: 3000, paidOrders: 1, pickups: 1, firstAt: "2026-10-01T00:00:00Z", lastAt: "2026-10-03T00:00:00Z" });
+    expect(riya.address?.city).toBe("Panaji");
+    expect(customerTag(riya)).toBe("Repeat");
   });
 });

@@ -183,13 +183,16 @@ export function seedCollections(): Collection[] {
   ];
 }
 
+/** Defaults for the fields only campaigns use. */
+export const NO_CAMPAIGN = { percent: null, startsAt: null, endsAt: null, banner: "" } as const;
+
 export function seedOffers(): Offer[] {
   return [
-    { id: "o-stickers", kind: "bxgy", name: "Buy 4 stickers, get 1 free", description: "Every 5th sticker is on us.", productType: "sticker", buy: 4, free: 1, pricePaise: null, active: true, sortOrder: 0 },
-    { id: "o-posters", kind: "bxgy", name: "Buy 5 posters, get 1 free", description: "Every 6th poster is on us.", productType: "poster", buy: 5, free: 1, pricePaise: null, active: true, sortOrder: 1 },
-    { id: "o-sheets-11", kind: "volume", name: "11+ sheets at ₹65 each", description: "Bulk price on super sheets.", productType: "sheet", buy: 11, free: 1, pricePaise: 6500, active: true, sortOrder: 2 },
-    { id: "o-wall-6", kind: "volume", name: "6+ wall cards at ₹25 each", description: "", productType: "wall-card", buy: 6, free: 1, pricePaise: 2500, active: true, sortOrder: 3 },
-    { id: "o-wall-11", kind: "volume", name: "11+ wall cards at ₹20 each", description: "", productType: "wall-card", buy: 11, free: 1, pricePaise: 2000, active: true, sortOrder: 4 },
+    { id: "o-stickers", kind: "bxgy", name: "Buy 4 stickers, get 1 free", description: "Every 5th sticker is on us.", productType: "sticker", buy: 4, free: 1, pricePaise: null, ...NO_CAMPAIGN, active: true, sortOrder: 0 },
+    { id: "o-posters", kind: "bxgy", name: "Buy 5 posters, get 1 free", description: "Every 6th poster is on us.", productType: "poster", buy: 5, free: 1, pricePaise: null, ...NO_CAMPAIGN, active: true, sortOrder: 1 },
+    { id: "o-sheets-11", kind: "volume", name: "11+ sheets at ₹65 each", description: "Bulk price on super sheets.", productType: "sheet", buy: 11, free: 1, pricePaise: 6500, ...NO_CAMPAIGN, active: true, sortOrder: 2 },
+    { id: "o-wall-6", kind: "volume", name: "6+ wall cards at ₹25 each", description: "", productType: "wall-card", buy: 6, free: 1, pricePaise: 2500, ...NO_CAMPAIGN, active: true, sortOrder: 3 },
+    { id: "o-wall-11", kind: "volume", name: "11+ wall cards at ₹20 each", description: "", productType: "wall-card", buy: 11, free: 1, pricePaise: 2000, ...NO_CAMPAIGN, active: true, sortOrder: 4 },
   ];
 }
 
@@ -201,6 +204,9 @@ export const DEFAULT_SETTINGS: Settings = {
   deliveryNote: "Dispatched within 2 days.",
   bulkNote: "Ordering in bulk for a club, fest or shop? Message us and we'll quote.",
   freeShippingAbovePaise: 25000,
+  upiId: "",
+  upiName: "Stix N Vibes",
+  mrpMarkupPercent: 20,
 };
 
 export const DEMO_SETTINGS: Settings = {

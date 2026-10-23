@@ -6,7 +6,10 @@ import { formatDate } from "@/components/admin/orders-table";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { requireAdmin } from "@/lib/admin/session";
 import { formatINR } from "@/lib/money";
+import { orderUrl } from "@/lib/orders";
+import { formatPhone, waNumber } from "@/lib/phone";
 import { getStore } from "@/lib/store";
+import { addressText, waLink } from "@/lib/whatsapp";
 
 export const metadata: Metadata = { title: "Order" };
 
@@ -28,6 +31,46 @@ export default async function OrderPage({ params }: PageProps<"/admin/orders/[nu
         Sent {formatDate(order.createdAt)}
         {order.customerName && <> by {order.customerName}</>}. Find the chat in WhatsApp by searching the ref.
       </p>
+
+      <dl className="grid gap-4 rounded-2xl border border-line p-4 text-sm sm:grid-cols-3">
+        <div>
+          <dt className="text-mute">Customer</dt>
+          <dd className="mt-1">
+            {order.customerPhone ? (
+              <Link href={`/admin/customers/${order.customerPhone}`} className="hover:text-lemon">
+                {order.customerName || "No name"}
+              </Link>
+            ) : (
+              order.customerName || <span className="text-mute">Not given</span>
+            )}
+            {order.customerPhone && (
+              <span className="mt-1 flex flex-wrap gap-3">
+                <a href={`tel:+${waNumber(order.customerPhone)}`} className="tabular-nums text-paper/70 hover:text-lemon">
+                  {formatPhone(order.customerPhone)}
+                </a>
+                <a href={waLink(waNumber(order.customerPhone), `Hi ${order.customerName.split(" ")[0] || ""}! About your Stix N Vibes order ${order.number}:`)} target="_blank" rel="noopener" className="text-lemon underline underline-offset-2">
+                  WhatsApp
+                </a>
+              </span>
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-mute">{order.fulfilment === "pickup" ? "Pickup at a stall" : "Deliver to"}</dt>
+          <dd className="mt-1 whitespace-pre-line">{order.fulfilment === "pickup" ? "Customer picks up" : addressText(order.address) || <span className="text-mute">No address</span>}</dd>
+        </div>
+        {order.viewKey && (
+          <div>
+            <dt className="text-mute">Customer&apos;s order page</dt>
+            <dd className="mt-1">
+              <a href={orderUrl(order)} target="_blank" rel="noopener" className="break-all text-lemon underline underline-offset-2">
+                Open
+              </a>
+              <span className="block text-xs text-mute">Shows status and the UPI QR. Share it if they lose the link.</span>
+            </dd>
+          </div>
+        )}
+      </dl>
 
       <div className="grid gap-6 xl:grid-cols-[1fr_22rem]">
         <section className="rounded-2xl border border-line">
@@ -71,7 +114,8 @@ export default async function OrderPage({ params }: PageProps<"/admin/orders/[nu
             {order.offers.map((o) => (
               <div key={o.offerId} className="flex justify-between text-lemon">
                 <dt>
-                  {o.name} ({o.freeUnits} free)
+                  {o.name}
+                  {o.freeUnits > 0 && ` (${o.freeUnits} free)`}
                 </dt>
                 <dd className="tabular-nums">−{formatINR(o.discountPaise)}</dd>
               </div>

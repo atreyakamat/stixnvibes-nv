@@ -3,6 +3,7 @@ import { CollectionCard } from "@/components/collection-card";
 import { OfferStrip } from "@/components/offer-strip";
 import { ProductCard } from "@/components/product/product-card";
 import { Reveal } from "@/components/reveal";
+import { StallReels } from "@/components/stall-reels";
 import { collectionCover, getShopState } from "@/lib/shop";
 import { PRODUCT_TYPES } from "@/lib/types";
 import { waLink } from "@/lib/whatsapp";
@@ -156,7 +157,7 @@ export default async function HomePage() {
         <ol className="mt-8 grid gap-4 md:grid-cols-3">
           {[
             { t: "Fill your cart", b: "Pick designs, sizes and finishes. Offers apply on their own." },
-            { t: "Checkout on WhatsApp", b: "One tap sends us your full order. We reply to confirm and share UPI details." },
+            { t: "Place your order", b: "Add your details and tap once. Your order goes to us on WhatsApp and you get an order page to track it." },
             { t: "Stick it", b: settings.deliveryNote || "We pack it and send it your way." },
           ].map((s, i) => (
             <li key={s.t} className="rounded-[1.5rem] border border-line p-6 md:p-8">
@@ -166,6 +167,20 @@ export default async function HomePage() {
             </li>
           ))}
         </ol>
+      </section>
+
+      <section className="container-x pt-20 md:pt-28" aria-labelledby="stalls">
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <h2 id="stalls" className="display text-[clamp(2.6rem,7vw,5.5rem)]">
+            At our <span className="text-lemon">stalls</span>
+          </h2>
+          <a href="https://instagram.com/stixnvibes" target="_blank" rel="noopener" className="label text-mute hover:text-lemon">
+            More on Instagram →
+          </a>
+        </div>
+        <div className="mt-8">
+          <StallReels />
+        </div>
       </section>
 
       <section className="container-x pt-20 md:pt-28">

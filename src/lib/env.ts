@@ -37,3 +37,9 @@ export function sessionSecret(): string | null {
   if (secret.length >= 32) return secret;
   return storeMode() === "demo" ? "demo-only-session-secret-not-for-production" : null;
 }
+
+/** Shared secret InWoice uses to read orders. Empty = the feed is off. */
+export function syncToken(): string | null {
+  const t = process.env.INWOICE_SYNC_TOKEN ?? "";
+  return t.length >= 32 ? t : null;
+}

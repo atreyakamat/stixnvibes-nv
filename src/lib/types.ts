@@ -85,13 +85,15 @@ export type Collection = {
   createdAt: string;
 };
 
-export const OFFER_KINDS = ["bxgy", "volume"] as const;
+export const OFFER_KINDS = ["bxgy", "volume", "percent"] as const;
 export type OfferKind = (typeof OFFER_KINDS)[number];
 
 /**
  * bxgy: buy `buy`, get `free` free.
  * volume: once `buy` or more of the type are in the cart, each costs `pricePaise`.
- * Either applies to one product type, or to every type when productType is null.
+ * percent: `percent`% off (a campaign), on what's left after the other offers.
+ * Each applies to one product type, or to every type when productType is null,
+ * and only between startsAt and endsAt when those are set.
  */
 export type Offer = {
   id: string;
@@ -103,6 +105,13 @@ export type Offer = {
   free: number;
   /** volume only: the unit price once the minimum is reached. */
   pricePaise: number | null;
+  /** percent only: how much off, 1–90. */
+  percent: number | null;
+  /** ISO times; null = no limit on that side. */
+  startsAt: string | null;
+  endsAt: string | null;
+  /** Shown across the top of the shop while the offer runs. */
+  banner: string;
   active: boolean;
   sortOrder: number;
 };
@@ -128,12 +137,24 @@ export type OrderLine = {
 /** freeUnits is 0 for volume pricing. */
 export type AppliedOffer = { offerId: string; name: string; freeUnits: number; discountPaise: number };
 
+export const FULFILMENTS = ["delivery", "pickup"] as const;
+export type Fulfilment = (typeof FULFILMENTS)[number];
+
+export type Address = { line: string; city: string; state: string; pincode: string };
+
 /** An order sent to WhatsApp. Payment and delivery are sorted in the chat. */
 export type Order = {
   id: string;
   number: string;
+  /** Secret in the customer's order page link. */
+  viewKey: string;
   status: OrderStatus;
   customerName: string;
+  /** 10 digits, no country code. */
+  customerPhone: string;
+  fulfilment: Fulfilment;
+  /** Empty fields for pickup orders. */
+  address: Address;
   customerNote: string;
   lines: OrderLine[];
   subtotalPaise: number;
@@ -162,6 +183,12 @@ export type Settings = {
   bulkNote: string;
   /** null = no free shipping threshold. */
   freeShippingAbovePaise: number | null;
+  /** UPI ID for payments on the order page, e.g. name@okicici. Empty hides it. */
+  upiId: string;
+  /** Name shown in the customer's UPI app. */
+  upiName: string;
+  /** MRP shown struck through = price + this %, rounded up to the rupee. null = off. */
+  mrpMarkupPercent: number | null;
 };
 
 export type Stats = {
