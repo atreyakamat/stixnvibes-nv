@@ -1,0 +1,41 @@
+# Netlify detects Next.js and uses its runtime: pages render on the server,
+# API routes and server actions run as functions.
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Deploy previews and branch deploys run in demo mode (in-memory data, demo
+# prices, demo admin login) unless Supabase keys are set for that context.
+# Production never runs in demo mode.
+[context.deploy-preview.environment]
+  SHOP_DEMO_MODE = "true"
+[context.branch-deploy.environment]
+  SHOP_DEMO_MODE = "true"
+
+[[headers]]
+  for = "/lofi/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/stall/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Strict-Transport-Security = "max-age=63072000; includeSubDomains"
+
+[[headers]]
+  for = "/admin/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    Cache-Control = "no-store"
