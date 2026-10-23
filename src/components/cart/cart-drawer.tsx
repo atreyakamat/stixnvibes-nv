@@ -4,12 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { formatINR } from "@/lib/money";
 import { useCart } from "./cart-context";
-import { QtyStepper } from "./qty-stepper";
+import { CartLines } from "./cart-lines";
+import { OrderPanel } from "./order-panel";
 
 export function CartDrawer() {
-  const { items, drawerOpen, setDrawerOpen, setQty, remove, subtotalPaise } = useCart();
+  const { items, drawerOpen, setDrawerOpen } = useCart();
   const closeRef = useRef<HTMLButtonElement>(null);
   const reduce = useReducedMotion();
   const pathname = usePathname();
@@ -80,43 +80,13 @@ export function CartDrawer() {
               </div>
             ) : (
               <>
-                <ul className="flex-1 divide-y divide-line overflow-y-auto px-6">
-                  {items.map((item) => (
-                    <li key={item.variantId} className="flex gap-4 py-5">
-                      <div className="grid size-20 shrink-0 place-items-center rounded-xl bg-ink p-2">
-                        {item.image && <img src={item.image} alt="" className="max-h-full w-auto object-contain" />}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <Link href={`/shop/${item.slug}`} className="font-medium hover:text-lemon">
-                          {item.name}
-                        </Link>
-                        <p className="text-sm text-mute">{item.variantLabel}</p>
-                        <div className="mt-3 flex items-center justify-between gap-3">
-                          <QtyStepper value={item.qty} onChange={(q) => setQty(item.variantId, q)} label={item.name} />
-                          <p className="tabular-nums">{formatINR(item.unitPricePaise * item.qty)}</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => remove(item.variantId)}
-                          className="mt-2 text-sm text-mute underline-offset-4 hover:text-paper hover:underline"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-                <div className="space-y-4 border-t border-line px-6 py-6">
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-paper/70">Subtotal</span>
-                    <span className="text-xl font-semibold tabular-nums">{formatINR(subtotalPaise)}</span>
-                  </div>
-                  <p className="text-sm text-mute">Shipping is worked out at checkout.</p>
-                  <Link href="/checkout" className="btn btn-primary w-full justify-center">
-                    Checkout
-                  </Link>
-                  <Link href="/cart" className="btn btn-ghost w-full justify-center">
-                    View cart
+                <div className="flex-1 overflow-y-auto px-6">
+                  <CartLines size="sm" />
+                </div>
+                <div className="space-y-3 border-t border-line px-6 py-6">
+                  <OrderPanel compact />
+                  <Link href="/cart" className="block text-center text-sm text-mute underline-offset-4 hover:text-paper hover:underline">
+                    View full cart
                   </Link>
                 </div>
               </>

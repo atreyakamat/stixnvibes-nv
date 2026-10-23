@@ -1,30 +1,12 @@
-import type {
-  CustomRequest,
-  CustomStatus,
-  Order,
-  OrderItem,
-  OrderStatus,
-  Product,
-  Settings,
-} from "@/lib/types";
+import type { Collection, EventType, Offer, Order, OrderStatus, Product, Settings, Stats, Upload } from "@/lib/types";
 
-export type NewOrder = Omit<Order, "id" | "createdAt" | "updatedAt">;
-
-export type ProductInput = Omit<Product, "id" | "createdAt" | "updatedAt" | "variants"> & {
-  variants: (Omit<Product["variants"][number], "id"> & { id?: string })[];
-};
-
-export type OrderPatch = Partial<Pick<Order, "status" | "utr" | "courier" | "trackingNumber" | "adminNote">> & {
-  event?: Order["events"][number];
-};
-
+export type ProductInput = Omit<Product, "id" | "createdAt" | "updatedAt">;
+export type CollectionInput = Omit<Collection, "id" | "createdAt">;
+export type OfferInput = Omit<Offer, "id">;
+export type NewOrder = Omit<Order, "id" | "createdAt" | "updatedAt" | "status" | "adminNote">;
+export type OrderPatch = Partial<Pick<Order, "status" | "adminNote">>;
 export type OrderFilter = { status?: OrderStatus; search?: string; limit?: number };
-
-export class OutOfStockError extends Error {
-  constructor(public variantId: string) {
-    super("Out of stock");
-  }
-}
+export type TrackEvent = { type: EventType; productId: string | null; path: string };
 
 /**
  * Everything the app needs from persistence. Two implementations: Supabase
@@ -33,28 +15,36 @@ export class OutOfStockError extends Error {
 export interface Store {
   readonly mode: "supabase" | "demo";
 
-  listProducts(opts?: { includeInactive?: boolean }): Promise<Product[]>;
-  getProductBySlug(slug: string): Promise<Product | null>;
+  listProducts(opts?: { includeHidden?: boolean }): Promise<Product[]>;
   getProduct(id: string): Promise<Product | null>;
   createProduct(input: ProductInput): Promise<Product>;
   updateProduct(id: string, input: ProductInput): Promise<Product>;
   deleteProduct(id: string): Promise<void>;
-  /** Stores an image and returns its public URL. */
+  /** Stores a product photo and returns its public URL. */
   uploadProductImage(file: File): Promise<string>;
 
-  /** Inserts the order and takes stock in one step; throws OutOfStockError. */
-  placeOrder(order: NewOrder): Promise<Order>;
-  getOrderByNumber(number: string): Promise<Order | null>;
+  listCollections(opts?: { includeHidden?: boolean }): Promise<Collection[]>;
+  getCollection(id: string): Promise<Collection | null>;
+  createCollection(input: CollectionInput): Promise<Collection>;
+  updateCollection(id: string, input: CollectionInput): Promise<Collection>;
+  deleteCollection(id: string): Promise<void>;
+
+  listOffers(opts?: { includeInactive?: boolean }): Promise<Offer[]>;
+  saveOffer(id: string | null, input: OfferInput): Promise<Offer>;
+  deleteOffer(id: string): Promise<void>;
+
+  createOrder(order: NewOrder): Promise<Order>;
+  getOrder(number: string): Promise<Order | null>;
   listOrders(filter?: OrderFilter): Promise<Order[]>;
   updateOrder(number: string, patch: OrderPatch): Promise<Order>;
-  /** Puts an order's stock back (on cancel). */
-  restock(items: OrderItem[]): Promise<void>;
 
-  createCustomRequest(input: Omit<CustomRequest, "id" | "createdAt" | "status" | "adminNote" | "file">, file: File | null): Promise<CustomRequest>;
-  listCustomRequests(): Promise<CustomRequest[]>;
-  updateCustomRequest(id: string, patch: { status?: CustomStatus; adminNote?: string }): Promise<void>;
-  /** A short-lived link to view an uploaded design. */
-  customFileUrl(file: string): Promise<string | null>;
+  /** A customer photo for a custom product (music card, etc.). */
+  saveUpload(id: string, file: File): Promise<Upload>;
+  /** A link the admin can open, or the file itself in demo mode. */
+  readUpload(id: string): Promise<{ url: string } | { body: Buffer; contentType: string } | null>;
+
+  track(events: TrackEvent[]): Promise<void>;
+  stats(sinceIso: string): Promise<Stats>;
 
   getSettings(): Promise<Settings>;
   saveSettings(settings: Settings): Promise<void>;

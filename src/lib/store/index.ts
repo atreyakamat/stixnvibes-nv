@@ -33,5 +33,4 @@ export function getStore(): Store {
   return store;
 }
 
-export { OutOfStockError } from "./types";
 export type { Store } from "./types";

@@ -1,49 +1,47 @@
 import Link from "next/link";
 import { formatINR } from "@/lib/money";
-import { fromPrice, isPurchasable } from "@/lib/orders/pricing";
+import { canOrder, fromPrice, hasPriceRange } from "@/lib/pricing";
 import type { Product } from "@/lib/types";
 
 export function priceLabel(product: Product): string {
+  if (product.status === "upcoming") return "Coming soon";
   const price = fromPrice(product);
-  if (price === null) return "Ask on Instagram";
-  const multiple = new Set(product.variants.filter((v) => v.active && v.pricePaise !== null).map((v) => v.pricePaise)).size > 1;
-  return `${multiple ? "From " : ""}${formatINR(price)}`;
+  if (price === null) return "Ask on WhatsApp";
+  return `${hasPriceRange(product) ? "From " : ""}${formatINR(price)}`;
 }
 
 export function ProductCard({ product, priority = false }: { product: Product; priority?: boolean }) {
-  const soldOut = product.variants.length > 0 && product.variants.filter((v) => v.active).every((v) => v.stock === 0);
-  const buyable = isPurchasable(product);
   const [first, ...rest] = product.images;
+  const tag = product.status === "upcoming" ? "Coming soon" : product.soldOut ? "Sold out" : product.badge;
 
   return (
     <Link
       href={`/shop/${product.slug}`}
-      className="ice group flex h-full flex-col overflow-hidden rounded-[1.5rem] border border-line p-5 transition-colors hover:border-lemon/60"
+      className="ice group flex h-full flex-col overflow-hidden rounded-[1.5rem] border border-line p-4 transition-colors hover:border-lemon/60 md:p-5"
     >
-      <div className="relative grid aspect-square place-items-center overflow-hidden rounded-2xl bg-ink/60 p-6">
+      <div className="relative grid aspect-square place-items-center overflow-hidden rounded-2xl bg-ink/60 p-5">
         {first ? (
           <img
             src={first}
             alt={product.name}
             loading={priority ? "eager" : "lazy"}
+            decoding="async"
             fetchPriority={priority ? "high" : undefined}
             className="sticker-shadow max-h-full w-auto object-contain transition-transform duration-500 ease-out-expo group-hover:-rotate-3 group-hover:scale-105"
           />
         ) : (
           <span className="label text-mute">Photo soon</span>
         )}
-        {rest.length > 0 && (
-          <span className="label absolute bottom-3 right-3 rounded-full bg-ink/80 px-2 py-1 text-mute">+{rest.length}</span>
-        )}
-        {soldOut && (
-          <span className="label absolute left-3 top-3 rounded-full bg-paper px-3 py-1.5 text-ink">Sold out</span>
+        {rest.length > 0 && <span className="label absolute bottom-3 right-3 rounded-full bg-ink/80 px-2 py-1 text-mute">+{rest.length}</span>}
+        {tag && (
+          <span className={`label absolute left-3 top-3 rounded-full px-3 py-1.5 ${product.status === "live" && !product.soldOut ? "bg-lemon text-ink" : "bg-paper text-ink"}`}>
+            {tag}
+          </span>
         )}
       </div>
-      <div className="mt-5 flex flex-1 items-end justify-between gap-3">
-        <h3 className="text-lg font-semibold leading-tight">{product.name}</h3>
-        <p className={`shrink-0 text-right text-sm tabular-nums ${buyable ? "text-lemon" : "text-mute"}`}>
-          {priceLabel(product)}
-        </p>
+      <div className="mt-4 flex flex-1 items-end justify-between gap-3">
+        <h3 className="font-semibold leading-tight md:text-lg">{product.name}</h3>
+        <p className={`shrink-0 text-right text-sm tabular-nums ${canOrder(product) ? "text-lemon" : "text-mute"}`}>{priceLabel(product)}</p>
       </div>
     </Link>
   );

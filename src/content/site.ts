@@ -1,5 +1,6 @@
-// Shop copy and contact facts. Contacts match stixnvibes.com; confirm them in
-// the questionnaire before launch.
+// Shop copy and contact facts. Contacts match stixnvibes.com.
+
+import { DEFAULT_WHATSAPP, waLink } from "@/lib/whatsapp";
 
 export const site = {
   name: "Stix N Vibes",
@@ -7,24 +8,23 @@ export const site = {
   mainSite: "https://www.stixnvibes.com",
   tagline: "Your stickers. Your vibe.",
   description:
-    "Shop Stix N Vibes: waterproof stickers, sticker packs, peel-to-paste posters and Framez from a student-led brand in Goa.",
+    "Shop Stix N Vibes: stickers from ₹10, super sheets, A4 and A3 posters, Spotify music cards and wall cards from a student-led brand in Goa. Order on WhatsApp.",
   origin: "From Goa, for everywhere.",
   contact: {
     email: "hello@stixnvibes.com",
     instagram: "https://instagram.com/stixnvibes",
     instagramHandle: "@stixnvibes",
     instagramDm: "https://ig.me/m/stixnvibes",
-    whatsappNumber: "917744020601",
+    whatsappNumber: DEFAULT_WHATSAPP,
   },
 } as const;
 
-export const whatsappLink = (text?: string) =>
-  `https://wa.me/${site.contact.whatsappNumber}${text ? `?text=${encodeURIComponent(text)}` : ""}`;
+export const whatsappLink = (text?: string) => waLink(site.contact.whatsappNumber, text);
 
 export const nav = [
   { href: "/shop", label: "Shop all" },
-  { href: "/shop?category=stickers", label: "Stickers" },
-  { href: "/shop?category=posters", label: "Posters" },
-  { href: "/custom", label: "Custom" },
-  { href: "/track", label: "Track order" },
+  { href: "/shop?type=sticker", label: "Stickers" },
+  { href: "/shop?type=poster", label: "Posters" },
+  { href: "/shop?type=music-card", label: "Music cards" },
+  { href: "/collections", label: "Collections" },
 ] as const;

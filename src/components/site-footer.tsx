@@ -3,7 +3,7 @@ import { nav, site, whatsappLink } from "@/content/site";
 import { Wordmark } from "./wordmark";
 
 const policies = [
-  { href: "/policies/shipping", label: "Shipping" },
+  { href: "/policies/ordering", label: "How ordering works" },
   { href: "/policies/returns", label: "Returns" },
   { href: "/policies/privacy", label: "Privacy" },
   { href: "/policies/terms", label: "Terms" },

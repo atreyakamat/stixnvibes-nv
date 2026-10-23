@@ -1,6 +1,6 @@
 # Stix N Vibes shop
 
-The online shop for Stix N Vibes (shop.stixnvibes.com): catalog, cart, UPI checkout, order tracking, custom sticker requests and an admin panel to run it all. Same look as [stixnvibes.com](https://www.stixnvibes.com).
+The online shop for Stix N Vibes (shop.stixnvibes.com). Customers browse, customise and fill a cart, then send the whole order to WhatsApp in one tap. An admin panel runs the catalog, collections, offers and orders, and shows what people view and order. Same look as [stixnvibes.com](https://www.stixnvibes.com).
 
 **Stack:** Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · Motion · Supabase (Postgres + Auth + Storage) · Netlify.
 
@@ -11,7 +11,7 @@ npm install
 npm run dev        # http://localhost:3000, demo data, no keys needed
 ```
 
-Without Supabase keys the app runs in **demo mode**: data lives in memory, products have demo prices, and the admin login (`demo@stixnvibes.com` / `demo-admin`) is shown on `/admin/login`.
+Without Supabase keys the app runs in **demo mode**: data lives in memory, products that have no price yet get demo prices, and the admin login (`demo@stixnvibes.com` / `demo-admin`) is shown on `/admin/login`.
 
 | Command | What it does |
 | --- | --- |
@@ -20,20 +20,19 @@ Without Supabase keys the app runs in **demo mode**: data lives in memory, produ
 | `npm run lint` | ESLint |
 | `npm run typecheck` | Route types + `tsc` |
 | `npm test` | Unit tests (Vitest) |
-| `npm run test:e2e` | Browser tests (Playwright, desktop + mobile, demo mode) |
+| `npm run test:e2e` | Browser tests (Playwright, desktop + phone, demo mode) |
+| `npx jiti scripts/gen-seed.ts` | Rewrites `supabase/seed.sql` from `src/lib/store/seed.ts` |
 
 ## How it works
 
-- **Catalog**: products with options (size, finish…), each with its own price and optional stock. A blank price means "not for sale yet": it shows on the shop with an Instagram link instead of a cart button.
-- **Cart**: kept in the browser. The server re-prices every line from the database, so a tampered cart can't change a price.
-- **Checkout**: ship to an address, or free pickup (if turned on). Payment is UPI: the order page shows a QR code (desktop) or an "Open UPI app" button (phone) with the exact amount and order number filled in. The customer then enters their 12 digit UPI reference (UTR). Pickup orders can also be "pay at pickup".
-- **Payment check**: in admin, "Payments to check" lists orders with a UTR. Match the amount and UTR in your bank or UPI app, then click **Mark paid** (or **Reject payment** to let the customer fix it). One UTR can only ever be used for one order.
-- **Stock**: taken atomically when the order is placed (a Postgres function), and put back if an order is cancelled.
-- **Order flow**: awaiting payment → checking payment → paid → packed → shipped → delivered. Pickup: placed → packed → ready for pickup → collected. Every step is logged on the order.
-- **Customers** see their order at a private link (`/order/SNV-XXXXXX?k=…`) or look it up on `/track` with order number + phone.
-- **Admin** (`/admin`): dashboard (to-dos, money in), orders (filters, search, status buttons, courier/tracking, private notes, one-tap WhatsApp message to the customer), products (create/edit, options, prices, stock, photo upload), custom requests (with uploaded artwork), settings (open/close shop, UPI ID, shipping fee, free-shipping threshold, pickup).
-
-Swapping UPI for a payment gateway later means adding a payment method next to `src/lib/payments/upi.ts` and a webhook route; the order statuses already cover it.
+- **Product types**: stickers, sticker sheets, posters, music cards and wall cards. Each product has a base price (blank = "Ask on WhatsApp"), an optional "was" price, a badge, and a status: live, coming soon (shown, can't be ordered) or hidden.
+- **Options**: any number of option groups (Size: A4 / A3, Print: normal / sticker, Frame: none / framed, Material: paper vinyl / waterproof). Each choice can add to or take off the base price. Each type has a one-click template.
+- **Custom fields**: what the customer fills in, e.g. a Spotify link, a dedication and a photo for a music card. Photos go to a private bucket; the order links to them at `/u/<random id>`.
+- **Collections**: group designs (Lo-fi, Anime…). A product can be in several.
+- **Offers**: buy X get Y free per product type (stickers: buy 4 get 1; posters: buy 5 get 1). Items are grouped from most to least expensive and the cheapest in each full group are free. The cart nudges ("add 1 more sticker and it's free").
+- **Ordering**: the cart lives in the browser. "Order on WhatsApp" sends the cart to the server, which re-prices it from the database, records the order with a ref (`SNV-XXXXXX`) and returns a `wa.me` link with the full order written out. If the server can't be reached, the browser builds the same message itself, so an order is never lost. Payment and delivery are sorted in the WhatsApp chat.
+- **Analytics**: product views, add-to-cart, order taps and "Ask on WhatsApp" taps are counted without cookies or personal data.
+- **Admin** (`/admin`): dashboard (orders sent, order value, views, conversion, most viewed / ordered, daily chart), orders (status, private notes, customer photos), products (filters, quick hide / sold out / feature, duplicate, full editor with options, custom fields and photos), bulk add (one product per uploaded design), collections, offers, settings (WhatsApp number, notes, banner, pause orders).
 
 ## Going live
 
@@ -44,10 +43,11 @@ See [docs/SETUP.md](docs/SETUP.md) for the Supabase and Netlify steps.
 ```
 src/app/(shop)/      storefront pages
 src/app/admin/       admin pages and server actions
-src/app/api/         checkout, quote, UTR, tracking, custom request endpoints
-src/lib/store/       data layer: Supabase + in-memory demo store
-src/lib/orders/      pricing, statuses, order service
-src/lib/payments/    UPI links and UTR checks
+src/app/api/         order, upload and analytics endpoints
+src/lib/pricing.ts   options and offers (shared by browser and server)
+src/lib/orders.ts    server-side pricing and order recording
+src/lib/whatsapp.ts  WhatsApp links and the order message
+src/lib/store/       data layer: Supabase + in-memory demo store, seed catalog
 supabase/            SQL migration and starter catalog
 tests/               unit (Vitest) and browser (Playwright) tests
 ```

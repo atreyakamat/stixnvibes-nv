@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AddToCart } from "@/components/product/add-to-cart";
+import { BuyBox } from "@/components/product/buy-box";
 import { Gallery } from "@/components/product/gallery";
 import { ProductCard } from "@/components/product/product-card";
 import { site } from "@/content/site";
-import { fromPrice } from "@/lib/orders/pricing";
+import { fromPrice } from "@/lib/pricing";
 import { getProductBySlug, getShopState } from "@/lib/shop";
-import { CATEGORIES } from "@/lib/types";
+import { PRODUCT_TYPES } from "@/lib/types";
 
 export const revalidate = 60;
 
@@ -23,36 +23,39 @@ export async function generateMetadata({ params }: PageProps<"/shop/[slug]">): P
   return {
     title: product.name,
     description: product.description || site.description,
-    openGraph: { images: product.images[0] ? [{ url: product.images[0] }] : undefined },
+    openGraph: { images: product.images[0] && !product.images[0].startsWith("data:") ? [{ url: product.images[0] }] : undefined },
   };
 }
 
 export default async function ProductPage({ params }: PageProps<"/shop/[slug]">) {
   const { slug } = await params;
-  const [product, { products, settings }] = await Promise.all([getProductBySlug(slug), getShopState()]);
+  const [product, { products, collections, settings }] = await Promise.all([getProductBySlug(slug), getShopState()]);
   if (!product) notFound();
 
-  const category = CATEGORIES.find((c) => c.id === product.category);
-  const related = products.filter((p) => p.category === product.category && p.id !== product.id).slice(0, 4);
+  const type = PRODUCT_TYPES.find((t) => t.id === product.type);
+  const inCollections = collections.filter((c) => product.collectionIds.includes(c.id));
+  const related = products
+    .filter((p) => p.id !== product.id && p.status !== "hidden" && (p.collectionIds.some((c) => product.collectionIds.includes(c)) || p.type === product.type))
+    .slice(0, 8);
+  const url = `${site.url}/shop/${product.slug}`;
   const price = fromPrice(product);
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
     name: product.name,
     description: product.description,
-    image: product.images.map((i) => (i.startsWith("http") ? i : `${site.url}${i}`)),
+    image: product.images.filter((i) => !i.startsWith("data:")).map((i) => (i.startsWith("http") ? i : `${site.url}${i}`)),
     brand: { "@type": "Brand", name: site.name },
-    ...(price !== null && {
-      offers: {
-        "@type": "Offer",
-        priceCurrency: "INR",
-        price: (price / 100).toFixed(2),
-        availability: product.variants.some((v) => v.active && v.stock !== 0)
-          ? "https://schema.org/InStock"
-          : "https://schema.org/OutOfStock",
-        url: `${site.url}/shop/${product.slug}`,
-      },
-    }),
+    ...(price !== null &&
+      product.status === "live" && {
+        offers: {
+          "@type": "Offer",
+          priceCurrency: "INR",
+          price: (price / 100).toFixed(2),
+          availability: product.soldOut ? "https://schema.org/OutOfStock" : "https://schema.org/InStock",
+          url,
+        },
+      }),
   };
 
   return (
@@ -63,11 +66,11 @@ export default async function ProductPage({ params }: PageProps<"/shop/[slug]">)
           <Link href="/shop" className="hover:text-lemon">
             Shop
           </Link>
-          {category && (
+          {type && (
             <>
               {" / "}
-              <Link href={`/shop?category=${category.id}`} className="hover:text-lemon">
-                {category.label}
+              <Link href={`/shop?type=${type.id}`} className="hover:text-lemon">
+                {type.label}
               </Link>
             </>
           )}
@@ -77,11 +80,12 @@ export default async function ProductPage({ params }: PageProps<"/shop/[slug]">)
           <Gallery images={product.images} name={product.name} />
 
           <div className="md:pt-6">
-            <h1 className="display text-[clamp(2.8rem,7vw,5.5rem)]">{product.name}</h1>
-            {product.description && <p className="mt-5 max-w-lg text-lg text-paper/75">{product.description}</p>}
+            {product.badge && <p className="label text-lemon">{product.badge}</p>}
+            <h1 className="display mt-2 text-[clamp(2.8rem,7vw,5.5rem)]">{product.name}</h1>
+            {product.description && <p className="mt-5 max-w-lg whitespace-pre-line text-lg text-paper/75">{product.description}</p>}
 
             <div className="mt-8">
-              <AddToCart product={product} storeOpen={Boolean(settings?.storeOpen)} />
+              <BuyBox product={product} url={url} />
             </div>
 
             {product.details && (
@@ -91,14 +95,27 @@ export default async function ProductPage({ params }: PageProps<"/shop/[slug]">)
               </div>
             )}
             <div className="mt-6 border-t border-line pt-6">
-              <h2 className="label text-mute">Shipping</h2>
+              <h2 className="label text-mute">Ordering</h2>
               <p className="mt-3 text-paper/75">
-                {settings?.dispatchNote || "We dispatch within 2 days."}{" "}
-                <Link href="/policies/shipping" className="underline underline-offset-4 hover:text-lemon">
-                  Shipping info
+                {settings.deliveryNote}{" "}
+                <Link href="/policies/ordering" className="underline underline-offset-4 hover:text-lemon">
+                  How ordering works
                 </Link>
               </p>
             </div>
+            {inCollections.length > 0 && (
+              <p className="mt-6 text-sm text-mute">
+                Part of{" "}
+                {inCollections.map((c, i) => (
+                  <span key={c.id}>
+                    {i > 0 && ", "}
+                    <Link href={`/collections/${c.slug}`} className="text-paper underline underline-offset-4 hover:text-lemon">
+                      {c.name}
+                    </Link>
+                  </span>
+                ))}
+              </p>
+            )}
           </div>
         </div>
 

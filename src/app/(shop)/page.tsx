@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { CollectionCard } from "@/components/collection-card";
+import { OfferStrip } from "@/components/offer-strip";
 import { ProductCard } from "@/components/product/product-card";
 import { Reveal } from "@/components/reveal";
-import { site } from "@/content/site";
-import { getShopState } from "@/lib/shop";
-import { CATEGORIES } from "@/lib/types";
+import { collectionCover, getShopState } from "@/lib/shop";
+import { PRODUCT_TYPES } from "@/lib/types";
+import { waLink } from "@/lib/whatsapp";
 
 export const revalidate = 60;
 
@@ -15,14 +17,18 @@ const HERO_STICKERS = [
 ];
 
 export default async function HomePage() {
-  const { products, settings } = await getShopState();
-  const featured = products.filter((p) => p.featured).slice(0, 8);
-  const shown = featured.length ? featured : products.slice(0, 8);
-  const liveCategories = CATEGORIES.filter((c) => products.some((p) => p.category === c.id));
+  const { products, collections, offers, settings } = await getShopState();
+  const live = products.filter((p) => p.status === "live");
+  const featured = live.filter((p) => p.featured).slice(0, 8);
+  const shown = featured.length ? featured : live.slice(0, 8);
+  const upcoming = products.filter((p) => p.status === "upcoming").slice(0, 4);
+  const types = PRODUCT_TYPES.map((t) => ({ ...t, cover: products.find((p) => p.type === t.id && p.images[0])?.images[0] ?? null })).filter((t) =>
+    products.some((p) => p.type === t.id),
+  );
 
   return (
     <>
-      <section className="container-x grid items-center gap-10 pb-16 pt-10 md:grid-cols-2 md:pb-24 md:pt-16">
+      <section className="container-x grid items-center gap-10 pb-12 pt-8 md:grid-cols-2 md:pb-20 md:pt-14">
         <div>
           <p className="label fade-up text-mute">The Stix N Vibes shop</p>
           <h1 className="display mt-5 text-[clamp(3.4rem,10vw,8.5rem)]">
@@ -36,15 +42,15 @@ export default async function HomePage() {
             </span>
           </h1>
           <p className="fade-up mt-6 max-w-md text-lg text-paper/75" style={{ ["--d" as string]: "300ms" }}>
-            Waterproof stickers, packs and posters from a student-led brand in Goa. Order online
-            {settings?.pickupEnabled ? " or pick up at our next stall." : "."}
+            Stickers from ₹10, posters, Spotify music cards and wall cards. Fill your cart and order in one tap on WhatsApp.
           </p>
+          <OfferStrip offers={offers} className="fade-up mt-6" />
           <div className="fade-up mt-8 flex flex-wrap gap-3" style={{ ["--d" as string]: "400ms" }}>
             <Link href="/shop" className="btn btn-primary">
               Shop now
             </Link>
-            <Link href="/custom" className="btn btn-ghost">
-              Make it custom
+            <Link href="/collections" className="btn btn-ghost">
+              Collections
             </Link>
           </div>
         </div>
@@ -63,16 +69,20 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {liveCategories.length > 0 && (
-        <section className="container-x" aria-labelledby="cats">
-          <h2 id="cats" className="sr-only">
-            Categories
+      {types.length > 0 && (
+        <section className="container-x" aria-labelledby="types">
+          <h2 id="types" className="display text-[clamp(2.6rem,7vw,5.5rem)]">
+            What we <span className="text-lemon">make</span>
           </h2>
-          <ul className="flex flex-wrap gap-3">
-            {liveCategories.map((c) => (
-              <li key={c.id}>
-                <Link href={`/shop?category=${c.id}`} className="btn btn-ghost">
-                  {c.label}
+          <ul className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-5">
+            {types.map((t) => (
+              <li key={t.id}>
+                <Link href={`/shop?type=${t.id}`} className="ice group flex h-full flex-col rounded-[1.5rem] border border-line p-4 transition-colors hover:border-lemon/60">
+                  <div className="grid aspect-square place-items-center rounded-2xl bg-ink/60 p-4">
+                    {t.cover && <img src={t.cover} alt="" loading="lazy" className="sticker-shadow max-h-full w-auto object-contain transition-transform duration-500 group-hover:-rotate-3" />}
+                  </div>
+                  <h3 className="mt-4 font-semibold">{t.label}</h3>
+                  <p className="mt-1 text-sm text-paper/60">{t.blurb}</p>
                 </Link>
               </li>
             ))}
@@ -80,7 +90,27 @@ export default async function HomePage() {
         </section>
       )}
 
-      <section className="container-x pt-16 md:pt-24" aria-labelledby="featured">
+      {collections.length > 0 && (
+        <section className="container-x pt-20 md:pt-28" aria-labelledby="collections">
+          <div className="flex items-end justify-between gap-6">
+            <h2 id="collections" className="display text-[clamp(2.6rem,7vw,5.5rem)]">
+              Collections
+            </h2>
+            <Link href="/collections" className="label text-mute hover:text-lemon">
+              See all →
+            </Link>
+          </div>
+          <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {collections.slice(0, 3).map((c) => (
+              <li key={c.id}>
+                <CollectionCard collection={c} cover={collectionCover(c, products)} count={products.filter((p) => p.collectionIds.includes(c.id)).length} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="container-x pt-20 md:pt-28" aria-labelledby="featured">
         <div className="flex items-end justify-between gap-6">
           <h2 id="featured" className="display text-[clamp(2.6rem,7vw,5.5rem)]">
             Fresh <span className="text-lemon">drops</span>
@@ -90,7 +120,7 @@ export default async function HomePage() {
           </Link>
         </div>
         {shown.length ? (
-          <ul className="mt-10 grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
+          <ul className="mt-8 grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
             {shown.map((p, i) => (
               <li key={p.id}>
                 <Reveal delay={(i % 4) * 70} className="h-full">
@@ -100,24 +130,34 @@ export default async function HomePage() {
             ))}
           </ul>
         ) : (
-          <p className="mt-10 text-paper/70">The catalog is being stocked. Check back soon.</p>
+          <p className="mt-8 text-paper/70">The catalog is being stocked. Check back soon.</p>
         )}
       </section>
 
-      <section className="container-x pt-24 md:pt-32" aria-labelledby="how">
+      {upcoming.length > 0 && (
+        <section className="container-x pt-20 md:pt-28" aria-labelledby="upcoming">
+          <h2 id="upcoming" className="display text-[clamp(2.6rem,7vw,5.5rem)]">
+            Coming <span className="text-lemon">soon</span>
+          </h2>
+          <ul className="mt-8 grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
+            {upcoming.map((p) => (
+              <li key={p.id}>
+                <ProductCard product={p} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="container-x pt-20 md:pt-28" aria-labelledby="how">
         <h2 id="how" className="display text-[clamp(2.6rem,7vw,5.5rem)]">
           How it <span className="text-lemon">works</span>
         </h2>
-        <ol className="mt-10 grid gap-4 md:grid-cols-3">
+        <ol className="mt-8 grid gap-4 md:grid-cols-3">
           {[
-            { t: "Pick your vibe", b: "Add stickers, packs or posters to your cart." },
-            {
-              t: "Pay with UPI",
-              b: settings?.pickupEnabled
-                ? "Scan and pay from any UPI app, or pay when you collect at a stall."
-                : "Scan and pay from any UPI app. No card needed.",
-            },
-            { t: "Stick it", b: settings?.dispatchNote || "We pack it and send it your way." },
+            { t: "Fill your cart", b: "Pick designs, sizes and finishes. Offers apply on their own." },
+            { t: "Order on WhatsApp", b: "One tap sends us your full order. We reply to confirm and share UPI details." },
+            { t: "Stick it", b: settings.deliveryNote || "We pack it and send it your way." },
           ].map((s, i) => (
             <li key={s.t} className="rounded-[1.5rem] border border-line p-6 md:p-8">
               <span className="label text-lemon">0{i + 1}</span>
@@ -128,20 +168,15 @@ export default async function HomePage() {
         </ol>
       </section>
 
-      <section className="container-x pt-24 md:pt-32">
+      <section className="container-x pt-20 md:pt-28">
         <Reveal className="relative overflow-hidden rounded-[2rem] border border-line px-6 py-16 text-center md:px-16 md:py-24">
           <img src="/lofi/lofi-04.webp" alt="" className="sticker-shadow absolute left-6 top-6 hidden w-28 -rotate-12 md:block" />
           <img src="/lofi/lofi-13.webp" alt="" className="sticker-shadow absolute bottom-6 right-6 hidden w-32 rotate-12 md:block" />
-          <h2 className="display text-[clamp(2.8rem,9vw,8rem)]">Got your own design?</h2>
-          <p className="mx-auto mt-6 max-w-lg text-paper/75">
-            Send us your artwork, logo or idea. We cut it into stickers in any shape.
-          </p>
+          <h2 className="display text-[clamp(2.8rem,9vw,8rem)]">Bulk or custom?</h2>
+          <p className="mx-auto mt-6 max-w-lg text-paper/75">{settings.bulkNote || "Clubs, fests, shops, your own artwork: message us and we'll quote."}</p>
           <div className="mt-10 flex flex-wrap justify-center gap-3">
-            <Link href="/custom" className="btn btn-primary">
-              Start a custom order
-            </Link>
-            <a href={site.contact.instagramDm} className="btn btn-ghost" target="_blank" rel="noopener">
-              DM us on Instagram
+            <a href={waLink(settings.whatsappNumber, "Hi Stix N Vibes! I'd like a bulk / custom order.")} className="btn btn-primary" target="_blank" rel="noopener">
+              Message us on WhatsApp
             </a>
           </div>
         </Reveal>

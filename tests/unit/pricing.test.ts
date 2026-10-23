@@ -1,84 +1,83 @@
 import { describe, expect, it } from "vitest";
-import { fromPrice, isPurchasable, quoteCart } from "@/lib/orders/pricing";
-import { DEMO_SETTINGS, demoProducts, seedProducts } from "@/lib/store/seed";
-import type { Product } from "@/lib/types";
+import { applyOffers, canOrder, defaultSelections, fromPrice, offerHints, resolveOptions, totals, unitPrice } from "@/lib/pricing";
+import { demoProducts, seedOffers, seedProducts } from "@/lib/store/seed";
+import type { Offer } from "@/lib/types";
 
-const products = demoProducts();
-const sticker = products.find((p) => p.slug === "lofi-01")!;
-const line = (p: Product, qty: number) => ({ productId: p.id, variantId: p.variants[0].id, qty });
+const offers = seedOffers();
+const sticker = (price = 1000, qty = 1) => ({ type: "sticker" as const, unitPricePaise: price, qty });
+const poster = (price: number, qty = 1) => ({ type: "poster" as const, unitPricePaise: price, qty });
+const word = (_: unknown, n: number) => (n === 1 ? "sticker" : "stickers");
 
-describe("quoteCart", () => {
-  it("prices from the catalog, never from the client", () => {
-    const q = quoteCart([line(sticker, 3)], products, DEMO_SETTINGS, "ship");
-    expect(q.problems).toEqual([]);
-    expect(q.subtotalPaise).toBe(3 * 4900);
-    expect(q.shippingPaise).toBe(DEMO_SETTINGS.shippingFeePaise);
-    expect(q.totalPaise).toBe(3 * 4900 + DEMO_SETTINGS.shippingFeePaise);
+describe("buy X get Y offers", () => {
+  it("gives the 5th sticker free (buy 4 get 1)", () => {
+    expect(applyOffers([sticker(1000, 4)], offers).discountPaise).toBe(0);
+    const r = applyOffers([sticker(1000, 5)], offers);
+    expect(r.discountPaise).toBe(1000);
+    expect(r.applied).toEqual([{ offerId: "o-stickers", name: "Buy 4 stickers, get 1 free", freeUnits: 1, discountPaise: 1000 }]);
+    expect(applyOffers([sticker(1000, 10)], offers).discountPaise).toBe(2000);
+    expect(applyOffers([sticker(1000, 14)], offers).discountPaise).toBe(2000);
   });
 
-  it("merges duplicate lines for the same variant", () => {
-    const q = quoteCart([line(sticker, 1), line(sticker, 2)], products, DEMO_SETTINGS, "ship");
-    expect(q.items).toHaveLength(1);
-    expect(q.items[0].qty).toBe(3);
+  it("makes the cheapest item in each group free", () => {
+    // Prices 50, 40, 30, 20, 10 → one group, the ₹10 one is free.
+    const lines = [50, 40, 30, 20, 10].map((r) => sticker(r * 100));
+    expect(applyOffers(lines, offers).discountPaise).toBe(1000);
   });
 
-  it("gives free shipping at the threshold and for pickup", () => {
-    const big = quoteCart([line(sticker, 11)], products, DEMO_SETTINGS, "ship");
-    expect(big.subtotalPaise).toBeGreaterThanOrEqual(DEMO_SETTINGS.freeShippingAbovePaise!);
-    expect(big.shippingPaise).toBe(0);
-    expect(big.toFreeShippingPaise).toBeNull();
-    const pickup = quoteCart([line(sticker, 1)], products, DEMO_SETTINGS, "pickup");
-    expect(pickup.shippingPaise).toBe(0);
+  it("gives every 6th poster free (buy 5 get 1) and keeps offers to their type", () => {
+    const r = totals([poster(9900, 6), sticker(1000, 3)], offers);
+    expect(r.subtotalPaise).toBe(9900 * 6 + 3000);
+    expect(r.discountPaise).toBe(9900);
+    expect(r.totalPaise).toBe(9900 * 5 + 3000);
   });
 
-  it("tells you how far you are from free shipping", () => {
-    const q = quoteCart([line(sticker, 1)], products, DEMO_SETTINGS, "ship");
-    expect(q.toFreeShippingPaise).toBe(DEMO_SETTINGS.freeShippingAbovePaise! - 4900);
+  it("ignores inactive offers and counts a unit toward one offer only", () => {
+    const all: Offer = { id: "o-all", name: "Any 2 get 1", description: "", productType: null, buy: 2, free: 1, active: true, sortOrder: 5 };
+    expect(applyOffers([sticker(1000, 5)], [{ ...offers[0], active: false }]).discountPaise).toBe(0);
+    // 6 stickers: first offer takes 5 (₹10 off), the leftover 1 can't fill a group of 3.
+    expect(applyOffers([sticker(1000, 6)], [offers[0], all]).discountPaise).toBe(1000);
   });
 
-  it("rejects unpriced, inactive, unknown and over-stock items", () => {
-    const unpriced = seedProducts()[0];
-    const hidden = { ...sticker, id: "hidden", active: false, variants: [{ ...sticker.variants[0], id: "vh" }] };
-    const limited = { ...sticker, id: "lim", variants: [{ ...sticker.variants[0], id: "vl", stock: 2 }] };
-    const q = quoteCart(
-      [line(unpriced, 1), line(hidden, 1), { productId: "nope", variantId: "nope", qty: 1 }, line(limited, 3)],
-      [unpriced, hidden, limited],
-      DEMO_SETTINGS,
-      "ship",
-    );
-    expect(q.items).toEqual([]);
-    expect(q.problems.map((p) => p.reason)).toEqual([
-      "This item isn't on sale online yet.",
-      "This item is no longer available.",
-      "This item is no longer available.",
-      "Only 2 left.",
-    ]);
-    expect(q.shippingPaise).toBe(0);
-  });
-
-  it("flags orders below the minimum", () => {
-    const q = quoteCart([line(sticker, 1)], products, { ...DEMO_SETTINGS, minOrderPaise: 10000 }, "ship");
-    expect(q.belowMinimum).toBe(true);
+  it("nudges toward the next free item", () => {
+    expect(offerHints([sticker(1000, 4)], offers, word)).toEqual(["Add 1 more sticker and it's free (Buy 4 stickers, get 1 free)."]);
+    expect(offerHints([sticker(1000, 2)], offers, word)).toEqual(["Add 2 more stickers to unlock Buy 4 stickers, get 1 free."]);
+    expect(offerHints([sticker(1000, 5)], offers, word)).toEqual([]);
   });
 });
 
-describe("product helpers", () => {
-  it("knows what can be bought", () => {
-    expect(isPurchasable(sticker)).toBe(true);
-    expect(isPurchasable(seedProducts()[0])).toBe(false);
-    expect(isPurchasable({ ...sticker, variants: [{ ...sticker.variants[0], stock: 0 }] })).toBe(false);
+describe("options", () => {
+  const poster = demoProducts().find((p) => p.type === "poster")!;
+
+  it("defaults to the first choice of each option", () => {
+    expect(defaultSelections(poster)).toEqual({ size: "a4", print: "normal", frame: "none" });
+    expect(unitPrice(poster, {})).toBe(9900);
   });
 
-  it("finds the lowest live price", () => {
-    const p = {
-      ...sticker,
-      variants: [
-        { ...sticker.variants[0], id: "a", pricePaise: 9900 },
-        { ...sticker.variants[0], id: "b", pricePaise: 4900 },
-        { ...sticker.variants[0], id: "c", pricePaise: 100, active: false },
-      ],
-    };
-    expect(fromPrice(p)).toBe(4900);
-    expect(fromPrice(seedProducts()[0])).toBeNull();
+  it("adds price changes and labels picked choices", () => {
+    const r = resolveOptions(poster, { size: "a3", frame: "framed" })!;
+    expect(r.labels).toEqual(["Size: A3", "Print: Normal print", "Frame: Framed"]);
+    expect(unitPrice(poster, { size: "a3", frame: "framed" })).toBe(9900 + 5000 + 15000);
+    expect(fromPrice(poster)).toBe(9900);
+  });
+
+  it("rejects choices that don't exist", () => {
+    expect(resolveOptions(poster, { size: "a0" })).toBeNull();
+    expect(unitPrice(poster, { size: "a0" })).toBeNull();
+  });
+
+  it("only live, in-stock, priced products can be ordered", () => {
+    const [s] = seedProducts();
+    expect(canOrder(s)).toBe(true);
+    expect(canOrder({ ...s, status: "upcoming" })).toBe(false);
+    expect(canOrder({ ...s, soldOut: true })).toBe(false);
+    expect(canOrder({ ...s, pricePaise: null })).toBe(false);
+  });
+});
+
+describe("seed facts", () => {
+  it("prices stickers at ₹10 and the super sheet at ₹65", () => {
+    const seed = seedProducts();
+    expect(seed.filter((p) => p.type === "sticker").every((p) => p.pricePaise === 1000)).toBe(true);
+    expect(seed.find((p) => p.type === "sheet")!.pricePaise).toBe(6500);
   });
 });

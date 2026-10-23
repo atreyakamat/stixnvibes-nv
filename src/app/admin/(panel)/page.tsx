@@ -2,42 +2,65 @@ import Link from "next/link";
 import { OrdersTable } from "@/components/admin/orders-table";
 import { requireAdmin } from "@/lib/admin/session";
 import { formatINR } from "@/lib/money";
-import { fromPrice } from "@/lib/orders/pricing";
-import { revenueSince } from "@/lib/orders/stats";
 import { getStore } from "@/lib/store";
-import type { OrderStatus } from "@/lib/types";
 
-export default async function Dashboard() {
+const PERIODS = [
+  { days: 1, label: "Today" },
+  { days: 7, label: "7 days" },
+  { days: 30, label: "30 days" },
+  { days: 90, label: "90 days" },
+];
+
+export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
   await requireAdmin();
+  const sp = await searchParams;
+  const days = PERIODS.find((p) => String(p.days) === sp.days)?.days ?? 7;
+  const since = new Date();
+  since.setHours(0, 0, 0, 0);
+  since.setDate(since.getDate() - (days - 1));
+
   const store = getStore();
-  const [orders, products, custom, settings] = await Promise.all([
-    store.listOrders({ limit: 500 }),
-    store.listProducts({ includeInactive: true }),
-    store.listCustomRequests(),
+  const [stats, orders, products, settings] = await Promise.all([
+    store.stats(since.toISOString()),
+    store.listOrders({ limit: 8 }),
+    store.listProducts({ includeHidden: true }),
     store.getSettings(),
   ]);
+  const name = (id: string) => products.find((p) => p.id === id)?.name ?? "Deleted product";
+  const conversion = stats.views ? ((stats.orders / stats.views) * 100).toFixed(1) : "0";
+  const newOrders = orders.filter((o) => o.status === "new").length;
+  const maxDay = Math.max(1, ...stats.daily.map((d) => d.views));
 
-  const revenue = (days: number) => revenueSince(orders, days);
-  const count = (s: OrderStatus) => orders.filter((o) => o.status === s).length;
-
-  const todo = [
-    { label: "Payments to check", n: count("payment_review"), href: "/admin/orders?status=payment_review" },
-    { label: "Paid, to pack", n: count("paid"), href: "/admin/orders?status=paid" },
-    { label: "Pickup orders to pack", n: count("placed"), href: "/admin/orders?status=placed" },
-    { label: "Packed, to send", n: count("packed"), href: "/admin/orders?status=packed" },
-    { label: "New custom requests", n: custom.filter((c) => c.status === "new").length, href: "/admin/custom" },
+  const cards = [
+    { label: "Orders sent to WhatsApp", value: stats.orderClicks, hint: "Taps on Order on WhatsApp" },
+    { label: "Order value", value: formatINR(stats.orderValuePaise), hint: `${stats.orders} orders, excluding cancelled` },
+    { label: "Product views", value: stats.views, hint: `${conversion}% of views became an order` },
+    { label: "Added to cart", value: stats.addToCart, hint: `${stats.askClicks} "Ask on WhatsApp" taps` },
   ];
 
-  const unpriced = products.filter((p) => p.active && fromPrice(p) === null).length;
+  const unpriced = products.filter((p) => p.status === "live" && p.pricePaise === null).length;
   const warnings = [
-    !settings.storeOpen && "The shop is closed for online orders. Open it in Settings.",
-    !settings.upiEnabled && "UPI payments are off. Add your UPI ID in Settings.",
-    unpriced > 0 && `${unpriced} active product${unpriced === 1 ? " has" : "s have"} no price yet, so customers can't buy them.`,
+    !settings.storeOpen && "Online orders are paused. Turn them on in Settings.",
+    unpriced > 0 && `${unpriced} live product${unpriced === 1 ? " has" : "s have"} no price, so customers see "Ask on WhatsApp".`,
   ].filter(Boolean) as string[];
 
   return (
     <div className="space-y-10">
-      <h1 className="display text-5xl">Dashboard</h1>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <h1 className="display text-5xl">Dashboard</h1>
+        <nav className="flex gap-1 rounded-full bg-surface p-1 text-sm" aria-label="Period">
+          {PERIODS.map((p) => (
+            <Link
+              key={p.days}
+              href={`/admin?days=${p.days}`}
+              aria-current={p.days === days ? "page" : undefined}
+              className={`rounded-full px-3 py-1.5 ${p.days === days ? "bg-lemon text-ink" : "text-paper/70 hover:text-paper"}`}
+            >
+              {p.label}
+            </Link>
+          ))}
+        </nav>
+      </div>
 
       {warnings.length > 0 && (
         <ul className="space-y-2">
@@ -49,55 +72,70 @@ export default async function Dashboard() {
         </ul>
       )}
 
-      <section aria-labelledby="todo">
-        <h2 id="todo" className="label text-mute">
-          To do
-        </h2>
-        <ul className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          {todo.map((t) => (
-            <li key={t.label}>
-              <Link
-                href={t.href}
-                className={`block rounded-2xl border p-5 transition-colors hover:border-lemon ${t.n ? "border-lemon/50 bg-lemon/5" : "border-line"}`}
-              >
-                <p className="text-4xl font-semibold tabular-nums">{t.n}</p>
-                <p className="mt-1 text-sm text-paper/70">{t.label}</p>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {cards.map((c) => (
+          <li key={c.label} className="rounded-2xl border border-line p-5">
+            <p className="text-sm text-mute">{c.label}</p>
+            <p className="mt-2 text-3xl font-semibold tabular-nums" data-testid={`stat-${c.label}`}>
+              {c.value}
+            </p>
+            <p className="mt-1 text-xs text-mute">{c.hint}</p>
+          </li>
+        ))}
+      </ul>
 
-      <section aria-labelledby="money">
-        <h2 id="money" className="label text-mute">
-          Money in (paid orders)
-        </h2>
-        <dl className="mt-3 grid gap-3 sm:grid-cols-3">
-          {[
-            ["Last 24 hours", revenue(1)],
-            ["Last 7 days", revenue(7)],
-            ["Last 30 days", revenue(30)],
-          ].map(([label, v]) => (
-            <div key={label as string} className="rounded-2xl border border-line p-5">
-              <dt className="text-sm text-paper/70">{label}</dt>
-              <dd className="mt-1 text-3xl font-semibold tabular-nums">{formatINR(v as number)}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
+      {stats.daily.length > 1 && (
+        <section aria-labelledby="daily" className="rounded-2xl border border-line p-5">
+          <h2 id="daily" className="font-medium">
+            Views and orders per day
+          </h2>
+          <ul className="mt-4 flex h-40 items-end gap-1">
+            {stats.daily.map((d) => (
+              <li key={d.day} className="flex h-full flex-1 flex-col justify-end" title={`${d.day}: ${d.views} views, ${d.orders} orders`}>
+                <span className="block rounded-t bg-paper/20" style={{ height: `${(d.views / maxDay) * 100}%` }} />
+                {d.orders > 0 && <span className="mt-0.5 block h-1.5 rounded bg-lemon" />}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-mute">Grey: views. Yellow mark: at least one order that day.</p>
+        </section>
+      )}
 
-      <section aria-labelledby="recent">
-        <div className="flex items-baseline justify-between">
-          <h2 id="recent" className="label text-mute">
-            Latest orders
+      <div className="grid gap-6 lg:grid-cols-2">
+        {[
+          { title: "Most viewed", rows: stats.topViewed.map((t) => ({ id: t.productId, n: `${t.count} views` })) },
+          { title: "Most ordered", rows: stats.topOrdered.map((t) => ({ id: t.productId, n: `${t.qty} sold` })) },
+        ].map((block) => (
+          <section key={block.title} className="rounded-2xl border border-line p-5">
+            <h2 className="font-medium">{block.title}</h2>
+            {block.rows.length ? (
+              <ol className="mt-3 divide-y divide-line text-sm">
+                {block.rows.map((r) => (
+                  <li key={r.id} className="flex justify-between gap-3 py-2">
+                    <Link href={`/admin/products/${r.id}`} className="truncate hover:text-lemon">
+                      {name(r.id)}
+                    </Link>
+                    <span className="shrink-0 tabular-nums text-mute">{r.n}</span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="mt-3 text-sm text-mute">Nothing yet for this period.</p>
+            )}
+          </section>
+        ))}
+      </div>
+
+      <section className="space-y-4">
+        <div className="flex items-end justify-between">
+          <h2 className="display text-3xl">
+            Latest orders {newOrders > 0 && <span className="text-lemon">({newOrders} new)</span>}
           </h2>
           <Link href="/admin/orders" className="text-sm text-mute hover:text-lemon">
             All orders →
           </Link>
         </div>
-        <div className="mt-3">
-          <OrdersTable orders={orders.slice(0, 8)} />
-        </div>
+        <OrdersTable orders={orders} />
       </section>
     </div>
   );

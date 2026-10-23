@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import path from "node:path";
+import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
 async function adminLogin(page: Page) {
   await page.goto("/admin/login");
@@ -8,111 +9,100 @@ async function adminLogin(page: Page) {
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
 }
 
-test("browse, buy with UPI, then admin verifies and ships", async ({ page, isMobile }) => {
+/** Catches the wa.me link instead of leaving for WhatsApp. */
+async function catchWhatsApp(context: BrowserContext) {
+  const urls: string[] = [];
+  await context.route("https://wa.me/**", (route) => {
+    urls.push(route.request().url());
+    return route.fulfill({ contentType: "text/html", body: "<title>WhatsApp</title>ok" });
+  });
+  return urls;
+}
+
+test("build a cart with offers and a music card, order on WhatsApp, then manage it in admin", async ({ page, context, isMobile }) => {
+  const wa = await catchWhatsApp(context);
+
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /your stickers/i })).toBeVisible();
+  await expect(page.getByLabel("Offers").first()).toContainText("Buy 4 stickers, get 1 free");
 
-  await page.goto("/shop");
-  await page.getByRole("link", { name: /Lo-fi sticker 03/ }).first().click();
-  await expect(page.getByRole("heading", { level: 1, name: "Lo-fi sticker 03" })).toBeVisible();
-  await page.getByRole("button", { name: "Increase quantity" }).click();
+  // Five stickers: the fifth is free.
+  await page.goto("/shop/lofi-03");
+  await expect(page.getByRole("heading", { level: 1, name: "Lo-fi 03" })).toBeVisible();
+  await expect(page.getByTestId("price")).toHaveText("₹10");
+  await page.getByText("Waterproof", { exact: true }).click();
+  for (let i = 0; i < 4; i++) await page.getByRole("button", { name: "Increase quantity" }).click();
   await page.getByRole("button", { name: "Add to cart" }).click();
   const drawer = page.getByRole("dialog", { name: "Your cart" });
   await expect(drawer).toBeVisible();
-  await drawer.getByRole("link", { name: "Checkout" }).click();
+  await expect(drawer.getByTestId("cart-total")).toHaveText("₹40");
+  await expect(drawer).toContainText("Material: Waterproof");
+  await drawer.getByRole("button", { name: "Close cart" }).first().click();
 
-  await expect(page.getByTestId("checkout-total")).toHaveText("₹147");
-  await page.getByLabel("Full name").fill("Asha Naik");
-  await page.getByLabel("Mobile number").fill("98765 43210");
-  await page.getByLabel("House, building, street").fill("House 12, Fontainhas");
-  await page.getByLabel("City").fill("Panaji");
-  await page.getByLabel("Pincode").fill("403001");
-  await page.getByRole("button", { name: "Place order and pay" }).click();
+  // A music card needs its Spotify link; the photo is optional.
+  await page.goto("/shop/music-card");
+  await page.getByRole("button", { name: "Add to cart" }).click();
+  await expect(page.getByText('Fill in "Spotify song link" first.')).toBeVisible();
+  await page.getByLabel(/Spotify song link/).fill("https://open.spotify.com/track/abc");
+  await page.getByLabel(/Your photo/).setInputFiles(path.join(__dirname, "fixtures/photo.png"));
+  await expect(page.locator("img[src^='blob:']")).toBeVisible();
+  await page.getByLabel(/Dedicated to/).fill("Riya");
+  await page.getByRole("button", { name: "Add to cart" }).click();
+  await expect(page.getByTestId("cart-count")).toHaveText("6");
 
-  await expect(page.getByTestId("order-status")).toHaveText("Awaiting payment");
-  const orderNumber = (await page.getByText(/^Order SNV-/).textContent())!.replace("Order ", "").trim();
-  if (isMobile) await expect(page.getByRole("link", { name: "Open UPI app" })).toHaveAttribute("href", /^upi:\/\/pay\?pa=demo%40upi.*am=147\.00/);
-  else await expect(page.getByRole("img", { name: /UPI QR code/ })).toBeVisible();
+  await page.goto("/cart");
+  await expect(page.getByTestId("cart-total")).toHaveText("₹189");
+  await page.getByPlaceholder("Your name").fill("Asha");
+  await page.getByRole("button", { name: "Order on WhatsApp" }).click();
+  // Phones hand over to the WhatsApp app; desktops open it in a new tab.
+  if (isMobile) await expect(page).toHaveURL(/^https:\/\/wa\.me\//);
+  else await expect(page.getByText(/Your order is ready in WhatsApp \(ref SNV-/)).toBeVisible();
+  await expect.poll(() => wa.length).toBe(1);
 
-  // UTRs are unique per order, and demo data lives as long as the server.
-  const utr = String(Date.now()).slice(-12).padStart(12, "4");
-  await page.getByLabel("UPI reference number").fill(utr);
-  await page.getByRole("button", { name: "I've paid" }).click();
-  await expect(page.getByTestId("order-status")).toHaveText("Checking payment");
+  const text = new URL(wa[0]).searchParams.get("text")!;
+  expect(new URL(wa[0]).pathname).toBe("/917744020601");
+  expect(text).toContain("Lo-fi 03 × 5 = ₹50");
+  expect(text).toContain("Buy 4 stickers, get 1 free: −₹10");
+  expect(text).toContain("Spotify song link: https://open.spotify.com/track/abc");
+  expect(text).toMatch(/Your photo: https?:\/\/\S+\/u\/[a-f0-9]{32}/);
+  expect(text).toContain("Total: ₹189");
+  const ref = /Order ref: (SNV-[A-Z0-9]{6})/.exec(text)![1];
 
-  // Cart is emptied after ordering.
-  await expect(page.getByTestId("cart-count")).toHaveText("0");
-
-  // Admin side.
+  // Admin sees the order, its photo and the numbers.
   await page.goto("/admin");
   await expect(page).toHaveURL(/\/admin\/login/);
-  await page.getByLabel("Email").fill("demo@stixnvibes.com");
-  await page.getByLabel("Password").fill("demo-admin");
-  await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
-
-  await page.goto(`/admin/orders/${orderNumber}`);
-  await expect(page.getByText(utr).first()).toBeVisible();
-  await page.getByRole("button", { name: "Mark paid" }).click();
-  await expect(page.getByRole("button", { name: "Mark packed" })).toBeVisible();
-  await page.getByRole("button", { name: "Mark packed" }).click();
-  await page.getByLabel("Courier").fill("India Post");
-  await page.getByLabel("Tracking number").fill("EK123456789IN");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await adminLogin(page);
+  await expect(page.getByTestId("stat-Orders sent to WhatsApp")).not.toHaveText("0");
+  await page.getByRole("link", { name: ref }).click();
+  await expect(page.getByRole("heading", { name: ref })).toBeVisible();
+  await expect(page.getByText("Customer note")).toHaveCount(0);
+  await expect(page.getByAltText("Your photo")).toBeVisible();
+  await page.getByLabel("Status").selectOption("paid");
+  await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Saved.")).toBeVisible();
-  await page.getByRole("button", { name: "Mark shipped" }).click();
-  await expect(page.getByRole("button", { name: "Mark delivered" })).toBeVisible();
-
-  // Customer sees it through order tracking.
-  await page.goto("/track");
-  await page.getByLabel("Order number").fill(orderNumber.toLowerCase());
-  await page.getByLabel("Phone number").fill("9876543210");
-  await page.getByRole("button", { name: "Find my order" }).click();
-  await expect(page.getByTestId("order-status")).toHaveText("Shipped");
-  await expect(page.getByText("EK123456789IN")).toBeVisible();
 });
 
-test("admin can price a product and the shop picks it up", async ({ page }) => {
+test("admin adds a poster with options and it shows in the shop", async ({ page }) => {
   await adminLogin(page);
-  await page.goto("/admin/products/new");
-  const name = `Test A4 poster ${Date.now().toString(36)}`;
+  await page.goto("/admin/products/new?type=poster");
+  const name = `Test poster ${Date.now().toString(36)}`;
   await page.getByLabel("Name", { exact: true }).fill(name);
-  await page.getByLabel("Category").selectOption("posters");
-  await page.getByLabel("Option name").fill("A4");
-  await page.getByLabel("Price ₹").fill("149");
-  await page.getByLabel("Stock").fill("5");
-  await page.getByPlaceholder(/paste an image link/).fill("/lofi/lofi-05.webp");
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByLabel(/^Price ₹/).fill("120");
+  // Template gives Size / Print / Frame; make A3 cost ₹60 more.
+  await page.getByLabel("Price change in rupees").nth(1).fill("60");
   await page.getByRole("button", { name: "Create product" }).click();
   await expect(page.getByText("Product created.")).toBeVisible();
 
-  await page.goto(`/shop/${name.toLowerCase().replace(/ /g, "-")}`);
-  await expect(page.getByText("₹149").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add to cart" })).toBeVisible();
+  await page.goto("/shop?type=poster");
+  await page.getByRole("link", { name: new RegExp(name) }).click();
+  await expect(page.getByTestId("price")).toHaveText("₹120");
+  await page.locator("label", { hasText: /^A3/ }).click();
+  await expect(page.getByTestId("price")).toHaveText("₹180");
 });
 
-test("custom request reaches admin", async ({ page }) => {
-  await page.goto("/custom");
-  await page.getByLabel("Name", { exact: true }).fill("Fest Team");
-  await page.getByLabel("Phone, email or Instagram").fill("@festteam");
-  await page.getByLabel("What do you want?").fill("100 logo stickers for our college fest in December");
-  await page.getByRole("button", { name: "Ask for a quote" }).click();
-  await expect(page.getByRole("heading", { name: "Got it!" })).toBeVisible();
-
-  await adminLogin(page);
-  await page.goto("/admin/custom");
-  await expect(page.getByText("100 logo stickers for our college fest").first()).toBeVisible();
-});
-
-test("tampered cart prices are ignored", async ({ request }) => {
-  const res = await request.post("/api/cart/quote", {
-    data: { lines: [{ productId: "p-lofi-01", variantId: "v-lofi-01", qty: 2, price: 1 }], fulfilment: "pickup" },
-  });
-  const { quote } = await res.json();
-  expect(quote.totalPaise).toBe(9800);
-});
-
-test("admin pages and APIs are locked without a session", async ({ request }) => {
-  const res = await request.get("/admin/orders", { maxRedirects: 0 });
-  expect([302, 303, 307]).toContain(res.status());
+test("upcoming products can't be added to the cart", async ({ page }) => {
+  await page.goto("/shop/wall-cards");
+  await expect(page.getByTestId("price")).toHaveText("Coming soon");
+  await expect(page.getByRole("button", { name: "Add to cart" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Ask on WhatsApp" })).toHaveAttribute("href", /^https:\/\/wa\.me\/917744020601\?text=/);
 });
