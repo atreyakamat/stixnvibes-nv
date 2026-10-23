@@ -1,65 +1,58 @@
-# Stix N Vibes — Enterprise Commerce & Customization Engine
+# Stix N Vibes shop
 
-A world-class, enterprise-grade digital product ecosystem for stickers, posters, Spotify acrylic cards, custom vinyl studio, and mystery packs. Built with Next.js 14 (App Router), TypeScript, Tailwind CSS, Framer Motion, Supabase, Cloudinary, and Razorpay.
+The online shop for Stix N Vibes (shop.stixnvibes.com). Customers browse, customise and fill a cart, then send the whole order to WhatsApp in one tap. An admin panel runs the catalog, collections, offers and orders, and shows what people view and order. Same look as [stixnvibes.com](https://www.stixnvibes.com).
 
----
+**Stack:** Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · Motion · Supabase (Postgres + Auth + Storage) · Netlify.
 
-## Single Unified Command
-
-The entire application—**both Frontend UI & Backend Server APIs** (`/api/checkout`, `/api/spotify/metadata`, `/api/orders/create`, `/api/admin/*`, `/api/analytics/vitals`)—runs seamlessly in a single unified command:
+## Run it locally
 
 ```bash
-npm run dev
+npm install
+npm run dev        # http://localhost:3000, demo data, no keys needed
 ```
 
-*Access the application at [http://localhost:3000](http://localhost:3000)*
+Without Supabase keys the app runs in **demo mode**: data lives in memory, products that have no price yet get demo prices, and the admin login (`demo@stixnvibes.com` / `demo-admin`) is shown on `/admin/login`.
 
----
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Dev server |
+| `npm run build` / `npm start` | Production build and server |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | Route types + `tsc` |
+| `npm test` | Unit tests (Vitest) |
+| `npm run test:e2e` | Browser tests (Playwright, desktop + phone, demo mode) |
+| `npx jiti scripts/gen-seed.ts` | Rewrites `supabase/seed.sql` from `src/lib/store/seed.ts` |
 
-## All Commands
+## How it works
 
-| Command | Description |
-|---|---|
-| `npm run dev` | **Unified Full-Stack Dev Server** (Frontend + Backend APIs at http://localhost:3000) |
-| `npm run build` | Production bundle build (compiles all 21 static/dynamic pages) |
-| `npm run start` | Start production server |
-| `npm run typecheck` | Run TypeScript strict type verification (`tsc --noEmit`) |
-| `npm run test:run` | Run complete unit & integration test suite (`vitest run`) |
-| `npm run lint` | ESLint static code analysis (`next lint`) |
+- **Product types**: stickers, sticker sheets, posters, music cards and wall cards. Each product has a base price (blank = "Ask on WhatsApp"), an optional "was" price, a badge, and a status: live, coming soon (shown, can't be ordered) or hidden.
+- **Options**: any number of option groups (Size: A4 / A3, Print: normal / sticker, Frame: none / framed, Material: paper vinyl / waterproof). Each choice can add to or take off the base price. Each type has a one-click template.
+- **Custom fields**: what the customer fills in, e.g. a Spotify link, a dedication and a photo for a music card. Photos go to a private bucket; the order links to them at `/u/<random id>`.
+- **Collections**: group designs (Lo-fi, Anime…). A product can be in several.
+- **Offers**, per product type:
+  - Bulk price: from N items, each costs ₹X (sheets ₹65 from 11; wall cards ₹25 from 6, ₹20 from 11).
+  - Buy X get Y free (stickers: buy 4 get 1; posters: buy 5 get 1). Items are grouped from most to least expensive and the cheapest in each full group are free.
+  - The cart nudges ("add 1 more sticker and it's free", "add 2 more wall cards to pay ₹25 each").
+- **Minimum per order** per product (music cards: 5). Checkout waits until it's met.
+- **Free shipping** above a set amount (₹250), with a cart nudge.
+- **Ordering**: the cart lives in the browser. "Order on WhatsApp" sends the cart to the server, which re-prices it from the database, records the order with a ref (`SNV-XXXXXX`) and returns a `wa.me` link with the full order written out. If the server can't be reached, the browser builds the same message itself, so an order is never lost. Payment and delivery are sorted in the WhatsApp chat.
+- **Analytics**: product views, add-to-cart, order taps and "Ask on WhatsApp" taps are counted without cookies or personal data.
+- **Admin** (`/admin`): dashboard (orders sent, order value, views, conversion, most viewed / ordered, daily chart), orders (status, private notes, customer photos), products (filters, quick hide / sold out / feature, duplicate, full editor with options, custom fields and photos), bulk add (one product per uploaded design), collections, offers, settings (WhatsApp number, notes, banner, pause orders).
 
----
+## Going live
 
-## Docker Support (Run Full Suite in Container)
+See [docs/SETUP.md](docs/SETUP.md) for the Supabase and Netlify steps.
 
-```bash
-# Hot-reload development server inside Docker
-docker compose up dev
+## Project layout
 
-# Production build served via Next.js inside Docker
-docker compose up prod
-
-# Execute entire automated test suite inside container
-docker compose run --rm tests
 ```
-
----
-
-## Platform Features & Architecture
-
-- **Interactive Live Canvas Customizer**: 2D/3D studio with live transform controls, 300 DPI resolution checker, text typography tools, material finish swatches (Holographic, Glossy, Matte, Clear), and Spotify track metadata auto-lookup.
-- **Shop Catalog & Product Engine**: Multi-category filter pipeline, debounced instant search, price band sliders, variant matrices, technical spec sheets, and verified review submissions.
-- **Cart & Multi-Gateway Checkout**: Optimistic slide-out cart drawer, coupon engine (`VIBES20`, `VIBES10`), free shipping progress bar, Razorpay online payments (UPI/Cards/NetBanking), and single-tap WhatsApp checkout.
-- **Supabase PostgreSQL & Security**: Production database schema (`supabase/schema.sql`) with Row Level Security (RLS) policies, indexes, and automated triggers.
-
----
-
-## Database Architecture & Relational Integrity
-
-The Stix N Vibes database architecture, entity relationship diagram, and gaps are documented in the following artifacts:
-- **Entity Relationship Diagram (ERD)**: See [database_erd.md](file:///C:/Users/atkam/.gemini/antigravity-cli/brain/64d9c92b-4c18-44c9-a25c-c49e27cf4204/database_erd.md)
-- **Detailed Database Architecture**: See [database_architecture.md](file:///C:/Users/atkam/.gemini/antigravity-cli/brain/64d9c92b-4c18-44c9-a25c-c49e27cf4204/database_architecture.md)
-- **Gap Analysis & Hardening Verdict**: See [database_gap_analysis.md](file:///C:/Users/atkam/.gemini/antigravity-cli/brain/64d9c92b-4c18-44c9-a25c-c49e27cf4204/database_gap_analysis.md)
-- **Hardening Cross-Examination Report**: See [database_hardening_cross_exam.md](file:///C:/Users/atkam/.gemini/antigravity-cli/brain/64d9c92b-4c18-44c9-a25c-c49e27cf4204/database_hardening_cross_exam.md)
-- **Entity Relationship & Integrity Matrix**: See [database_relationship_matrix.md](file:///C:/Users/atkam/.gemini/antigravity-cli/brain/64d9c92b-4c18-44c9-a25c-c49e27cf4204/database_relationship_matrix.md)
-- **Database Data Flow Diagram**: See [database_data_flow.md](file:///C:/Projects/stixnvibes-nv/.gemini/antigravity-cli/brain/64d9c92b-4c18-44c9-a25c-c49e27cf4204/database_data_flow.md) or the locally stored [database_data_flow.md](file:///C:/Users/atkam/.gemini/antigravity-cli/brain/64d9c92b-4c18-44c9-a25c-c49e27cf4204/database_data_flow.md)
-
+src/app/(shop)/      storefront pages
+src/app/admin/       admin pages and server actions
+src/app/api/         order, upload and analytics endpoints
+src/lib/pricing.ts   options and offers (shared by browser and server)
+src/lib/orders.ts    server-side pricing and order recording
+src/lib/whatsapp.ts  WhatsApp links and the order message
+src/lib/store/       data layer: Supabase + in-memory demo store, seed catalog
+supabase/            SQL migration and starter catalog
+tests/               unit (Vitest) and browser (Playwright) tests
+```

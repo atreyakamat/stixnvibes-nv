@@ -1,33 +1,41 @@
-# Netlify configuration for Stix N Vibes
-# Modern Next.js (SSR + RSC) is auto-detected by Netlify's Next runtime.
-# No `next export` needed — Netlify's plugin builds it as a hybrid site:
-#  - Marketing homepage runs as static/edge
-#  - /shop, /checkout, /api/* run as serverless functions
+# Netlify detects Next.js and uses its runtime: pages render on the server,
+# API routes and server actions run as functions.
 [build]
   command = "npm run build"
   publish = ".next"
 
 [build.environment]
-  NODE_VERSION = "20"
-  NPM_FLAGS = "--no-audit --no-fund"
+  NODE_VERSION = "22"
 
-# Long-cache static assets
+# Deploy previews and branch deploys run in demo mode (in-memory data, demo
+# prices, demo admin login) unless Supabase keys are set for that context.
+# Production never runs in demo mode.
+[context.deploy-preview.environment]
+  SHOP_DEMO_MODE = "true"
+[context.branch-deploy.environment]
+  SHOP_DEMO_MODE = "true"
+
 [[headers]]
-  for = "/_next/static/*"
+  for = "/lofi/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
 [[headers]]
-  for = "/favicon.svg"
+  for = "/stall/*"
   [headers.values]
-    Cache-Control = "public, max-age=604800"
+    Cache-Control = "public, max-age=31536000, immutable"
 
-# Security headers
 [[headers]]
   for = "/*"
   [headers.values]
-    X-Frame-Options = "SAMEORIGIN"
     X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
-    Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
+    Strict-Transport-Security = "max-age=63072000; includeSubDomains"
+
+[[headers]]
+  for = "/admin/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    Cache-Control = "no-store"

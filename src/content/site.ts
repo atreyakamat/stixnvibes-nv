@@ -1,0 +1,30 @@
+// Shop copy and contact facts. Contacts match stixnvibes.com.
+
+import { DEFAULT_WHATSAPP, waLink } from "@/lib/whatsapp";
+
+export const site = {
+  name: "Stix N Vibes",
+  url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://shop.stixnvibes.com",
+  mainSite: "https://www.stixnvibes.com",
+  tagline: "Your stickers. Your vibe.",
+  description:
+    "Shop Stix N Vibes: stickers from ₹10, super sheets, A4 and A3 posters, Spotify music cards and wall cards from a student-led brand in Goa. Order on WhatsApp.",
+  origin: "From Goa, for everywhere.",
+  contact: {
+    email: "hello@stixnvibes.com",
+    instagram: "https://instagram.com/stixnvibes",
+    instagramHandle: "@stixnvibes",
+    instagramDm: "https://ig.me/m/stixnvibes",
+    whatsappNumber: DEFAULT_WHATSAPP,
+  },
+} as const;
+
+export const whatsappLink = (text?: string) => waLink(site.contact.whatsappNumber, text);
+
+export const nav = [
+  { href: "/shop", label: "Shop all" },
+  { href: "/shop?type=sticker", label: "Stickers" },
+  { href: "/shop?type=poster", label: "Posters" },
+  { href: "/shop?type=music-card", label: "Music cards" },
+  { href: "/collections", label: "Collections" },
+] as const;

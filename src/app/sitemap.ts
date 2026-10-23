@@ -1,28 +1,18 @@
 import type { MetadataRoute } from "next";
-import { siteConfig } from "@/lib/site-config";
+import { policies } from "@/content/policies";
+import { site } from "@/content/site";
+import { getShopState } from "@/lib/shop";
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  const base = siteConfig.url;
-  const now = new Date();
+export const revalidate = 3600;
 
-  const staticRoutes = [
-    "/", "/shop", "/shop/stickers", "/shop/stickers/normal",
-    "/shop/stickers/vinyl", "/shop/posters", "/shop/posters/a5",
-    "/shop/posters/a4", "/shop/posters/a3",
-    "/shop/spotify-cards", "/shop/spotify-cards/ready",
-    "/shop/frames", "/shop/frames/standard", "/shop/frames/premium",
-    "/shop/mystery", "/shop/mystery/anime", "/shop/mystery/gaming",
-    "/shop/mystery/premium",
-    "/customize", "/customize/spotify-card", "/customize/posters",
-    "/customize/frames", "/customize/stickers",
-    "/about", "/faq", "/contact",
-    "/policies/privacy", "/policies/refund", "/policies/shipping", "/policies/terms", "/policies/cookie",
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const { products, collections } = await getShopState();
+  return [
+    { url: `${site.url}/`, changeFrequency: "weekly", priority: 1 },
+    { url: `${site.url}/shop`, changeFrequency: "daily", priority: 0.9 },
+    { url: `${site.url}/collections`, changeFrequency: "weekly", priority: 0.7 },
+    ...collections.map((c) => ({ url: `${site.url}/collections/${c.slug}`, priority: 0.7 })),
+    ...products.map((p) => ({ url: `${site.url}/shop/${p.slug}`, lastModified: p.updatedAt, priority: 0.6 })),
+    ...policies.map((p) => ({ url: `${site.url}/policies/${p.slug}`, priority: 0.2 })),
   ];
-
-  return staticRoutes.map((path) => ({
-    url: `${base}${path}`,
-    lastModified: now,
-    changeFrequency: path === "/" ? "daily" : "weekly",
-    priority: path === "/" ? 1 : path.startsWith("/shop") ? 0.9 : 0.6,
-  }));
 }

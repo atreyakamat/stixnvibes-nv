@@ -1,28 +1,21 @@
 import { defineConfig, devices } from "@playwright/test";
 
-/**
- * E2E config for Stix N Vibes.
- * Spawns `npm run start` against the production build.
- */
+// Runs against a production build in demo mode (in-memory data, demo admin).
 export default defineConfig({
-  testDir: "./tests/e2e",
-  timeout: 90_000,
-  expect: { timeout: 10_000 },
-  fullyParallel: true,
-  retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
-  use: {
-    baseURL: "http://localhost:3009",
-    trace: "on-first-retry",
-    headless: true,
-  },
+  testDir: "tests/e2e",
+  timeout: 60_000,
+  fullyParallel: false,
+  workers: 1,
+  use: { baseURL: "http://localhost:3100", trace: "retain-on-failure" },
   projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    { name: "desktop", use: { ...devices["Desktop Chrome"] } },
+    { name: "mobile", use: { ...devices["Pixel 7"] } },
   ],
   webServer: {
-    command: "npx next dev -p 3009",
-    url: "http://localhost:3009",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    command: "npm run build && npx next start -p 3100",
+    url: "http://localhost:3100",
+    timeout: 240_000,
+    reuseExistingServer: true,
+    env: { SHOP_DEMO_MODE: "true" },
   },
 });

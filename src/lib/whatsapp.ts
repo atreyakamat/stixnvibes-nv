@@ -1,95 +1,50 @@
-/**
- * Builds a WhatsApp deep-link URL pre-filled with the customer's order details.
- * Used as the primary checkout flow — Database is source of truth first,
- * then WhatsApp opens with pre-filled Order ID for admin confirmation.
- *
- * Env: NEXT_PUBLIC_WHATSAPP_NUMBER (country code + number, digits only).
- */
+import { formatINR } from "./money";
+import type { AppliedOffer, OrderLine } from "./types";
 
-export type WhatsAppCartItem = {
-  id?: string;
-  productId?: string;
-  name: string;
-  price_cents: number;
-  quantity: number;
-  image?: string;
-  variantName?: string;
+export const DEFAULT_WHATSAPP = "917744020601";
+
+export function waLink(number: string, text?: string) {
+  const digits = number.replace(/\D/g, "") || DEFAULT_WHATSAPP;
+  return `https://wa.me/${digits}${text ? `?text=${encodeURIComponent(text)}` : ""}`;
+}
+
+export type MessageInput = {
+  number?: string | null;
+  lines: Pick<OrderLine, "name" | "options" | "custom" | "qty" | "unitPricePaise" | "lineTotalPaise">[];
+  subtotalPaise: number;
+  discountPaise: number;
+  totalPaise: number;
+  offers: Pick<AppliedOffer, "name" | "discountPaise">[];
+  customerName?: string;
+  customerNote?: string;
+  /** null = no free shipping threshold, so no shipping line. */
+  freeShippingAbovePaise?: number | null;
 };
 
-export interface WhatsAppParams {
-  orderId?: string;
-  orderNumber?: string;
-  name: string;
-  address: string;
-  pincode: string;
-  phone: string;
-  items: WhatsAppCartItem[];
-  totalRupees: number;
-  notes?: string;
-}
-
-const BUSINESS_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.replace(/\D/g, "");
-
-/** True when the WhatsApp business number env var is set. */
-export function isWhatsAppConfigured() {
-  return Boolean(BUSINESS_NUMBER);
-}
-
-export function getWhatsAppNumber() {
-  return BUSINESS_NUMBER ?? "";
-}
-
-export function buildWhatsAppUrl(params: WhatsAppParams): string {
-  if (!BUSINESS_NUMBER) {
-    throw new Error(
-      "WhatsApp number not configured. Set NEXT_PUBLIC_WHATSAPP_NUMBER in your .env.local (country code + number, digits only)."
-    );
-  }
-
-  const orderRef = params.orderNumber || (params.orderId ? `#ORD-${params.orderId.slice(0, 8).toUpperCase()}` : undefined);
-
-  const lines: string[] = [];
-  lines.push("Hi Stix N Vibes 👋");
-  lines.push("");
-  lines.push("I'd like to confirm my order.");
-  lines.push("");
-  if (orderRef) {
-    lines.push("Order ID:");
-    lines.push(orderRef);
-    lines.push("");
-  }
-  lines.push("Name:");
-  lines.push(params.name);
-  lines.push("");
-  lines.push("Phone:");
-  lines.push(params.phone);
-  lines.push("");
-  lines.push("Items:");
-  params.items.forEach((item) => {
-    const price = formatRupees((item.price_cents * item.quantity) / 100);
-    const variant = item.variantName ? ` (${item.variantName})` : "";
-    lines.push(`• ${item.name}${variant} ×${item.quantity} — ${price}`);
+/** The order as a WhatsApp message the customer sends to the shop. */
+export function orderMessage(o: MessageInput): string {
+  const out: string[] = ["Hi Stix N Vibes! I'd like to order:", ""];
+  o.lines.forEach((l, i) => {
+    out.push(`${i + 1}. ${l.name} × ${l.qty} = ${formatINR(l.lineTotalPaise)}`);
+    for (const opt of l.options) out.push(`   ${opt}`);
+    for (const c of l.custom) out.push(`   ${c.label}: ${c.value}`);
   });
-  lines.push("");
-  lines.push("Delivery:");
-  lines.push(`${params.address} (Pincode: ${params.pincode})`);
-  if (params.notes) {
-    lines.push(`Notes: ${params.notes}`);
+  out.push("");
+  if (o.discountPaise > 0) {
+    out.push(`Subtotal: ${formatINR(o.subtotalPaise)}`);
+    for (const a of o.offers) out.push(`${a.name}: −${formatINR(a.discountPaise)}`);
   }
-  lines.push("");
-  lines.push("Total:");
-  lines.push(formatRupees(params.totalRupees));
-  lines.push("");
-  lines.push("Thank you!");
-
-  const message = encodeURIComponent(lines.join("\n"));
-  return `https://wa.me/${BUSINESS_NUMBER}?text=${message}`;
+  out.push(`Total: ${formatINR(o.totalPaise)}`);
+  if (o.freeShippingAbovePaise != null) {
+    out.push(o.totalPaise >= o.freeShippingAbovePaise ? "Shipping: free" : "Shipping: please share the charge for my area");
+  }
+  if (o.customerName) out.push("", `Name: ${o.customerName}`);
+  if (o.customerNote) out.push(`Note: ${o.customerNote}`);
+  if (o.number) out.push("", `Order ref: ${o.number}`);
+  return out.join("\n");
 }
 
-function formatRupees(amount: number): string {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(amount);
+/** A question about one product that has no online price, or is upcoming. */
+export function askMessage(name: string, url: string) {
+  return `Hi Stix N Vibes! I'm interested in "${name}". ${url}`;
 }
