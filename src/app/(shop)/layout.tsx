@@ -17,6 +17,7 @@ export default async function ShopLayout({ children }: LayoutProps<"/">) {
     whatsappNumber: settings.whatsappNumber,
     orderNote: settings.orderNote,
     bulkNote: settings.bulkNote,
+    freeShippingAbovePaise: settings.freeShippingAbovePaise,
   };
 
   return (

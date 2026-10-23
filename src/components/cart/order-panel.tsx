@@ -8,9 +8,9 @@ import { useCart } from "./cart-context";
 
 type Done = { number: string | null; url: string };
 
-/** Totals, offer nudges and the "Order on WhatsApp" button. */
+/** Totals, offer nudges and the "Checkout on WhatsApp" button. */
 export function OrderPanel({ compact = false }: { compact?: boolean }) {
-  const { items, subtotalPaise, discountPaise, totalPaise, applied, hints, config, clear } = useCart();
+  const { items, subtotalPaise, discountPaise, totalPaise, applied, hints, shortfalls, shipping, config, clear } = useCart();
   const [name, setName] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -30,6 +30,7 @@ export function OrderPanel({ compact = false }: { compact?: boolean }) {
         offers: applied,
         customerName: name.trim(),
         customerNote: note.trim(),
+        freeShippingAbovePaise: config.freeShippingAbovePaise,
       }),
     );
 
@@ -95,6 +96,11 @@ export function OrderPanel({ compact = false }: { compact?: boolean }) {
 
   return (
     <div className="space-y-4">
+      {shortfalls.map((s) => (
+        <p key={s.productId} className="rounded-xl bg-[#ff7a59]/10 px-3 py-2 text-sm text-[#ffb59f]" role="alert">
+          {s.name}: minimum {s.minQty} per order. Add {s.need} more to check out.
+        </p>
+      ))}
       {hints.map((h) => (
         <p key={h} className="rounded-xl bg-lemon/10 px-3 py-2 text-sm text-lemon">
           {h}
@@ -123,6 +129,14 @@ export function OrderPanel({ compact = false }: { compact?: boolean }) {
             {formatINR(totalPaise)}
           </dd>
         </div>
+        {shipping && (
+          <div className="flex justify-between text-sm">
+            <dt className="text-paper/70">Shipping</dt>
+            <dd className={shipping.free ? "text-lemon" : "text-paper/70"}>
+              {shipping.free ? "Free" : `Add ${formatINR(shipping.needPaise)} more for free shipping`}
+            </dd>
+          </div>
+        )}
       </dl>
 
       <details className="group text-sm" open={!compact}>
@@ -144,11 +158,11 @@ export function OrderPanel({ compact = false }: { compact?: boolean }) {
           {error}
         </p>
       )}
-      <button type="button" onClick={order} disabled={busy || !items.length} className="btn btn-primary w-full justify-center disabled:opacity-50">
+      <button type="button" onClick={order} disabled={busy || !items.length || shortfalls.length > 0} className="btn btn-primary w-full justify-center disabled:opacity-50">
         <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="currentColor">
           <path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2l-.4-.3Z" />
         </svg>
-        {busy ? "Opening WhatsApp…" : "Order on WhatsApp"}
+        {busy ? "Opening WhatsApp…" : "Checkout on WhatsApp"}
       </button>
       <p className="text-xs text-mute">{config.orderNote}</p>
     </div>

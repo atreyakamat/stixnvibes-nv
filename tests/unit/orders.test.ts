@@ -22,7 +22,7 @@ describe("priceLines", () => {
     expect(missing.problems[0].reason).toMatch(/Spotify song link/);
 
     const id = "a".repeat(32);
-    const ok = priceLines([{ productId: music.id, qty: 1, selections: {}, custom: { song: "https://open.spotify.com/track/x", photo: id, for: "Riya" } }], products, offers);
+    const ok = priceLines([{ productId: music.id, qty: 5, selections: {}, custom: { song: "https://open.spotify.com/track/x", photo: id, for: "Riya" } }], products, offers);
     expect(ok.problems).toEqual([]);
     expect(ok.lines[0].custom).toEqual([
       { label: "Spotify song link", value: "https://open.spotify.com/track/x", kind: "link" },
@@ -32,9 +32,10 @@ describe("priceLines", () => {
   });
 
   it("rejects bad upload ids, unknown options and products that can't be ordered", () => {
-    expect(priceLines([{ productId: music.id, qty: 1, selections: {}, custom: { song: "x", photo: "../etc" } }], products, offers).problems).toHaveLength(1);
+    expect(priceLines([{ productId: music.id, qty: 5, selections: {}, custom: { song: "x", photo: "../etc" } }], products, offers).problems).toHaveLength(1);
+    expect(priceLines([{ productId: music.id, qty: 3, selections: {}, custom: { song: "x" } }], products, offers).problems[0].reason).toMatch(/minimum is 5/);
     expect(priceLines([{ productId: poster.id, qty: 1, selections: { size: "a0" }, custom: {} }], products, offers).problems).toHaveLength(1);
-    expect(priceLines([{ productId: "p-wall-cards", qty: 1, selections: {}, custom: {} }], products, offers).problems).toHaveLength(1);
+    expect(priceLines([{ productId: "p-wall-cards", qty: 1, selections: {}, custom: {} }], [{ ...products.find((p) => p.id === "p-wall-cards")!, status: "upcoming" }], offers).problems).toHaveLength(1);
     expect(priceLines([{ productId: "nope", qty: 1, selections: {}, custom: {} }], products, offers).problems).toHaveLength(1);
   });
 });
@@ -49,11 +50,12 @@ describe("WhatsApp message", () => {
       products,
       offers,
     );
-    const text = orderMessage({ ...r, offers: r.applied, number: "SNV-ABC234", customerName: "Riya" });
+    const text = orderMessage({ ...r, offers: r.applied, number: "SNV-ABC234", customerName: "Riya", freeShippingAbovePaise: 25000 });
     expect(text).toContain("1. Lo-fi 01 × 4 = ₹40");
     expect(text).toContain("   Material: Paper vinyl");
     expect(text).toContain("Buy 4 stickers, get 1 free: −₹10");
     expect(text).toContain("Total: ₹40");
+    expect(text).toContain("Shipping: please share the charge for my area");
     expect(text).toContain("Name: Riya");
     expect(text).toContain("Order ref: SNV-ABC234");
     expect(waLink("91 77440 20601", "hi")).toBe("https://wa.me/917744020601?text=hi");

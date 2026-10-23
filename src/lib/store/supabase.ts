@@ -24,6 +24,7 @@ function toProduct(r: Row): Product {
     sortOrder: r.sort_order as number,
     pricePaise: (r.price_paise as number | null) ?? null,
     compareAtPaise: (r.compare_at_paise as number | null) ?? null,
+    minQty: (r.min_qty as number) ?? 1,
     options: (r.options as Product["options"]) ?? [],
     customFields: (r.custom_fields as Product["customFields"]) ?? [],
     createdAt: r.created_at as string,
@@ -48,6 +49,7 @@ function productRow(p: ProductInput): Row {
     sort_order: p.sortOrder,
     price_paise: p.pricePaise,
     compare_at_paise: p.compareAtPaise,
+    min_qty: p.minQty,
     options: p.options,
     custom_fields: p.customFields,
     updated_at: new Date().toISOString(),
@@ -71,8 +73,10 @@ function toCollection(r: Row): Collection {
 function toOffer(r: Row): Offer {
   return {
     id: r.id as string,
+    kind: (r.kind as Offer["kind"]) ?? "bxgy",
     name: r.name as string,
     description: r.description as string,
+    pricePaise: (r.price_paise as number | null) ?? null,
     productType: (r.product_type as Offer["productType"]) ?? null,
     buy: r.buy as number,
     free: r.free as number,
@@ -186,7 +190,17 @@ export class SupabaseStore implements Store {
   }
 
   async saveOffer(id: string | null, o: OfferInput) {
-    const row = { name: o.name, description: o.description, product_type: o.productType, buy: o.buy, free: o.free, active: o.active, sort_order: o.sortOrder };
+    const row = {
+      kind: o.kind,
+      name: o.name,
+      description: o.description,
+      product_type: o.productType,
+      buy: o.buy,
+      free: o.free,
+      price_paise: o.pricePaise,
+      active: o.active,
+      sort_order: o.sortOrder,
+    };
     const res = id ? await this.db.from("offers").update(row).eq("id", id).select("*").single() : await this.db.from("offers").insert(row).select("*").single();
     return toOffer(check(res) as Row);
   }

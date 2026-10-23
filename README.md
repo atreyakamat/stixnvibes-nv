@@ -29,7 +29,12 @@ Without Supabase keys the app runs in **demo mode**: data lives in memory, produ
 - **Options**: any number of option groups (Size: A4 / A3, Print: normal / sticker, Frame: none / framed, Material: paper vinyl / waterproof). Each choice can add to or take off the base price. Each type has a one-click template.
 - **Custom fields**: what the customer fills in, e.g. a Spotify link, a dedication and a photo for a music card. Photos go to a private bucket; the order links to them at `/u/<random id>`.
 - **Collections**: group designs (Lo-fi, Anime…). A product can be in several.
-- **Offers**: buy X get Y free per product type (stickers: buy 4 get 1; posters: buy 5 get 1). Items are grouped from most to least expensive and the cheapest in each full group are free. The cart nudges ("add 1 more sticker and it's free").
+- **Offers**, per product type:
+  - Bulk price: from N items, each costs ₹X (sheets ₹65 from 11; wall cards ₹25 from 6, ₹20 from 11).
+  - Buy X get Y free (stickers: buy 4 get 1; posters: buy 5 get 1). Items are grouped from most to least expensive and the cheapest in each full group are free.
+  - The cart nudges ("add 1 more sticker and it's free", "add 2 more wall cards to pay ₹25 each").
+- **Minimum per order** per product (music cards: 5). Checkout waits until it's met.
+- **Free shipping** above a set amount (₹250), with a cart nudge.
 - **Ordering**: the cart lives in the browser. "Order on WhatsApp" sends the cart to the server, which re-prices it from the database, records the order with a ref (`SNV-XXXXXX`) and returns a `wa.me` link with the full order written out. If the server can't be reached, the browser builds the same message itself, so an order is never lost. Payment and delivery are sorted in the WhatsApp chat.
 - **Analytics**: product views, add-to-cart, order taps and "Ask on WhatsApp" taps are counted without cookies or personal data.
 - **Admin** (`/admin`): dashboard (orders sent, order value, views, conversion, most viewed / ordered, daily chart), orders (status, private notes, customer photos), products (filters, quick hide / sold out / feature, duplicate, full editor with options, custom fields and photos), bulk add (one product per uploaded design), collections, offers, settings (WhatsApp number, notes, banner, pause orders).

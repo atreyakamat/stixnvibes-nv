@@ -41,6 +41,13 @@ export function SettingsForm({ settings: s }: { settings: Settings }) {
         </label>
         <Text name="whatsappNumber" label="WhatsApp number orders go to" defaultValue={s.whatsappNumber} inputMode="tel" hint="With country code. 10 digits are treated as an Indian number." />
         <Text name="orderNote" label="How payment and confirmation work (shown in the cart)" defaultValue={s.orderNote} area maxLength={300} />
+        <Text
+          name="freeShippingAbove"
+          label="Free shipping above ₹ (blank = no free shipping)"
+          defaultValue={s.freeShippingAbovePaise === null ? "" : String(s.freeShippingAbovePaise / 100)}
+          inputMode="decimal"
+          hint="Shown in the cart with a nudge, and in the WhatsApp message."
+        />
         <Text name="deliveryNote" label="Delivery note" defaultValue={s.deliveryNote} maxLength={200} placeholder="Dispatched within 2 days." />
         <Text name="bulkNote" label="Bulk orders note" defaultValue={s.bulkNote} area maxLength={300} />
       </Section>

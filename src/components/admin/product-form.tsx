@@ -49,6 +49,7 @@ export function ProductForm({ product, collections, initialType }: { product?: P
   const [sortOrder, setSortOrder] = useState(String(product?.sortOrder ?? 0));
   const [price, setPrice] = useState(paiseToRupees(product?.pricePaise ?? (startType === "sticker" && !product ? 1000 : null)));
   const [compareAt, setCompareAt] = useState(paiseToRupees(product?.compareAtPaise ?? null));
+  const [minQty, setMinQty] = useState(String(product?.minQty ?? 1));
   const [groups, setGroups] = useState<GroupRow[]>(groupsFrom(product ?? tpl));
   const [fields, setFields] = useState<FieldRow[]>(product?.customFields ?? tpl.customFields);
 
@@ -68,6 +69,7 @@ export function ProductForm({ product, collections, initialType }: { product?: P
     sortOrder,
     price,
     compareAt,
+    minQty,
     options: groups.map((g) => ({ id: g.id, name: g.name, values: g.values.map((v) => ({ id: v.id, label: v.label, delta: v.delta })) })),
     customFields: fields,
   });
@@ -172,7 +174,8 @@ export function ProductForm({ product, collections, initialType }: { product?: P
 
         <section className={section}>
           <h2 className="font-medium">Price</h2>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <p className="text-xs text-mute">Bulk prices (e.g. 6+ at ₹25) and buy-X-get-Y deals are set per product type under Offers.</p>
+          <div className="grid gap-4 sm:grid-cols-3">
             <label className="block">
               <span className={lbl}>Price ₹ (blank = ask on WhatsApp)</span>
               <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" className="field tabular-nums" placeholder="10" />
@@ -180,6 +183,10 @@ export function ProductForm({ product, collections, initialType }: { product?: P
             <label className="block">
               <span className={lbl}>Was ₹ (optional, shown crossed out)</span>
               <input value={compareAt} onChange={(e) => setCompareAt(e.target.value)} inputMode="decimal" className="field tabular-nums" />
+            </label>
+            <label className="block">
+              <span className={lbl}>Minimum per order</span>
+              <input value={minQty} onChange={(e) => setMinQty(e.target.value)} inputMode="numeric" className="field tabular-nums" />
             </label>
           </div>
         </section>

@@ -5,7 +5,7 @@ About 20 minutes. Nothing here costs money on the free tiers.
 ## 1. Supabase (database, admin logins, photo storage)
 
 1. Create a project at supabase.com (free tier is fine). Region: Mumbai (`ap-south-1`).
-2. **SQL Editor → New query**: paste and run `supabase/migrations/0001_shop.sql`, then `supabase/seed.sql`. This creates the tables, the dashboard stats function, two storage buckets, the Lo-fi collection with 17 stickers at ₹10, a ₹65 super sheet, a poster, a music card, wall cards (coming soon) and the two offers.
+2. **SQL Editor → New query**: paste and run `supabase/migrations/0001_shop.sql`, then `supabase/seed.sql`. This creates the tables, the dashboard stats function, two storage buckets, the Lo-fi collection with 17 stickers at ₹10, a super sheet (₹80, ₹65 each for 11+), a poster (A4 ₹60, A3 ₹100, A4 framed ₹200, A3 framed ₹400), a music card (₹20, min 5), wall cards (₹30, ₹25 for 6+, ₹20 for 11+), the buy-4-get-1 sticker and buy-5-get-1 poster offers, and free shipping above ₹250.
 3. **Authentication → Users → Add user**: one per admin with an email and a strong password. Only emails in `ADMIN_EMAILS` can reach admin.
 4. **Project settings → API**: copy the Project URL, the `anon` key and the `service_role` key.
 
@@ -26,7 +26,7 @@ On the Netlify site for shop.stixnvibes.com:
 ## 3. Open the shop
 
 1. Go to `https://shop.stixnvibes.com/admin` and log in.
-2. **Products**: set prices on the poster, music card and wall cards (and the price changes on their options: A3, framed…). Upload real photos.
+2. **Products**: check the prices and upload real photos. **Offers** holds the bulk prices and free-item deals.
 3. **Products → Bulk add**: upload a folder of designs into a collection in one go.
 4. **Settings**: check the WhatsApp number and the notes. Save.
 5. Place a test order from your phone and check it lands in **Orders** and on the **Dashboard**.

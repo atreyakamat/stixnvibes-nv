@@ -156,7 +156,7 @@ export default async function HomePage() {
         <ol className="mt-8 grid gap-4 md:grid-cols-3">
           {[
             { t: "Fill your cart", b: "Pick designs, sizes and finishes. Offers apply on their own." },
-            { t: "Order on WhatsApp", b: "One tap sends us your full order. We reply to confirm and share UPI details." },
+            { t: "Checkout on WhatsApp", b: "One tap sends us your full order. We reply to confirm and share UPI details." },
             { t: "Stick it", b: settings.deliveryNote || "We pack it and send it your way." },
           ].map((s, i) => (
             <li key={s.t} className="rounded-[1.5rem] border border-line p-6 md:p-8">

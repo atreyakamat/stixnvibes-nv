@@ -30,7 +30,7 @@ export function BuyBox({ product, url }: { product: Product; url: string }) {
   const resolved = resolveOptions(product, selections);
   const unit = product.pricePaise === null || !resolved ? null : Math.max(0, product.pricePaise + resolved.deltaPaise);
   const orderable = canOrder(product) && config.storeOpen;
-  const offer = config.offers.find((o) => o.productType === product.type);
+  const offers = config.offers.filter((o) => o.productType === product.type);
   const ask = waLink(config.whatsappNumber, askMessage(product.name, url));
 
   async function upload(fieldId: string, file: File | undefined) {
@@ -75,6 +75,7 @@ export function BuyBox({ product, url }: { product: Product; url: string }) {
         type: product.type,
         image: product.images[0] ?? null,
         unitPricePaise: unit,
+        minQty: product.minQty,
         selections: resolved.selections,
         optionLabels: resolved.labels,
         custom: filled,
@@ -99,11 +100,15 @@ export function BuyBox({ product, url }: { product: Product; url: string }) {
           <p className="text-lg tabular-nums text-mute line-through">{formatINR(product.compareAtPaise)}</p>
         )}
       </div>
-      {offer && (
-        <p className="inline-block rounded-full bg-lemon/10 px-3 py-1.5 text-sm text-lemon">
-          {offer.name}
-          {offer.description ? `: ${offer.description}` : ""}
-        </p>
+      {product.minQty > 1 && product.status === "live" && <p className="text-sm text-paper/70">Minimum {product.minQty} per order. Mix different designs or songs.</p>}
+      {offers.length > 0 && (
+        <ul className="flex flex-wrap gap-2">
+          {offers.map((o) => (
+            <li key={o.id} className="rounded-full bg-lemon/10 px-3 py-1.5 text-sm text-lemon">
+              {o.name}
+            </li>
+          ))}
+        </ul>
       )}
 
       {product.options.filter((g) => g.values.length > 1).map((g) => (

@@ -50,10 +50,15 @@ test("build a cart with offers and a music card, order on WhatsApp, then manage 
   await page.getByRole("button", { name: "Add to cart" }).click();
   await expect(page.getByTestId("cart-count")).toHaveText("6");
 
+  // Music cards have a minimum of 5, so checkout waits until there are 5.
   await page.goto("/cart");
-  await expect(page.getByTestId("cart-total")).toHaveText("₹189");
+  await expect(page.getByText("Music card: minimum 5 per order. Add 4 more to check out.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Checkout on WhatsApp" })).toBeDisabled();
+  for (let i = 0; i < 4; i++) await page.getByRole("button", { name: "Increase quantity" }).nth(1).click();
+  await expect(page.getByTestId("cart-total")).toHaveText("₹140");
+  await expect(page.getByText("Add ₹110 more for free shipping")).toBeVisible();
   await page.getByPlaceholder("Your name").fill("Asha");
-  await page.getByRole("button", { name: "Order on WhatsApp" }).click();
+  await page.getByRole("button", { name: "Checkout on WhatsApp" }).click();
   // Phones hand over to the WhatsApp app; desktops open it in a new tab.
   if (isMobile) await expect(page).toHaveURL(/^https:\/\/wa\.me\//);
   else await expect(page.getByText(/Your order is ready in WhatsApp \(ref SNV-/)).toBeVisible();
@@ -65,7 +70,9 @@ test("build a cart with offers and a music card, order on WhatsApp, then manage 
   expect(text).toContain("Buy 4 stickers, get 1 free: −₹10");
   expect(text).toContain("Spotify song link: https://open.spotify.com/track/abc");
   expect(text).toMatch(/Your photo: https?:\/\/\S+\/u\/[a-f0-9]{32}/);
-  expect(text).toContain("Total: ₹189");
+  expect(text).toContain("Music card × 5 = ₹100");
+  expect(text).toContain("Total: ₹140");
+  expect(text).toContain("Shipping: please share the charge for my area");
   const ref = /Order ref: (SNV-[A-Z0-9]{6})/.exec(text)![1];
 
   // Admin sees the order, its photo and the numbers.
@@ -88,7 +95,7 @@ test("admin adds a poster with options and it shows in the shop", async ({ page 
   const name = `Test poster ${Date.now().toString(36)}`;
   await page.getByLabel("Name", { exact: true }).fill(name);
   await page.getByLabel(/^Price ₹/).fill("120");
-  // Template gives Size / Print / Frame; make A3 cost ₹60 more.
+  // The poster template has Size (A4, A3, framed) and Print; make A3 cost ₹60 more.
   await page.getByLabel("Price change in rupees").nth(1).fill("60");
   await page.getByRole("button", { name: "Create product" }).click();
   await expect(page.getByText("Product created.")).toBeVisible();
@@ -96,13 +103,24 @@ test("admin adds a poster with options and it shows in the shop", async ({ page 
   await page.goto("/shop?type=poster");
   await page.getByRole("link", { name: new RegExp(name) }).click();
   await expect(page.getByTestId("price")).toHaveText("₹120");
-  await page.locator("label", { hasText: /^A3/ }).click();
+  await page.locator("label", { hasText: /^A3 \+/ }).click();
   await expect(page.getByTestId("price")).toHaveText("₹180");
 });
 
-test("upcoming products can't be added to the cart", async ({ page }) => {
+test("wall cards drop to ₹25 each from 6, with free shipping over ₹250", async ({ page }) => {
   await page.goto("/shop/wall-cards");
-  await expect(page.getByTestId("price")).toHaveText("Coming soon");
-  await expect(page.getByRole("button", { name: "Add to cart" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Ask on WhatsApp" })).toHaveAttribute("href", /^https:\/\/wa\.me\/917744020601\?text=/);
+  await expect(page.getByTestId("price")).toHaveText("₹30");
+  for (let i = 0; i < 5; i++) await page.getByRole("button", { name: "Increase quantity" }).click();
+  await page.getByRole("button", { name: "Add to cart" }).click();
+  const drawer = page.getByRole("dialog", { name: "Your cart" });
+  await expect(drawer.getByTestId("cart-total")).toHaveText("₹150");
+  await expect(drawer).toContainText("6+ wall cards at ₹25 each");
+  await expect(drawer).toContainText("Add 5 more wall cards to pay ₹20 each.");
+  for (let i = 0; i < 5; i++) await drawer.getByRole("button", { name: "Increase quantity" }).click();
+  await expect(drawer.getByTestId("cart-total")).toHaveText("₹220");
+  await page.goto("/shop/lofi-01");
+  for (let i = 0; i < 2; i++) await page.getByRole("button", { name: "Increase quantity" }).click();
+  await page.getByRole("button", { name: "Add to cart" }).click();
+  await expect(drawer.getByTestId("cart-total")).toHaveText("₹250");
+  await expect(drawer.getByText("Free", { exact: true })).toBeVisible();
 });

@@ -22,16 +22,16 @@ for (const c of seedCollections()) {
 out.push("");
 for (const p of seedProducts()) {
   out.push(
-    `insert into public.products (id, slug, name, type, collection_ids, description, details, images, tags, status, featured, sold_out, badge, sort_order, price_paise, compare_at_paise, options, custom_fields) values (${[
+    `insert into public.products (id, slug, name, type, collection_ids, description, details, images, tags, status, featured, sold_out, badge, sort_order, price_paise, compare_at_paise, min_qty, options, custom_fields) values (${[
       q(p.id), q(p.slug), q(p.name), q(p.type), arr(p.collectionIds), q(p.description), q(p.details), arr(p.images), arr(p.tags), q(p.status),
-      q(p.featured), q(p.soldOut), q(p.badge), q(p.sortOrder), q(p.pricePaise), q(p.compareAtPaise), json(p.options), json(p.customFields),
+      q(p.featured), q(p.soldOut), q(p.badge), q(p.sortOrder), q(p.pricePaise), q(p.compareAtPaise), q(p.minQty), json(p.options), json(p.customFields),
     ].join(", ")}) on conflict (id) do nothing;`,
   );
 }
 out.push("");
 for (const o of seedOffers()) {
   out.push(
-    `insert into public.offers (id, name, description, product_type, buy, free, active, sort_order) values (${[o.id, o.name, o.description, o.productType, o.buy, o.free, o.active, o.sortOrder].map(q).join(", ")}) on conflict (id) do nothing;`,
+    `insert into public.offers (id, kind, name, description, product_type, buy, free, price_paise, active, sort_order) values (${[o.id, o.kind, o.name, o.description, o.productType, o.buy, o.free, o.pricePaise, o.active, o.sortOrder].map(q).join(", ")}) on conflict (id) do nothing;`,
   );
 }
 out.push("", `insert into public.settings (id, data) values (1, ${json(DEFAULT_SETTINGS)}) on conflict (id) do nothing;`, "");

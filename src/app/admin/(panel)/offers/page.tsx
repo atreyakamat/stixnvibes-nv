@@ -14,8 +14,9 @@ export default async function OffersPage() {
     <div className="max-w-3xl space-y-6">
       <h1 className="display text-5xl">Offers</h1>
       <p className="text-paper/70">
-        Buy X, get Y free. In the cart, items of that type are grouped from most to least expensive and the cheapest in each full group are free. Each item counts toward
-        one offer only, applied in the order shown.
+        <strong>Bulk price</strong>: once the cart holds that many of a type, each one costs the bulk price. Add one per tier (6+ at ₹25, 11+ at ₹20); the cheapest tier reached
+        applies. <strong>Buy X, get Y free</strong>: items of that type are grouped from most to least expensive and the cheapest in each full group are free. Bulk prices
+        apply first.
       </p>
       <ul className="space-y-4">
         {offers.map((o) => (

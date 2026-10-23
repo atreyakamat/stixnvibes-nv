@@ -32,7 +32,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
   const maxDay = Math.max(1, ...stats.daily.map((d) => d.views));
 
   const cards = [
-    { label: "Orders sent to WhatsApp", value: stats.orderClicks, hint: "Taps on Order on WhatsApp" },
+    { label: "Orders sent to WhatsApp", value: stats.orderClicks, hint: "Taps on Checkout on WhatsApp" },
     { label: "Order value", value: formatINR(stats.orderValuePaise), hint: `${stats.orders} orders, excluding cancelled` },
     { label: "Product views", value: stats.views, hint: `${conversion}% of views became an order` },
     { label: "Added to cart", value: stats.addToCart, hint: `${stats.askClicks} "Ask on WhatsApp" taps` },

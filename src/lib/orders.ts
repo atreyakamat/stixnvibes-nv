@@ -2,7 +2,7 @@ import "server-only";
 import { randomInt } from "node:crypto";
 import { site } from "@/content/site";
 import { UPLOAD_ID_RE } from "@/lib/constants";
-import { canOrder, resolveOptions, totals } from "@/lib/pricing";
+import { canOrder, minQtyShortfalls, resolveOptions, totals } from "@/lib/pricing";
 import { getStore } from "@/lib/store";
 import type { Offer, Order, OrderLine, Product } from "@/lib/types";
 import type { OrderInput } from "@/lib/validation";
@@ -75,6 +75,9 @@ export function priceLines(input: OrderInput["lines"], products: Product[], offe
     });
   }
 
+  for (const s of minQtyShortfalls(lines, products)) {
+    problems.push({ productId: s.productId, reason: `${s.name}: the minimum is ${s.minQty} per order. Add ${s.need} more.` });
+  }
   const t = totals(lines, offers);
   return { lines, problems, ...t };
 }
@@ -106,6 +109,6 @@ export async function createOrder(input: OrderInput): Promise<{ order: Order; wh
     }
   }
 
-  const text = orderMessage({ ...order!, offers: order!.offers });
+  const text = orderMessage({ ...order!, freeShippingAbovePaise: settings.freeShippingAbovePaise });
   return { order: order!, whatsappUrl: waLink(settings.whatsappNumber, text) };
 }

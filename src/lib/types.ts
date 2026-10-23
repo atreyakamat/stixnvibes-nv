@@ -64,6 +64,8 @@ export type Product = {
   pricePaise: number | null;
   /** Optional "was" price shown struck through. */
   compareAtPaise: number | null;
+  /** Fewest a customer can order (across all lines of this product). */
+  minQty: number;
   options: OptionGroup[];
   customFields: CustomField[];
   createdAt: string;
@@ -83,14 +85,24 @@ export type Collection = {
   createdAt: string;
 };
 
-/** Buy `buy`, get `free` free, on products of one type (or all types). */
+export const OFFER_KINDS = ["bxgy", "volume"] as const;
+export type OfferKind = (typeof OFFER_KINDS)[number];
+
+/**
+ * bxgy: buy `buy`, get `free` free.
+ * volume: once `buy` or more of the type are in the cart, each costs `pricePaise`.
+ * Either applies to one product type, or to every type when productType is null.
+ */
 export type Offer = {
   id: string;
+  kind: OfferKind;
   name: string;
   description: string;
   productType: ProductType | null;
   buy: number;
   free: number;
+  /** volume only: the unit price once the minimum is reached. */
+  pricePaise: number | null;
   active: boolean;
   sortOrder: number;
 };
@@ -113,6 +125,7 @@ export type OrderLine = {
   lineTotalPaise: number;
 };
 
+/** freeUnits is 0 for volume pricing. */
 export type AppliedOffer = { offerId: string; name: string; freeUnits: number; discountPaise: number };
 
 /** An order sent to WhatsApp. Payment and delivery are sorted in the chat. */
@@ -147,6 +160,8 @@ export type Settings = {
   orderNote: string;
   deliveryNote: string;
   bulkNote: string;
+  /** null = no free shipping threshold. */
+  freeShippingAbovePaise: number | null;
 };
 
 export type Stats = {

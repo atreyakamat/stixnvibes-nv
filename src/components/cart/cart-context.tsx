@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { MAX_QTY_PER_LINE } from "@/lib/constants";
-import { offerHints, totals } from "@/lib/pricing";
+import { minQtyShortfalls, offerHints, shippingStatus, totals } from "@/lib/pricing";
 import type { AppliedOffer, CustomFieldKind, Offer, ProductType } from "@/lib/types";
 import { PRODUCT_TYPES } from "@/lib/types";
 
@@ -17,6 +17,8 @@ export type CartItem = {
   type: ProductType;
   image: string | null;
   unitPricePaise: number;
+  /** Fewest of this product per order (summed over its lines). */
+  minQty: number;
   qty: number;
   selections: Record<string, string>;
   optionLabels: string[];
@@ -25,7 +27,14 @@ export type CartItem = {
   customDisplay: { label: string; value: string; kind: CustomFieldKind }[];
 };
 
-export type ShopConfig = { offers: Offer[]; storeOpen: boolean; whatsappNumber: string; orderNote: string; bulkNote: string };
+export type ShopConfig = {
+  offers: Offer[];
+  storeOpen: boolean;
+  whatsappNumber: string;
+  orderNote: string;
+  bulkNote: string;
+  freeShippingAbovePaise: number | null;
+};
 
 type CartContextValue = {
   items: CartItem[];
@@ -35,6 +44,9 @@ type CartContextValue = {
   totalPaise: number;
   applied: AppliedOffer[];
   hints: string[];
+  /** Minimum-order problems that block checkout. */
+  shortfalls: { productId: string; name: string; minQty: number; need: number }[];
+  shipping: { free: boolean; needPaise: number } | null;
   config: ShopConfig;
   ready: boolean;
   drawerOpen: boolean;
@@ -113,11 +125,14 @@ export function CartProvider({ children, config }: { children: ReactNode; config
 
   const value = useMemo<CartContextValue>(() => {
     const t = totals(items, config.offers);
+    const products = [...new Map(items.map((i) => [i.productId, { id: i.productId, name: i.name, minQty: i.minQty ?? 1 }])).values()];
     return {
       items,
       count: items.reduce((n, i) => n + i.qty, 0),
       ...t,
       hints: offerHints(items, config.offers, typeWord),
+      shortfalls: minQtyShortfalls(items, products),
+      shipping: shippingStatus(t.totalPaise, config.freeShippingAbovePaise),
       config,
       ready,
       drawerOpen,

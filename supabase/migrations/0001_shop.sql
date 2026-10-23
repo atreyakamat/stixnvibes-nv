@@ -38,6 +38,7 @@ create table if not exists public.products (
   sort_order       integer not null default 0,
   price_paise      integer check (price_paise is null or price_paise >= 0),
   compare_at_paise integer check (compare_at_paise is null or compare_at_paise >= 0),
+  min_qty          integer not null default 1 check (min_qty between 1 and 999),
   -- [{id, name, values: [{id, label, priceDeltaPaise}]}]
   options          jsonb not null default '[]',
   -- [{id, label, kind, required, help}]
@@ -48,16 +49,21 @@ create table if not exists public.products (
 create index if not exists products_status_idx on public.products(status, sort_order);
 create index if not exists products_collections_idx on public.products using gin (collection_ids);
 
--- Buy X get Y free, per product type (null = every type).
+-- Per product type (null = every type):
+--   bxgy:   buy `buy`, get `free` free (cheapest in each group).
+--   volume: with `buy` or more in the cart, each costs `price_paise`.
 create table if not exists public.offers (
   id           text primary key default gen_random_uuid()::text,
+  kind         text not null default 'bxgy' check (kind in ('bxgy', 'volume')),
   name         text not null check (char_length(name) between 1 and 80),
   description  text not null default '',
   product_type text check (product_type is null or product_type in ('sticker', 'sheet', 'poster', 'music-card', 'wall-card')),
   buy          integer not null check (buy between 1 and 100),
   free         integer not null check (free between 1 and 100),
+  price_paise  integer check (price_paise is null or price_paise >= 0),
   active       boolean not null default true,
-  sort_order   integer not null default 0
+  sort_order   integer not null default 0,
+  check (kind = 'bxgy' or price_paise is not null)
 );
 
 -- Orders sent to WhatsApp ---------------------------------------------------

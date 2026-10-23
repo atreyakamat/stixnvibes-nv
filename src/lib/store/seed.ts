@@ -1,9 +1,11 @@
 import type { Collection, CustomField, Offer, OptionGroup, Product, Settings } from "@/lib/types";
 import { DEFAULT_WHATSAPP } from "../whatsapp";
 
-// Starter catalog and option templates. Sticker prices and the two offers
-// come from Atreya (23 Oct 2026). Poster, music card and wall card prices
-// aren't set yet, so those show "Ask on WhatsApp" until set in admin.
+// Starter catalog, option templates and offers. Prices and offers come from
+// Atreya (23 Oct 2026): stickers ₹10 (buy 4 get 1), super sheets ₹80 (₹65
+// each for 11+), posters A4 ₹60 / A3 ₹100 / A4 framed ₹200 / A3 framed ₹400
+// (buy 5 get 1), music cards ₹20 (min 5), wall cards ₹30 (₹25 for 6+, ₹20
+// for 11+), free shipping above ₹250.
 
 const NOW = "2026-10-23T00:00:00.000Z";
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -39,16 +41,20 @@ export const TEMPLATES: Record<string, { options: OptionGroup[]; customFields: C
       },
     ],
     customFields: [{ id: "designs", label: "Designs you want on the sheet", kind: "textarea", required: false, help: "List design names, or leave blank and we'll pick a mix." }],
-    details: "A super sheet packed with stickers. Want more than a few sheets? Message us for bulk pricing.",
+    details: "A super sheet packed with stickers. More than 10 sheets? They drop to the bulk price automatically.",
   },
   poster: {
     options: [
+      // Size and frame are one choice because the frame costs more on A3.
+      // Price changes are on top of the ₹60 A4 base.
       {
         id: "size",
         name: "Size",
         values: [
           { id: "a4", label: "A4", priceDeltaPaise: 0 },
-          { id: "a3", label: "A3", priceDeltaPaise: 0 },
+          { id: "a3", label: "A3", priceDeltaPaise: 4000 },
+          { id: "a4-framed", label: "A4 framed", priceDeltaPaise: 14000 },
+          { id: "a3-framed", label: "A3 framed", priceDeltaPaise: 34000 },
         ],
       },
       {
@@ -57,14 +63,6 @@ export const TEMPLATES: Record<string, { options: OptionGroup[]; customFields: C
         values: [
           { id: "normal", label: "Normal print", priceDeltaPaise: 0 },
           { id: "sticker", label: "Sticker (peel and paste)", priceDeltaPaise: 0 },
-        ],
-      },
-      {
-        id: "frame",
-        name: "Frame",
-        values: [
-          { id: "none", label: "No frame", priceDeltaPaise: 0 },
-          { id: "framed", label: "Framed", priceDeltaPaise: 0 },
         ],
       },
     ],
@@ -108,6 +106,7 @@ function sticker(n: number): Product {
     sortOrder: n,
     pricePaise: 1000,
     compareAtPaise: null,
+    minQty: 1,
     options: structuredClone(t.options),
     customFields: [],
     createdAt: NOW,
@@ -134,6 +133,7 @@ function base(id: string, type: Product["type"], name: string, description: stri
     sortOrder: 0,
     pricePaise: null,
     compareAtPaise: null,
+    minQty: 1,
     options: structuredClone(t.options),
     customFields: structuredClone(t.customFields),
     createdAt: NOW,
@@ -147,15 +147,23 @@ export function seedProducts(): Product[] {
     ...Array.from({ length: 17 }, (_, i) => sticker(i + 1)),
     base("lofi-super-sheet", "sheet", "Lo-fi super sheet", "A whole sheet of lo-fi stickers. The best value per sticker.", ["/lofi/lofi-09.webp", "/lofi/lofi-12.webp"], {
       collectionIds: ["c-lofi"],
-      pricePaise: 6500,
+      pricePaise: 8000,
       featured: true,
       badge: "Best value",
     }),
     base("custom-poster", "poster", "Your poster", "Pick a design and we'll print it as a poster. A4 or A3, sticker or normal, framed or not.", ["/lofi/lofi-03.webp"], {
+      pricePaise: 6000,
       customFields: [{ id: "design", label: "Which design?", kind: "text", required: false, help: "A design name from the shop, or describe what you want." }],
     }),
-    base("music-card", "music-card", "Music card", "Dedicate a song. Your photo or the album cover with a scannable Spotify code.", ["/lofi/lofi-15.webp"], { featured: true, badge: "Gift" }),
-    base("wall-cards", "wall-card", "Wall cards", "10 × 10 cm cards for your wall corners and grids.", ["/lofi/lofi-06.webp"], { status: "upcoming" }),
+    base("music-card", "music-card", "Music card", "Dedicate a song. Your photo or the album cover with a scannable Spotify code. Minimum 5 cards per order.", ["/lofi/lofi-15.webp"], {
+      pricePaise: 2000,
+      minQty: 5,
+      featured: true,
+      badge: "Gift",
+    }),
+    base("wall-cards", "wall-card", "Wall cards", "10 × 10 cm cards for your wall corners and grids. ₹25 each for 6 or more, ₹20 each for 11 or more.", ["/lofi/lofi-06.webp"], {
+      pricePaise: 3000,
+    }),
   ];
 }
 
@@ -177,8 +185,11 @@ export function seedCollections(): Collection[] {
 
 export function seedOffers(): Offer[] {
   return [
-    { id: "o-stickers", name: "Buy 4 stickers, get 1 free", description: "Every 5th sticker is on us.", productType: "sticker", buy: 4, free: 1, active: true, sortOrder: 0 },
-    { id: "o-posters", name: "Buy 5 posters, get 1 free", description: "Every 6th poster is on us.", productType: "poster", buy: 5, free: 1, active: true, sortOrder: 1 },
+    { id: "o-stickers", kind: "bxgy", name: "Buy 4 stickers, get 1 free", description: "Every 5th sticker is on us.", productType: "sticker", buy: 4, free: 1, pricePaise: null, active: true, sortOrder: 0 },
+    { id: "o-posters", kind: "bxgy", name: "Buy 5 posters, get 1 free", description: "Every 6th poster is on us.", productType: "poster", buy: 5, free: 1, pricePaise: null, active: true, sortOrder: 1 },
+    { id: "o-sheets-11", kind: "volume", name: "11+ sheets at ₹65 each", description: "Bulk price on super sheets.", productType: "sheet", buy: 11, free: 1, pricePaise: 6500, active: true, sortOrder: 2 },
+    { id: "o-wall-6", kind: "volume", name: "6+ wall cards at ₹25 each", description: "", productType: "wall-card", buy: 6, free: 1, pricePaise: 2500, active: true, sortOrder: 3 },
+    { id: "o-wall-11", kind: "volume", name: "11+ wall cards at ₹20 each", description: "", productType: "wall-card", buy: 11, free: 1, pricePaise: 2000, active: true, sortOrder: 4 },
   ];
 }
 
@@ -188,7 +199,8 @@ export const DEFAULT_SETTINGS: Settings = {
   whatsappNumber: DEFAULT_WHATSAPP,
   orderNote: "Send the order on WhatsApp. We confirm it, share the UPI details, and pack it once paid.",
   deliveryNote: "Dispatched within 2 days.",
-  bulkNote: "Ordering in bulk for a club, fest or shop? Message us for sheet pricing.",
+  bulkNote: "Ordering in bulk for a club, fest or shop? Message us and we'll quote.",
+  freeShippingAbovePaise: 25000,
 };
 
 export const DEMO_SETTINGS: Settings = {
@@ -196,14 +208,7 @@ export const DEMO_SETTINGS: Settings = {
   announcement: "Preview: orders here are not real.",
 };
 
-/** Demo catalog: same as the seed, with sample prices so every flow works. */
+/** Demo catalog: the seed, which is fully priced. */
 export function demoProducts(): Product[] {
-  const demo: Record<string, number> = { poster: 9900, "music-card": 14900, "wall-card": 4900 };
-  return seedProducts().map((p) => {
-    if (p.pricePaise !== null || !(p.type in demo)) return p;
-    const options = p.options.map((g) =>
-      g.id === "size" ? { ...g, values: g.values.map((v) => (v.id === "a3" ? { ...v, priceDeltaPaise: 5000 } : v)) } : g.id === "frame" ? { ...g, values: g.values.map((v) => (v.id === "framed" ? { ...v, priceDeltaPaise: 15000 } : v)) } : g,
-    );
-    return { ...p, pricePaise: demo[p.type], options };
-  });
+  return seedProducts();
 }

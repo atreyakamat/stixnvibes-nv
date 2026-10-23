@@ -17,6 +17,8 @@ export type MessageInput = {
   offers: Pick<AppliedOffer, "name" | "discountPaise">[];
   customerName?: string;
   customerNote?: string;
+  /** null = no free shipping threshold, so no shipping line. */
+  freeShippingAbovePaise?: number | null;
 };
 
 /** The order as a WhatsApp message the customer sends to the shop. */
@@ -33,6 +35,9 @@ export function orderMessage(o: MessageInput): string {
     for (const a of o.offers) out.push(`${a.name}: −${formatINR(a.discountPaise)}`);
   }
   out.push(`Total: ${formatINR(o.totalPaise)}`);
+  if (o.freeShippingAbovePaise != null) {
+    out.push(o.totalPaise >= o.freeShippingAbovePaise ? "Shipping: free" : "Shipping: please share the charge for my area");
+  }
   if (o.customerName) out.push("", `Name: ${o.customerName}`);
   if (o.customerNote) out.push(`Note: ${o.customerNote}`);
   if (o.number) out.push("", `Order ref: ${o.number}`);

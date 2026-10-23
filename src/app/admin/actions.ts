@@ -10,7 +10,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { getStore } from "@/lib/store";
 import { TEMPLATES } from "@/lib/store/seed";
 import type { ProductInput } from "@/lib/store/types";
-import { CUSTOM_FIELD_KINDS, ORDER_STATUSES, PRODUCT_STATUSES, PRODUCT_TYPE_IDS, type Product, type Settings } from "@/lib/types";
+import { CUSTOM_FIELD_KINDS, OFFER_KINDS, ORDER_STATUSES, PRODUCT_STATUSES, PRODUCT_TYPE_IDS, type Product, type Settings } from "@/lib/types";
 
 export type FormState = { ok?: boolean; error?: string; message?: string };
 
@@ -122,6 +122,7 @@ const productSchema = z.object({
   sortOrder: z.coerce.number().int().min(-9999).max(9999),
   price: money,
   compareAt: money,
+  minQty: z.coerce.number().int().min(1, "Minimum order must be at least 1.").max(999),
   options: z
     .array(
       z.object({
@@ -164,6 +165,7 @@ function editable(p: Product): ProductInput {
     sortOrder: p.sortOrder,
     pricePaise: p.pricePaise,
     compareAtPaise: p.compareAtPaise,
+    minQty: p.minQty,
     options: p.options,
     customFields: p.customFields,
   };
@@ -189,6 +191,7 @@ function toProductInput(p: z.infer<typeof productSchema>): ProductInput {
     sortOrder: p.sortOrder,
     pricePaise: p.price,
     compareAtPaise: p.compareAt,
+    minQty: p.minQty,
     options: p.options.map((g) => ({ id: g.id, name: g.name, values: g.values.map((v) => ({ id: v.id, label: v.label, priceDeltaPaise: v.delta })) })),
     customFields: p.customFields,
   };
@@ -312,6 +315,7 @@ export async function bulkCreateAction(_: FormState, form: FormData): Promise<Fo
       sortOrder: i,
       pricePaise: b.price,
       compareAtPaise: null,
+      minQty: 1,
       options: structuredClone(t.options),
       customFields: structuredClone(t.customFields),
     });
@@ -382,20 +386,29 @@ export async function deleteCollectionAction(form: FormData) {
 
 const offerSchema = z.object({
   id: z.string().max(64).optional(),
+  kind: z.enum(OFFER_KINDS),
   name: z.string().trim().min(1, "Name the offer.").max(80),
   description: z.string().trim().max(200),
   productType: z.union([z.literal(""), z.enum(PRODUCT_TYPE_IDS)]),
   buy: z.coerce.number().int().min(1, "Buy must be at least 1.").max(100),
-  free: z.coerce.number().int().min(1, "Free must be at least 1.").max(100),
+  free: z.coerce.number().int().min(1, "Free must be at least 1.").max(100).catch(1),
+  price: money,
   sortOrder: z.coerce.number().int().min(-999).max(999),
 });
 
 export async function saveOfferAction(_: FormState, form: FormData): Promise<FormState> {
   await requireAdmin();
-  const parsed = offerSchema.safeParse({ ...Object.fromEntries(form), sortOrder: form.get("sortOrder") || 0 });
+  const parsed = offerSchema.safeParse({ ...Object.fromEntries(form), price: form.get("price") ?? "", sortOrder: form.get("sortOrder") || 0 });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the fields." };
-  const { id, productType, ...rest } = parsed.data;
-  await getStore().saveOffer(id || null, { ...rest, productType: productType || null, active: form.get("active") === "on" });
+  const { id, productType, price, ...rest } = parsed.data;
+  if (rest.kind === "volume" && price === null) return { error: "Set the price each item drops to." };
+  await getStore().saveOffer(id || null, {
+    ...rest,
+    free: rest.kind === "volume" ? 1 : rest.free,
+    pricePaise: rest.kind === "volume" ? price : null,
+    productType: productType || null,
+    active: form.get("active") === "on",
+  });
   refreshShop();
   revalidatePath("/admin/offers");
   return { ok: true, message: "Saved." };
@@ -418,6 +431,9 @@ export async function saveSettingsAction(_: FormState, form: FormData): Promise<
   const whatsappNumber = digits.length === 10 ? `91${digits}` : digits;
   if (!/^\d{11,15}$/.test(whatsappNumber)) return { error: "Enter the WhatsApp number with country code, like 91 77440 20601." };
 
+  const freeAbove = rupeesToPaise(text("freeShippingAbove", 12));
+  if (Number.isNaN(freeAbove)) return { error: "Free shipping amount must be a number like 250, or blank." };
+
   const settings: Settings = {
     storeOpen: form.get("storeOpen") === "on",
     announcement: text("announcement", 200),
@@ -425,6 +441,7 @@ export async function saveSettingsAction(_: FormState, form: FormData): Promise<
     orderNote: text("orderNote", 300),
     deliveryNote: text("deliveryNote", 200),
     bulkNote: text("bulkNote", 300),
+    freeShippingAbovePaise: freeAbove,
   };
   await getStore().saveSettings(settings);
   refreshShop();

@@ -11,11 +11,12 @@ export const policies: Policy[] = [
     slug: "ordering",
     title: "How ordering works",
     body: (s) => [
-      "Add what you like to your cart, then tap \"Order on WhatsApp\". Your order opens as a ready-to-send WhatsApp message to us.",
+      "Add what you like to your cart, then tap \"Checkout on WhatsApp\". Your order opens as a ready-to-send WhatsApp message to us.",
       s.orderNote,
       s.deliveryNote,
+      s.freeShippingAbovePaise !== null ? `Shipping is free on orders above ₹${s.freeShippingAbovePaise / 100}. Below that, we share the delivery charge for your area on WhatsApp.` : "",
       s.bulkNote,
-      "Offers like buy 4 get 1 free are worked out in your cart automatically. The cheapest items in each group are the free ones.",
+      "Offers and bulk prices are worked out in your cart automatically. On buy-X-get-Y deals, the cheapest items in each group are the free ones.",
     ].filter(Boolean),
   },
   {

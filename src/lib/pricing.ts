@@ -1,3 +1,4 @@
+import { formatINR } from "./money";
 import type { AppliedOffer, Offer, Product, ProductType } from "./types";
 
 // Pricing rules shared by the browser (cart totals) and the server (the
@@ -57,20 +58,50 @@ export function canOrder(product: Pick<Product, "status" | "soldOut" | "pricePai
 
 export type PricedLine = { type: ProductType; unitPricePaise: number; qty: number };
 
+const validOffer = (o: Offer) =>
+  o.active && o.buy > 0 && (o.kind === "volume" ? o.pricePaise !== null && o.pricePaise >= 0 : o.free > 0);
+const matches = (o: Offer, type: ProductType) => o.productType === null || o.productType === type;
+
+/** The volume tier that applies to `n` items, if any: the lowest price reached. */
+function volumeTier(offers: Offer[], n: number) {
+  return offers.filter((o) => o.buy <= n).sort((a, b) => a.pricePaise! - b.pricePaise!)[0] ?? null;
+}
+
 /**
- * Buy-X-get-Y offers. Per offer, the eligible units are sorted from most to
- * least expensive and cut into groups of (buy + free); in every full group
- * the cheapest `free` units cost nothing. A unit counts toward one offer
- * only, and offers apply in their sort order.
+ * Applies offers in two passes.
+ *
+ * 1. Volume pricing: for each product type with volume tiers, once the cart
+ *    holds `buy` or more of that type, every unit costs the tier price
+ *    (6+ wall cards at ₹25, 11+ at ₹20).
+ * 2. Buy-X-get-Y: per offer, the eligible units are sorted from most to
+ *    least expensive and cut into groups of (buy + free); in every full
+ *    group the cheapest `free` units cost nothing. A unit counts toward one
+ *    offer only, and offers apply in their sort order.
  */
 export function applyOffers(lines: PricedLine[], offers: Offer[]) {
-  const units = lines.flatMap((l, li) => Array.from({ length: l.qty }, () => ({ li, type: l.type, price: l.unitPricePaise, taken: false })));
+  const active = offers.filter(validOffer).sort((a, b) => a.sortOrder - b.sortOrder);
   const applied: AppliedOffer[] = [];
-  const active = offers.filter((o) => o.active && o.buy > 0 && o.free > 0).sort((a, b) => a.sortOrder - b.sortOrder);
+  const prices = lines.map((l) => l.unitPricePaise);
 
-  for (const offer of active) {
+  const volume = active.filter((o) => o.kind === "volume");
+  for (const scope of new Set(volume.map((o) => o.productType))) {
+    const tiers = volume.filter((o) => o.productType === scope);
+    const idx = lines.map((l, i) => (scope === null || l.type === scope ? i : -1)).filter((i) => i >= 0);
+    const tier = volumeTier(tiers, idx.reduce((n, i) => n + lines[i].qty, 0));
+    if (!tier) continue;
+    let discount = 0;
+    for (const i of idx) {
+      const cut = Math.max(0, prices[i] - tier.pricePaise!);
+      discount += cut * lines[i].qty;
+      prices[i] -= cut;
+    }
+    if (discount > 0) applied.push({ offerId: tier.id, name: tier.name, freeUnits: 0, discountPaise: discount });
+  }
+
+  const units = lines.flatMap((l, li) => Array.from({ length: l.qty }, () => ({ type: l.type, price: prices[li], taken: false })));
+  for (const offer of active.filter((o) => o.kind !== "volume")) {
     const size = offer.buy + offer.free;
-    const eligible = units.filter((u) => !u.taken && (offer.productType === null || u.type === offer.productType)).sort((a, b) => b.price - a.price);
+    const eligible = units.filter((u) => !u.taken && matches(offer, u.type)).sort((a, b) => b.price - a.price);
     const groups = Math.floor(eligible.length / size);
     if (!groups) continue;
     let discount = 0;
@@ -94,8 +125,22 @@ export function totals(lines: PricedLine[], offers: Offer[]) {
 /** "Add 1 more sticker and it's free" nudges for the cart. */
 export function offerHints(lines: PricedLine[], offers: Offer[], label: (type: ProductType | null, n: number) => string): string[] {
   const hints: string[] = [];
-  for (const o of offers.filter((x) => x.active && x.buy > 0 && x.free > 0).sort((a, b) => a.sortOrder - b.sortOrder)) {
-    const n = lines.filter((l) => o.productType === null || l.type === o.productType).reduce((s, l) => s + l.qty, 0);
+  const active = offers.filter(validOffer).sort((a, b) => a.sortOrder - b.sortOrder);
+  const count = (o: Offer) => lines.filter((l) => matches(o, l.type)).reduce((s, l) => s + l.qty, 0);
+
+  const volume = active.filter((o) => o.kind === "volume");
+  for (const scope of new Set(volume.map((o) => o.productType))) {
+    const tiers = volume.filter((o) => o.productType === scope).sort((a, b) => a.buy - b.buy);
+    const n = count(tiers[0]);
+    const current = volumeTier(tiers, n);
+    const next = tiers.find((t) => t.buy > n && (!current || t.pricePaise! < current.pricePaise!));
+    if (n === 0 || !next) continue;
+    const need = next.buy - n;
+    hints.push(`Add ${need} more ${label(scope, need)} to pay ${formatINR(next.pricePaise!)} each.`);
+  }
+
+  for (const o of active.filter((x) => x.kind !== "volume")) {
+    const n = count(o);
     if (n === 0) continue;
     const size = o.buy + o.free;
     const inGroup = n % size;
@@ -108,4 +153,19 @@ export function offerHints(lines: PricedLine[], offers: Offer[], label: (type: P
     );
   }
   return hints;
+}
+
+/** Products whose minimum order isn't met yet, e.g. music cards (min 5). */
+export function minQtyShortfalls(lines: { productId: string; qty: number }[], products: { id: string; name: string; minQty: number }[]) {
+  const qty = new Map<string, number>();
+  for (const l of lines) qty.set(l.productId, (qty.get(l.productId) ?? 0) + l.qty);
+  return products
+    .filter((p) => qty.has(p.id) && qty.get(p.id)! < p.minQty)
+    .map((p) => ({ productId: p.id, name: p.name, minQty: p.minQty, need: p.minQty - qty.get(p.id)! }));
+}
+
+/** Free shipping nudge; null when there's no threshold. */
+export function shippingStatus(totalPaise: number, freeAbovePaise: number | null) {
+  if (freeAbovePaise === null) return null;
+  return totalPaise >= freeAbovePaise ? { free: true, needPaise: 0 } : { free: false, needPaise: freeAbovePaise - totalPaise };
 }
