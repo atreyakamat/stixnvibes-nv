@@ -46,8 +46,8 @@ describe("priceLines", () => {
   });
 
   it("rejects bad upload ids, unknown options and products that can't be ordered", () => {
-    expect(priceLines([{ productId: music.id, qty: 5, selections: {}, custom: { song: "x", photo: "../etc" } }], products, offers).problems).toHaveLength(1);
-    expect(priceLines([{ productId: music.id, qty: 3, selections: {}, custom: { song: "x" } }], products, offers).problems[0].reason).toMatch(/minimum is 5/);
+    expect(priceLines([{ productId: music.id, qty: 5, selections: {}, custom: { song: "https://open.spotify.com/track/x", photo: "../etc" } }], products, offers).problems).toHaveLength(1);
+    expect(priceLines([{ productId: music.id, qty: 3, selections: {}, custom: { song: "https://open.spotify.com/track/x" } }], products, offers).problems[0].reason).toMatch(/minimum is 5/);
     expect(priceLines([{ productId: poster.id, qty: 1, selections: { size: "a0" }, custom: {} }], products, offers).problems).toHaveLength(1);
     expect(priceLines([{ productId: "p-wall-cards", qty: 1, selections: {}, custom: {} }], [{ ...products.find((p) => p.id === "p-wall-cards")!, status: "upcoming" }], offers).problems).toHaveLength(1);
     expect(priceLines([{ productId: "nope", qty: 1, selections: {}, custom: {} }], products, offers).problems).toHaveLength(1);

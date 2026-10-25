@@ -43,6 +43,16 @@ export function whatsappFor(order: Order, freeShippingAbovePaise: number | null)
   return orderMessage({ ...order, freeShippingAbovePaise, link: orderUrl(order) });
 }
 
+/** An http(s) link as typed, or null for anything else (javascript:, data:, plain text). */
+export function webLink(value: string): string | null {
+  try {
+    const u = new URL(value);
+    return u.protocol === "https:" || u.protocol === "http:" ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Prices the cart from the live catalog. The browser only sends ids,
  * picked options and typed text; prices always come from here.
@@ -75,6 +85,14 @@ export function priceLines(input: OrderInput["lines"], products: Product[], offe
           continue;
         }
         custom.push({ label: f.label, value: uploadUrl(value), kind: f.kind });
+      } else if (f.kind === "link") {
+        // Shown as a clickable link in admin and in the message, so only web links.
+        const url = webLink(value);
+        if (!url) {
+          problems.push({ productId: p.id, reason: `${p.name}: "${f.label}" needs a link starting with https://` });
+          continue;
+        }
+        custom.push({ label: f.label, value: url, kind: f.kind });
       } else {
         custom.push({ label: f.label, value, kind: f.kind });
       }
