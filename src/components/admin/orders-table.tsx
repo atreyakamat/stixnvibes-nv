@@ -11,7 +11,7 @@ export function formatDate(iso: string) {
 }
 
 export function OrdersTable({ orders }: { orders: Order[] }) {
-  if (orders.length === 0) return <p className="rounded-2xl border border-line p-6 text-paper/70">No orders yet. They show up here the moment a customer taps &ldquo;Place order on WhatsApp&rdquo;.</p>;
+  if (orders.length === 0) return <p className="rounded-2xl border border-line p-6 text-paper/70">No orders yet. They show up here the moment a customer taps &ldquo;Place order&rdquo;.</p>;
   return (
     <div className="overflow-x-auto rounded-2xl border border-line">
       <table className="w-full min-w-[40rem] text-left text-sm">

@@ -11,10 +11,10 @@ export const policies: Policy[] = [
     slug: "ordering",
     title: "How ordering works",
     body: (s) => [
-      "Add what you like to your cart, fill in your name, WhatsApp number and address (or pick up at a stall), then tap \"Place order on WhatsApp\". Your order opens as a ready-to-send WhatsApp message to us, and you get an order page to track it.",
+      `Add what you like to your cart, fill in your name, phone number and address (or pick up at a stall), then tap "Place order". You get an order page to track it. Tap "Copy order & open Instagram" there and paste the order in a DM to ${site.contact.instagramHandle}. We reply to confirm it.`,
       s.orderNote,
       s.deliveryNote,
-      s.freeShippingAbovePaise !== null ? `Shipping is free on orders above ₹${s.freeShippingAbovePaise / 100}. Below that, we share the delivery charge for your area on WhatsApp.` : "",
+      s.freeShippingAbovePaise !== null ? `Shipping is free on orders above ₹${s.freeShippingAbovePaise / 100}. Below that, we share the delivery charge for your area on Instagram.` : "",
       s.bulkNote,
       "Offers and bulk prices are worked out in your cart automatically. On buy-X-get-Y deals, the cheapest items in each group are the free ones.",
     ].filter(Boolean),
@@ -25,7 +25,7 @@ export const policies: Policy[] = [
     body: () => [
       "Stickers and prints are made for you, so we don't take returns for a change of mind.",
       "If your order arrives damaged, misprinted or wrong, message us within 7 days of delivery with your order ref and a photo. We'll replace it or refund you.",
-      `Reach us on WhatsApp, Instagram ${site.contact.instagramHandle}, or ${site.contact.email}.`,
+      `Reach us on Instagram ${site.contact.instagramHandle}, or ${site.contact.email}.`,
     ],
   },
   {
@@ -44,8 +44,8 @@ export const policies: Policy[] = [
     title: "Terms",
     body: () => [
       `${site.name} is a student-led brand from Goa, India. These terms cover orders placed through this shop.`,
-      "Prices are in Indian rupees. Your order is confirmed once we reply on WhatsApp and payment is received.",
-      "If an item turns out to be unavailable we'll tell you on WhatsApp, and refund anything you've paid for it.",
+      "Prices are in Indian rupees. Your order is confirmed once we reply on Instagram and payment is received.",
+      "If an item turns out to be unavailable we'll tell you on Instagram, and refund anything you've paid for it.",
       "Colours can look slightly different in print than on screen.",
       "Custom orders: only send photos and artwork you own or have permission to use. We may decline designs we can't legally print.",
     ],

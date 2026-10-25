@@ -60,7 +60,7 @@ export type Product = {
   /** Short label on the card, e.g. "New" or "Bestseller". */
   badge: string;
   sortOrder: number;
-  /** null = no price online; customers ask on WhatsApp. */
+  /** null = no price online; customers ask on Instagram. */
   pricePaise: number | null;
   /** Optional "was" price shown struck through. */
   compareAtPaise: number | null;
@@ -142,7 +142,7 @@ export type Fulfilment = (typeof FULFILMENTS)[number];
 
 export type Address = { line: string; city: string; state: string; pincode: string };
 
-/** An order sent to WhatsApp. Payment and delivery are sorted in the chat. */
+/** An order placed on the shop. Payment and delivery are sorted in the Instagram chat. */
 export type Order = {
   id: string;
   number: string;
@@ -175,9 +175,9 @@ export type Settings = {
   /** When off, the cart is replaced by "message us" buttons. */
   storeOpen: boolean;
   announcement: string;
-  /** Country code + number, digits only, e.g. 917744020601. */
-  whatsappNumber: string;
-  /** Shown in the cart and the WhatsApp message, e.g. how payment works. */
+  /** Instagram username customers DM, without the @, e.g. stixnvibes. */
+  instagramHandle: string;
+  /** Shown in the cart and on the order page, e.g. how payment works. */
   orderNote: string;
   deliveryNote: string;
   bulkNote: string;

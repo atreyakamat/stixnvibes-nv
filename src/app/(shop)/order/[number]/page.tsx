@@ -3,12 +3,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import QRCode from "qrcode";
 import { formatINR } from "@/lib/money";
-import { viewKeyMatches, whatsappFor } from "@/lib/orders";
+import { CopyAndDm, InstagramIcon } from "@/components/copy-and-dm";
+import { messageFor, viewKeyMatches } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
 import { getStoreOrNull } from "@/lib/store";
 import type { Order, OrderStatus } from "@/lib/types";
 import { upiLink } from "@/lib/upi";
-import { addressText, waLink } from "@/lib/whatsapp";
+import { addressText, dmLink } from "@/lib/instagram";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Your order", robots: { index: false, follow: false } };
@@ -22,7 +23,7 @@ const STEPS: { status: OrderStatus; label: string }[] = [
 ];
 
 const NEXT: Record<OrderStatus, string> = {
-  new: "Send the order on WhatsApp if you haven't yet. We'll reply to confirm it.",
+  new: "Send the order to us on Instagram if you haven't yet. We'll reply to confirm it.",
   confirmed: "Confirmed. Pay below (or at the stall for pickups) and we'll start packing.",
   paid: "Paid, thank you. We're packing your order.",
   shipped: "Your order is on its way.",
@@ -55,7 +56,8 @@ export default async function OrderPage({ params, searchParams }: PageProps<"/or
   if (!store || !order || !viewKeyMatches(order, key)) notFound();
   const settings = await store.getSettings();
 
-  const whatsapp = waLink(settings.whatsappNumber, whatsappFor(order, settings.freeShippingAbovePaise));
+  const message = messageFor(order, settings.freeShippingAbovePaise);
+  const handle = settings.instagramHandle;
   const shippingKnown = order.fulfilment === "pickup" || (settings.freeShippingAbovePaise !== null && order.totalPaise >= settings.freeShippingAbovePaise);
   const canPay = Boolean(settings.upiId) && (order.status === "new" || order.status === "confirmed");
   const upi = canPay
@@ -76,9 +78,19 @@ export default async function OrderPage({ params, searchParams }: PageProps<"/or
         <Steps order={order} />
         <p className="text-paper/80">{NEXT[order.status]}</p>
         {order.status === "new" && (
-          <a href={whatsapp} target="_blank" rel="noopener" className={`btn w-full justify-center ${fresh ? "btn-primary" : "btn-ghost"}`}>
-            {fresh ? "Send order on WhatsApp" : "Open the order in WhatsApp"}
-          </a>
+          <>
+            {fresh && (
+              <p className="font-medium text-lemon">
+                Last step: send it to us on Instagram. We copy your order, you paste it in the chat with @{handle}.
+              </p>
+            )}
+            <CopyAndDm
+              handle={handle}
+              message={message}
+              label={fresh ? "Copy order & open Instagram" : "Copy order & message us"}
+              className={`btn w-full justify-center ${fresh ? "btn-primary" : "btn-ghost"}`}
+            />
+          </>
         )}
       </div>
 
@@ -93,14 +105,14 @@ export default async function OrderPage({ params, searchParams }: PageProps<"/or
               </p>
             ) : (
               <p className="text-paper/80">
-                Items come to <strong className="tabular-nums">{formatINR(order.totalPaise)}</strong>. We&apos;ll confirm the delivery charge on WhatsApp first, then pay the total here.
+                Items come to <strong className="tabular-nums">{formatINR(order.totalPaise)}</strong>. We&apos;ll confirm the delivery charge on Instagram first, then pay the total here.
               </p>
             )}
             <a href={upi} className="btn btn-primary !py-2.5 md:hidden">
               Pay with a UPI app
             </a>
             <p className="text-xs text-mute">
-              Paying to {settings.upiId}. Send the payment screenshot on WhatsApp with your order ref {order.number}.
+              Paying to {settings.upiId}. Send the payment screenshot on Instagram with your order ref {order.number}.
             </p>
           </div>
         </div>
@@ -161,7 +173,7 @@ export default async function OrderPage({ params, searchParams }: PageProps<"/or
         </div>
         <div>
           <dt className="label text-mute">{order.fulfilment === "pickup" ? "Pickup" : "Deliver to"}</dt>
-          <dd className="mt-1">{order.fulfilment === "pickup" ? "At a Stix N Vibes stall. We'll tell you where on WhatsApp." : addressText(order.address)}</dd>
+          <dd className="mt-1">{order.fulfilment === "pickup" ? "At a Stix N Vibes stall. We'll tell you where on Instagram." : addressText(order.address)}</dd>
         </div>
         {order.customerNote && (
           <div className="sm:col-span-2">
@@ -173,10 +185,11 @@ export default async function OrderPage({ params, searchParams }: PageProps<"/or
 
       <p className="mt-6 text-sm text-mute">
         Questions?{" "}
-        <a href={waLink(settings.whatsappNumber, `Hi! A question about my order ${order.number}.`)} target="_blank" rel="noopener" className="text-lemon underline underline-offset-2">
-          Message us on WhatsApp
-        </a>
-        .
+        <a href={dmLink(handle)} target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-lemon underline underline-offset-2">
+          <InstagramIcon className="size-4" />
+          Message us on Instagram
+        </a>{" "}
+        with your order ref {order.number}.
       </p>
     </section>
   );

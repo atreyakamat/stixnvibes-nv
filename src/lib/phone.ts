@@ -12,5 +12,5 @@ export function normalizePhone(input: string): string | null {
 /** "98765 43210" for display. */
 export const formatPhone = (p: string) => (p.length === 10 ? `${p.slice(0, 5)} ${p.slice(5)}` : p);
 
-/** wa.me wants the country code. */
-export const waNumber = (p: string) => (p.length === 10 ? `91${p}` : p);
+/** With the country code, for tel: links. */
+export const telNumber = (p: string) => (p.length === 10 ? `91${p}` : p);

@@ -7,6 +7,7 @@ import { login, logout, requireAdmin } from "@/lib/admin/session";
 import { ORDER_NUMBER_RE } from "@/lib/constants";
 import { istInputToIso, rupeesToPaise } from "@/lib/money";
 import { rateLimit } from "@/lib/rate-limit";
+import { cleanHandle, INSTAGRAM_HANDLE_RE } from "@/lib/instagram";
 import { getStore } from "@/lib/store";
 import { TEMPLATES } from "@/lib/store/seed";
 import type { ProductInput } from "@/lib/store/types";
@@ -448,9 +449,8 @@ export async function deleteOfferAction(form: FormData) {
 export async function saveSettingsAction(_: FormState, form: FormData): Promise<FormState> {
   await requireAdmin();
   const text = (k: string, max = 300) => String(form.get(k) ?? "").trim().slice(0, max);
-  const digits = text("whatsappNumber", 20).replace(/\D/g, "");
-  const whatsappNumber = digits.length === 10 ? `91${digits}` : digits;
-  if (!/^\d{11,15}$/.test(whatsappNumber)) return { error: "Enter the WhatsApp number with country code, like 91 77440 20601." };
+  const instagramHandle = cleanHandle(text("instagramHandle", 120));
+  if (!INSTAGRAM_HANDLE_RE.test(instagramHandle)) return { error: "Enter the Instagram username, like stixnvibes." };
 
   const freeAbove = rupeesToPaise(text("freeShippingAbove", 12));
   if (Number.isNaN(freeAbove)) return { error: "Free shipping amount must be a number like 250, or blank." };
@@ -465,7 +465,7 @@ export async function saveSettingsAction(_: FormState, form: FormData): Promise<
   const settings: Settings = {
     storeOpen: form.get("storeOpen") === "on",
     announcement: text("announcement", 200),
-    whatsappNumber,
+    instagramHandle,
     orderNote: text("orderNote", 300),
     deliveryNote: text("deliveryNote", 200),
     bulkNote: text("bulkNote", 300),

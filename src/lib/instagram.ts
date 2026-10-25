@@ -2,11 +2,27 @@ import { formatINR } from "./money";
 import { formatPhone } from "./phone";
 import type { Address, AppliedOffer, Fulfilment, OrderLine } from "./types";
 
-export const DEFAULT_WHATSAPP = "917744020601";
+export const DEFAULT_INSTAGRAM = "stixnvibes";
 
-export function waLink(number: string, text?: string) {
-  const digits = number.replace(/\D/g, "") || DEFAULT_WHATSAPP;
-  return `https://wa.me/${digits}${text ? `?text=${encodeURIComponent(text)}` : ""}`;
+/** Instagram usernames: letters, numbers, dots and underscores, up to 30. */
+export const INSTAGRAM_HANDLE_RE = /^[A-Za-z0-9._]{1,30}$/;
+
+/** "@stixnvibes", "instagram.com/stixnvibes/" or "stixnvibes" -> "stixnvibes". */
+export function cleanHandle(input: string): string {
+  return input
+    .trim()
+    .replace(/^https?:\/\/(www\.)?(instagram\.com|ig\.me\/m)\//i, "")
+    .replace(/^@/, "")
+    .replace(/[/?#].*$/, "");
+}
+
+/**
+ * Opens a DM with the shop. Instagram can't prefill a message, so the
+ * text is copied to the clipboard first (see CopyAndDm).
+ */
+export function dmLink(handle?: string | null) {
+  const h = cleanHandle(handle ?? "");
+  return `https://ig.me/m/${INSTAGRAM_HANDLE_RE.test(h) ? h : DEFAULT_INSTAGRAM}`;
 }
 
 export type MessageInput = {
@@ -29,7 +45,7 @@ export type MessageInput = {
 
 export const addressText = (a: Address) => [a.line, a.city, [a.state, a.pincode].filter(Boolean).join(" ")].filter(Boolean).join(", ");
 
-/** The order as a WhatsApp message the customer sends to the shop. */
+/** The order as a message the customer sends to the shop on Instagram. */
 export function orderMessage(o: MessageInput): string {
   const out: string[] = ["Hi Stix N Vibes! I'd like to order:", ""];
   o.lines.forEach((l, i) => {

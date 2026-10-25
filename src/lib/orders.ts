@@ -6,7 +6,7 @@ import { canOrder, liveOffers, minQtyShortfalls, resolveOptions, totals } from "
 import { getStore } from "@/lib/store";
 import type { Offer, Order, OrderLine, Product } from "@/lib/types";
 import type { OrderInput } from "@/lib/validation";
-import { orderMessage, waLink } from "@/lib/whatsapp";
+import { orderMessage } from "@/lib/instagram";
 
 export class OrderError extends Error {
   constructor(message: string, public problems: { productId: string; reason: string }[] = []) {
@@ -38,8 +38,8 @@ export function viewKeyMatches(order: Pick<Order, "viewKey">, key: string | unde
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-/** The WhatsApp message for an order, with the customer's details and page link. */
-export function whatsappFor(order: Order, freeShippingAbovePaise: number | null) {
+/** The message the customer sends us for an order, with their details and page link. */
+export function messageFor(order: Order, freeShippingAbovePaise: number | null) {
   return orderMessage({ ...order, freeShippingAbovePaise, link: orderUrl(order) });
 }
 
@@ -119,11 +119,11 @@ export function priceLines(input: OrderInput["lines"], products: Product[], offe
   return { lines, problems, ...t };
 }
 
-/** Records the order and returns the WhatsApp link that sends it. */
-export async function createOrder(input: OrderInput): Promise<{ order: Order; whatsappUrl: string }> {
+/** Records the order. The customer then sends it to us from the order page. */
+export async function createOrder(input: OrderInput): Promise<{ order: Order }> {
   const store = getStore();
   const [products, allOffers, settings] = await Promise.all([store.listProducts(), store.listOffers(), store.getSettings()]);
-  if (!settings.storeOpen) throw new OrderError("Online orders are paused. Message us on WhatsApp.");
+  if (!settings.storeOpen) throw new OrderError("Online orders are paused. Message us on Instagram.");
 
   const priced = priceLines(input.lines, products, liveOffers(allOffers));
   if (priced.problems.length) throw new OrderError(priced.problems[0].reason, priced.problems);
@@ -150,5 +150,5 @@ export async function createOrder(input: OrderInput): Promise<{ order: Order; wh
     }
   }
 
-  return { order: order!, whatsappUrl: waLink(settings.whatsappNumber, whatsappFor(order!, settings.freeShippingAbovePaise)) };
+  return { order: order! };
 }

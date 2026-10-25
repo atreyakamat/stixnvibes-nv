@@ -28,17 +28,19 @@ On the Netlify site for shop.stixnvibes.com:
 
 Run `supabase/migrations/0002_checkout_campaigns.sql` in **SQL Editor → New query** before the v4 code deploys. It adds the customer phone, delivery/pickup and address to orders, a private view key for order pages, and % off sales with start and end dates. Then in **Admin → Settings** add your UPI ID so order pages show a pay-by-UPI QR.
 
+v4 takes orders through Instagram DMs instead of WhatsApp. In **Admin → Settings**, check the Instagram account (default `stixnvibes`) and rewrite the **How payment and confirmation work** note, because the saved one still says WhatsApp. Save.
+
 ## 3. Open the shop
 
 1. Go to `https://shop.stixnvibes.com/admin` and log in.
 2. **Products**: check the prices and upload real photos. **Offers** holds the bulk prices and free-item deals.
 3. **Products → Bulk add**: upload a folder of designs into a collection in one go.
-4. **Settings**: check the WhatsApp number and the notes. Save.
+4. **Settings**: check the Instagram account and the notes. Save.
 5. Place a test order from your phone and check it lands in **Orders** and on the **Dashboard**.
 
 ## Daily routine
 
-- A WhatsApp order arrives with a ref (`SNV-XXXXXX`). Open **Orders**, find the ref, check the items and any photos.
+- A customer DMs the shop on Instagram with their order and its ref (`SNV-XXXXXX`). Open **Orders**, find the ref, check the items and any photos. Only confirm orders whose DM has come in: a confirmed order becomes an invoice in InWoice.
 - Move it along: Confirmed → Paid → Shipped → Done. Keep the phone number, address and courier in the private note.
 - New designs: **Bulk add** or **Add product**. Upcoming designs: status "Coming soon".
 

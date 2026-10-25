@@ -5,9 +5,9 @@ import { formatDate, OrdersTable } from "@/components/admin/orders-table";
 import { requireAdmin } from "@/lib/admin/session";
 import { customersFromOrders, customerTag } from "@/lib/customers";
 import { formatINR } from "@/lib/money";
-import { formatPhone, normalizePhone, waNumber } from "@/lib/phone";
+import { formatPhone, normalizePhone, telNumber } from "@/lib/phone";
 import { getStore } from "@/lib/store";
-import { addressText, waLink } from "@/lib/whatsapp";
+import { addressText } from "@/lib/instagram";
 
 export const metadata: Metadata = { title: "Customer" };
 
@@ -18,7 +18,6 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
   const orders = (await getStore().listOrders({ search: phone, limit: 500 })).filter((o) => o.customerPhone === phone);
   const [c] = customersFromOrders(orders);
   if (!c) notFound();
-  const first = c.name.split(" ")[0] || "there";
 
   const facts = [
     { label: "Orders", value: `${c.orders} (${customerTag(c)})` },
@@ -35,11 +34,8 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
       <div>
         <h1 className="display text-5xl">{c.name || "No name"}</h1>
         <p className="mt-2 flex flex-wrap gap-4 text-sm">
-          <a href={`tel:+${waNumber(phone)}`} className="tabular-nums text-paper/70 hover:text-lemon">
+          <a href={`tel:+${telNumber(phone)}`} className="tabular-nums text-paper/70 hover:text-lemon">
             {formatPhone(phone)}
-          </a>
-          <a href={waLink(waNumber(phone), `Hi ${first}! `)} target="_blank" rel="noopener" className="text-lemon underline underline-offset-2">
-            Message on WhatsApp
           </a>
         </p>
       </div>

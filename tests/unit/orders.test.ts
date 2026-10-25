@@ -7,7 +7,7 @@ import { demoProducts, seedOffers } from "@/lib/store/seed";
 import type { Order } from "@/lib/types";
 import { upiLink } from "@/lib/upi";
 import { orderSchema } from "@/lib/validation";
-import { orderMessage, waLink } from "@/lib/whatsapp";
+import { cleanHandle, dmLink, orderMessage } from "@/lib/instagram";
 
 const details = {
   viewKey: "k".repeat(22),
@@ -54,7 +54,7 @@ describe("priceLines", () => {
   });
 });
 
-describe("WhatsApp message", () => {
+describe("order message", () => {
   it("lists items, options, offers and the ref", () => {
     const r = priceLines(
       [
@@ -72,7 +72,16 @@ describe("WhatsApp message", () => {
     expect(text).toContain("Shipping: please share the charge for my area");
     expect(text).toContain("Name: Riya");
     expect(text).toContain("Order ref: SNV-ABC234");
-    expect(waLink("91 77440 20601", "hi")).toBe("https://wa.me/917744020601?text=hi");
+  });
+
+  it("opens the Instagram DM with the shop, whatever the handle looks like", () => {
+    expect(dmLink("stixnvibes")).toBe("https://ig.me/m/stixnvibes");
+    expect(cleanHandle("@stix.n_vibes")).toBe("stix.n_vibes");
+    expect(cleanHandle("https://www.instagram.com/stixnvibes/?hl=en")).toBe("stixnvibes");
+    expect(cleanHandle("https://ig.me/m/stixnvibes")).toBe("stixnvibes");
+    // Anything that isn't a username falls back to the shop's account.
+    expect(dmLink("javascript:alert(1)")).toBe("https://ig.me/m/stixnvibes");
+    expect(dmLink("")).toBe("https://ig.me/m/stixnvibes");
   });
 
   it("makes readable order refs", () => {

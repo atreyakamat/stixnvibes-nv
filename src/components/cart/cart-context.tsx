@@ -30,7 +30,7 @@ export type CartItem = {
 export type ShopConfig = {
   offers: Offer[];
   storeOpen: boolean;
-  whatsappNumber: string;
+  instagramHandle: string;
   orderNote: string;
   bulkNote: string;
   freeShippingAbovePaise: number | null;

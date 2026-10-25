@@ -7,7 +7,8 @@ import { formatINR } from "@/lib/money";
 import { normalizePhone } from "@/lib/phone";
 import { track } from "@/lib/track";
 import type { Address, Fulfilment } from "@/lib/types";
-import { orderMessage, waLink } from "@/lib/whatsapp";
+import { orderMessage } from "@/lib/instagram";
+import { CopyAndDm } from "../copy-and-dm";
 import { useCart } from "./cart-context";
 
 type Details = { name: string; phone: string; fulfilment: Fulfilment; address: Address; note: string };
@@ -94,12 +95,6 @@ function Nudges() {
   );
 }
 
-const WhatsAppIcon = () => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="currentColor">
-    <path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2l-.4-.3Z" />
-  </svg>
-);
-
 /**
  * Totals, offer nudges and checkout. The drawer (compact) only shows totals
  * and links to the cart page, where the details form lives.
@@ -144,10 +139,8 @@ export function OrderPanel({ compact = false }: { compact?: boolean }) {
 
   // Built from the cart in the browser, used only if the server can't be
   // reached, so an order is never lost.
-  const fallbackUrl = () =>
-    waLink(
-      config.whatsappNumber,
-      orderMessage({
+  const fallbackMessage = () =>
+    orderMessage({
         lines: items.map((i) => ({ name: i.name, options: i.optionLabels, custom: i.customDisplay, qty: i.qty, unitPricePaise: i.unitPricePaise, lineTotalPaise: i.unitPricePaise * i.qty })),
         subtotalPaise,
         discountPaise,
@@ -159,8 +152,7 @@ export function OrderPanel({ compact = false }: { compact?: boolean }) {
         address: d.address,
         customerNote: d.note.trim(),
         freeShippingAbovePaise: config.freeShippingAbovePaise,
-      }),
-    );
+    });
 
   async function order(e: React.FormEvent) {
     e.preventDefault();
@@ -177,11 +169,6 @@ export function OrderPanel({ compact = false }: { compact?: boolean }) {
     } catch {
       // Not saving details is fine.
     }
-    // Desktops get WhatsApp in a new tab, opened now (inside the tap) so
-    // pop-up blockers allow it. Phones go to the order page, which has the
-    // WhatsApp button, so the customer keeps their order link.
-    const mobile = window.matchMedia("(pointer: coarse)").matches;
-    const tab = mobile ? null : window.open("about:blank", "_blank");
     try {
       const res = await fetch("/api/order", {
         method: "POST",
@@ -195,36 +182,33 @@ export function OrderPanel({ compact = false }: { compact?: boolean }) {
           customerNote: d.note,
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as { whatsappUrl?: string; orderPath?: string; error?: string };
-      if (res.ok && data.whatsappUrl && data.orderPath) {
-        if (tab) tab.location.href = data.whatsappUrl;
+      const data = (await res.json().catch(() => ({}))) as { orderPath?: string; error?: string };
+      // The order page has the "send it on Instagram" step and stays as
+      // the customer's link to the order.
+      if (res.ok && data.orderPath) {
         clear();
         router.push(`${data.orderPath}&new=1`);
         return;
       }
-      tab?.close();
       if (res.status === 400 || res.status === 409 || res.status === 429) {
         setError(data.error ?? "Something in your cart changed. Check it and try again.");
         setBusy(false);
         return;
       }
     } catch {
-      tab?.close();
+      // Network trouble: fall through.
     }
-    // Server trouble: hand the order to WhatsApp straight from the browser.
+    // Server trouble: send the order on Instagram straight from the browser.
     track("order_click");
-    setFallback(fallbackUrl());
+    setFallback(fallbackMessage());
     setBusy(false);
   }
 
   if (fallback) {
     return (
       <div className="space-y-4" role="status">
-        <p className="text-lg font-medium">Our order system is having a moment, so send your order straight on WhatsApp.</p>
-        <a href={fallback} target="_blank" rel="noopener" className="btn btn-primary w-full justify-center">
-          <WhatsAppIcon />
-          Send order on WhatsApp
-        </a>
+        <p className="text-lg font-medium">Our order system is having a moment, so send your order straight to us on Instagram.</p>
+        <CopyAndDm handle={config.instagramHandle} message={fallback} />
         <button type="button" className="btn btn-ghost !py-2.5" onClick={() => (clear(), setFallback(null))}>
           Sent it, clear my cart
         </button>
@@ -247,7 +231,7 @@ export function OrderPanel({ compact = false }: { compact?: boolean }) {
         </label>
         {fieldError("name")}
         <label className="block">
-          <span className="mb-1 block text-sm text-paper/70">WhatsApp number</span>
+          <span className="mb-1 block text-sm text-paper/70">Phone number</span>
           <input
             id="f-phone"
             value={d.phone}
@@ -318,7 +302,7 @@ export function OrderPanel({ compact = false }: { compact?: boolean }) {
             </label>
           </>
         )}
-        {pickup && <p className="text-sm text-paper/70">We&apos;ll tell you on WhatsApp where our next stall is. Pay when you pick up, or online.</p>}
+        {pickup && <p className="text-sm text-paper/70">We&apos;ll tell you on Instagram where our next stall is. Pay when you pick up, or online.</p>}
 
         <label className="block">
           <span className="mb-1 block text-sm text-paper/70">Note (optional)</span>
@@ -332,8 +316,7 @@ export function OrderPanel({ compact = false }: { compact?: boolean }) {
         </p>
       )}
       <button type="submit" disabled={busy || !items.length || shortfalls.length > 0} className="btn btn-primary w-full justify-center disabled:opacity-50">
-        <WhatsAppIcon />
-        {busy ? "Placing your order…" : "Place order on WhatsApp"}
+        {busy ? "Placing your order…" : "Place order"}
       </button>
       <p className="text-xs text-mute">{config.orderNote}</p>
     </form>

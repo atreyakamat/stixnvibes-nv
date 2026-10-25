@@ -1,5 +1,5 @@
 import type { Collection, CustomField, Offer, OptionGroup, Product, Settings } from "@/lib/types";
-import { DEFAULT_WHATSAPP } from "../whatsapp";
+import { DEFAULT_INSTAGRAM } from "../instagram";
 
 // Starter catalog, option templates and offers. Prices and offers come from
 // Atreya (23 Oct 2026): stickers ₹10 (buy 4 get 1), super sheets ₹80 (₹65
@@ -199,8 +199,8 @@ export function seedOffers(): Offer[] {
 export const DEFAULT_SETTINGS: Settings = {
   storeOpen: true,
   announcement: "",
-  whatsappNumber: DEFAULT_WHATSAPP,
-  orderNote: "Send the order on WhatsApp. We confirm it, share the UPI details, and pack it once paid.",
+  instagramHandle: DEFAULT_INSTAGRAM,
+  orderNote: "Send us the order on Instagram. We confirm it, share the UPI details, and pack it once paid.",
   deliveryNote: "Dispatched within 2 days.",
   bulkNote: "Ordering in bulk for a club, fest or shop? Message us and we'll quote.",
   freeShippingAbovePaise: 25000,

@@ -30,7 +30,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
     <div className="space-y-6">
       <h1 className="display text-5xl">Customers</h1>
       <p className="max-w-2xl text-sm text-mute">
-        Everyone who ordered online, grouped by WhatsApp number. {all.length} customers, {repeat} came back for more. Invoices, GST and the full CRM live in InWoice.
+        Everyone who ordered online, grouped by phone number. {all.length} customers, {repeat} came back for more. Invoices, GST and the full CRM live in InWoice.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         {SORTS.map((s) => (

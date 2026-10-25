@@ -11,11 +11,11 @@ export const revalidate = 60;
 
 export default async function ShopLayout({ children }: LayoutProps<"/">) {
   const { settings, offers } = await getShopState();
-  const notice = campaignBanner(offers) || settings.announcement || (!settings.storeOpen ? "Online orders are paused. Message us on WhatsApp to order." : "");
+  const notice = campaignBanner(offers) || settings.announcement || (!settings.storeOpen ? "Online orders are paused. Message us on Instagram to order." : "");
   const config = {
     offers,
     storeOpen: settings.storeOpen,
-    whatsappNumber: settings.whatsappNumber,
+    instagramHandle: settings.instagramHandle,
     orderNote: settings.orderNote,
     bulkNote: settings.bulkNote,
     freeShippingAbovePaise: settings.freeShippingAbovePaise,

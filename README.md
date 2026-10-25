@@ -1,6 +1,6 @@
 # Stix N Vibes shop
 
-The online shop for Stix N Vibes (shop.stixnvibes.com). Customers browse, customise and fill a cart, then send the whole order to WhatsApp in one tap. An admin panel runs the catalog, collections, offers and orders, and shows what people view and order. Same look as [stixnvibes.com](https://www.stixnvibes.com).
+The online shop for Stix N Vibes (shop.stixnvibes.com). Customers browse, customise and fill a cart, place the order and send it to the shop in an Instagram DM. An admin panel runs the catalog, collections, offers and orders, and shows what people view and order. Same look as [stixnvibes.com](https://www.stixnvibes.com).
 
 **Stack:** Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · Motion · Supabase (Postgres + Auth + Storage) · Netlify.
 
@@ -25,7 +25,7 @@ Without Supabase keys the app runs in **demo mode**: data lives in memory, produ
 
 ## How it works
 
-- **Product types**: stickers, sticker sheets, posters, music cards and wall cards. Each product has a base price (blank = "Ask on WhatsApp"), an optional "was" price, a badge, and a status: live, coming soon (shown, can't be ordered) or hidden.
+- **Product types**: stickers, sticker sheets, posters, music cards and wall cards. Each product has a base price (blank = "Ask on Instagram"), an optional "was" price, a badge, and a status: live, coming soon (shown, can't be ordered) or hidden.
 - **Options**: any number of option groups (Size: A4 / A3, Print: normal / sticker, Frame: none / framed, Material: paper vinyl / waterproof). Each choice can add to or take off the base price. Each type has a one-click template.
 - **Custom fields**: what the customer fills in, e.g. a Spotify link, a dedication and a photo for a music card. Photos go to a private bucket; the order links to them at `/u/<random id>`.
 - **Collections**: group designs (Lo-fi, Anime…). A product can be in several.
@@ -35,9 +35,9 @@ Without Supabase keys the app runs in **demo mode**: data lives in memory, produ
   - The cart nudges ("add 1 more sticker and it's free", "add 2 more wall cards to pay ₹25 each").
 - **Minimum per order** per product (music cards: 5). Checkout waits until it's met.
 - **Free shipping** above a set amount (₹250), with a cart nudge.
-- **Ordering**: the cart lives in the browser. "Order on WhatsApp" sends the cart to the server, which re-prices it from the database, records the order with a ref (`SNV-XXXXXX`) and returns a `wa.me` link with the full order written out. If the server can't be reached, the browser builds the same message itself, so an order is never lost. Payment and delivery are sorted in the WhatsApp chat.
-- **Analytics**: product views, add-to-cart, order taps and "Ask on WhatsApp" taps are counted without cookies or personal data.
-- **Admin** (`/admin`): dashboard (orders sent, order value, views, conversion, most viewed / ordered, daily chart), orders (status, private notes, customer photos), products (filters, quick hide / sold out / feature, duplicate, full editor with options, custom fields and photos), bulk add (one product per uploaded design), collections, offers, settings (WhatsApp number, notes, banner, pause orders).
+- **Ordering**: the cart lives in the browser. "Place order" sends the cart to the server, which re-prices it from the database, records the order with a ref (`SNV-XXXXXX`) and opens the customer's order page. Instagram can't prefill a DM, so the order page copies the full order and opens `ig.me/m/<account>` for the customer to paste it. If the server can't be reached, the browser builds the same message itself, so an order is never lost. Payment and delivery are sorted in the Instagram chat.
+- **Analytics**: product views, add-to-cart, order taps and "Ask on Instagram" taps are counted without cookies or personal data.
+- **Admin** (`/admin`): dashboard (orders sent, order value, views, conversion, most viewed / ordered, daily chart), orders (status, private notes, customer photos), products (filters, quick hide / sold out / feature, duplicate, full editor with options, custom fields and photos), bulk add (one product per uploaded design), collections, offers, settings (Instagram account, notes, banner, pause orders).
 
 ## Going live
 
@@ -51,7 +51,7 @@ src/app/admin/       admin pages and server actions
 src/app/api/         order, upload and analytics endpoints
 src/lib/pricing.ts   options and offers (shared by browser and server)
 src/lib/orders.ts    server-side pricing and order recording
-src/lib/whatsapp.ts  WhatsApp links and the order message
+src/lib/instagram.ts Instagram DM links and the order message
 src/lib/store/       data layer: Supabase + in-memory demo store, seed catalog
 supabase/            SQL migration and starter catalog
 tests/               unit (Vitest) and browser (Playwright) tests

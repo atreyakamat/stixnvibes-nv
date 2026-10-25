@@ -8,7 +8,7 @@ import type { Product } from "@/lib/types";
 export function priceLabel(product: Product): string {
   if (product.status === "upcoming") return "Coming soon";
   const price = fromPrice(product);
-  if (price === null) return "Ask on WhatsApp";
+  if (price === null) return "Ask on Instagram";
   return `${hasPriceRange(product) ? "From " : ""}${formatINR(price)}`;
 }
 

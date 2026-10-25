@@ -7,7 +7,8 @@ import { formatINR } from "@/lib/money";
 import { canOrder, defaultSelections, mrpFor, resolveOptions } from "@/lib/pricing";
 import { track } from "@/lib/track";
 import type { Product } from "@/lib/types";
-import { askMessage, waLink } from "@/lib/whatsapp";
+import { askMessage } from "@/lib/instagram";
+import { CopyAndDm } from "../copy-and-dm";
 
 type UploadState = { id: string; preview: string } | { busy: true } | { error: string };
 
@@ -32,7 +33,6 @@ export function BuyBox({ product, url }: { product: Product; url: string }) {
   const mrp = product.status === "live" ? mrpFor(unit, product.compareAtPaise, config.mrpMarkupPercent) : null;
   const orderable = canOrder(product) && config.storeOpen;
   const offers = config.offers.filter((o) => o.productType === product.type);
-  const ask = waLink(config.whatsappNumber, askMessage(product.name, url));
 
   async function upload(fieldId: string, file: File | undefined) {
     if (!file) return;
@@ -214,9 +214,13 @@ export function BuyBox({ product, url }: { product: Product; url: string }) {
                   ? "Online orders are paused. Message us and we'll sort it out."
                   : "Message us for the price and options."}
           </p>
-          <a href={ask} target="_blank" rel="noopener" className="btn btn-primary" onClick={() => track("ask_click", product.id)}>
-            Ask on WhatsApp
-          </a>
+          <CopyAndDm
+            handle={config.instagramHandle}
+            message={askMessage(product.name, url)}
+            label="Ask on Instagram"
+            className="btn btn-primary"
+            onSent={() => track("ask_click", product.id)}
+          />
         </div>
       )}
     </div>

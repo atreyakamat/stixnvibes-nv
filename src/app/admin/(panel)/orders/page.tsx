@@ -20,7 +20,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/admin/ord
     <div className="space-y-6">
       <h1 className="display text-5xl">Orders</h1>
       <p className="max-w-2xl text-sm text-mute">
-        Every tap on &ldquo;Place order on WhatsApp&rdquo; lands here with its ref (SNV-…). Match it to the WhatsApp chat, then move it along as you confirm, get paid and ship.
+        Every tap on &ldquo;Place order&rdquo; lands here with its ref (SNV-…). Match it to the customer&apos;s Instagram DM, then move it along as you confirm, get paid and ship.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <Link href="/admin/orders" className={chip(!status)}>

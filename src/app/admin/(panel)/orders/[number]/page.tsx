@@ -7,9 +7,9 @@ import { StatusBadge } from "@/components/admin/status-badge";
 import { requireAdmin } from "@/lib/admin/session";
 import { formatINR } from "@/lib/money";
 import { orderUrl } from "@/lib/orders";
-import { formatPhone, waNumber } from "@/lib/phone";
+import { formatPhone, telNumber } from "@/lib/phone";
 import { getStore } from "@/lib/store";
-import { addressText, waLink } from "@/lib/whatsapp";
+import { addressText } from "@/lib/instagram";
 
 export const metadata: Metadata = { title: "Order" };
 
@@ -29,7 +29,7 @@ export default async function OrderPage({ params }: PageProps<"/admin/orders/[nu
       </div>
       <p className="text-sm text-mute">
         Sent {formatDate(order.createdAt)}
-        {order.customerName && <> by {order.customerName}</>}. Find the chat in WhatsApp by searching the ref.
+        {order.customerName && <> by {order.customerName}</>}. Find the DM in Instagram by searching the ref. Confirm it only once that DM has come in, so made-up orders never reach InWoice.
       </p>
 
       <dl className="grid gap-4 rounded-2xl border border-line p-4 text-sm sm:grid-cols-3">
@@ -45,11 +45,8 @@ export default async function OrderPage({ params }: PageProps<"/admin/orders/[nu
             )}
             {order.customerPhone && (
               <span className="mt-1 flex flex-wrap gap-3">
-                <a href={`tel:+${waNumber(order.customerPhone)}`} className="tabular-nums text-paper/70 hover:text-lemon">
+                <a href={`tel:+${telNumber(order.customerPhone)}`} className="tabular-nums text-paper/70 hover:text-lemon">
                   {formatPhone(order.customerPhone)}
-                </a>
-                <a href={waLink(waNumber(order.customerPhone), `Hi ${order.customerName.split(" ")[0] || ""}! About your Stix N Vibes order ${order.number}:`)} target="_blank" rel="noopener" className="text-lemon underline underline-offset-2">
-                  WhatsApp
                 </a>
               </span>
             )}

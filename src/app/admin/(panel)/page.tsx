@@ -32,16 +32,16 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
   const maxDay = Math.max(1, ...stats.daily.map((d) => d.views));
 
   const cards = [
-    { label: "Orders sent to WhatsApp", value: stats.orderClicks, hint: "Taps on Place order on WhatsApp" },
+    { label: "Orders placed", value: stats.orderClicks, hint: "Taps on Place order" },
     { label: "Order value", value: formatINR(stats.orderValuePaise), hint: `${stats.orders} orders, excluding cancelled` },
     { label: "Product views", value: stats.views, hint: `${conversion}% of views became an order` },
-    { label: "Added to cart", value: stats.addToCart, hint: `${stats.askClicks} "Ask on WhatsApp" taps` },
+    { label: "Added to cart", value: stats.addToCart, hint: `${stats.askClicks} "Ask on Instagram" taps` },
   ];
 
   const unpriced = products.filter((p) => p.status === "live" && p.pricePaise === null).length;
   const warnings = [
     !settings.storeOpen && "Online orders are paused. Turn them on in Settings.",
-    unpriced > 0 && `${unpriced} live product${unpriced === 1 ? " has" : "s have"} no price, so customers see "Ask on WhatsApp".`,
+    unpriced > 0 && `${unpriced} live product${unpriced === 1 ? " has" : "s have"} no price, so customers see "Ask on Instagram".`,
   ].filter(Boolean) as string[];
 
   return (
