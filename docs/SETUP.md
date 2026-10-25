@@ -41,3 +41,12 @@ Run `supabase/migrations/0002_checkout_campaigns.sql` in **SQL Editor → New qu
 - A WhatsApp order arrives with a ref (`SNV-XXXXXX`). Open **Orders**, find the ref, check the items and any photos.
 - Move it along: Confirmed → Paid → Shipped → Done. Keep the phone number, address and courier in the private note.
 - New designs: **Bulk add** or **Add product**. Upcoming designs: status "Coming soon".
+
+## Running the shop in Docker (optional)
+
+Netlify stays the main host. The Docker setup is for running a copy on the home lab or any server, e.g. if Netlify is down.
+
+1. `cp .env.example .env` and fill in the same values as on Netlify (Supabase keys, `ADMIN_EMAILS`, `ADMIN_SESSION_SECRET`, optional `INWOICE_SYNC_TOKEN`).
+2. `docker compose up -d --build`, then open `http://<server>:3000`.
+
+It uses the same Supabase database as the live shop, so orders placed on it are real. The container restarts by itself after a reboot or power cut. For a demo copy with in-memory data instead, build with `docker build --build-arg SHOP_DEMO_MODE=true -t shop-demo .`.
