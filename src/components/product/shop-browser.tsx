@@ -102,7 +102,7 @@ export function ShopBrowser({ products, collections }: { products: Product[]; co
           ))}
         </ul>
       ) : (
-        <p className="mt-6 text-paper/70">Nothing matches that yet. Try another search, or ask us on WhatsApp.</p>
+        <p className="mt-6 text-paper/70">Nothing matches that yet. Try another search, or ask us on Instagram.</p>
       )}
     </div>
   );

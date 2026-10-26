@@ -177,7 +177,7 @@ export function ProductForm({ product, collections, initialType }: { product?: P
           <p className="text-xs text-mute">Bulk prices (e.g. 6+ at ₹25) and buy-X-get-Y deals are set per product type under Offers.</p>
           <div className="grid gap-4 sm:grid-cols-3">
             <label className="block">
-              <span className={lbl}>Price ₹ (blank = ask on WhatsApp)</span>
+              <span className={lbl}>Price ₹ (blank = ask on Instagram)</span>
               <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" className="field tabular-nums" placeholder="10" />
             </label>
             <label className="block">

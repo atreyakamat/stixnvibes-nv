@@ -3,6 +3,7 @@ import { CartDrawer } from "@/components/cart/cart-drawer";
 import { GlassSheen } from "@/components/glass-sheen";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { campaignBanner } from "@/lib/pricing";
 import { getShopState } from "@/lib/shop";
 
 // Header notice and offers read settings; refresh the cached shell every minute.
@@ -10,14 +11,15 @@ export const revalidate = 60;
 
 export default async function ShopLayout({ children }: LayoutProps<"/">) {
   const { settings, offers } = await getShopState();
-  const notice = settings.announcement || (!settings.storeOpen ? "Online orders are paused. Message us on WhatsApp to order." : "");
+  const notice = campaignBanner(offers) || settings.announcement || (!settings.storeOpen ? "Online orders are paused. Message us on Instagram to order." : "");
   const config = {
     offers,
     storeOpen: settings.storeOpen,
-    whatsappNumber: settings.whatsappNumber,
+    instagramHandle: settings.instagramHandle,
     orderNote: settings.orderNote,
     bulkNote: settings.bulkNote,
     freeShippingAbovePaise: settings.freeShippingAbovePaise,
+    mrpMarkupPercent: settings.mrpMarkupPercent,
   };
 
   return (

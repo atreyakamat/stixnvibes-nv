@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { nav, site, whatsappLink } from "@/content/site";
+import { nav, site } from "@/content/site";
 import { Wordmark } from "./wordmark";
 
 const policies = [
@@ -51,8 +51,8 @@ export function SiteFooter() {
               </a>
             </li>
             <li>
-              <a href={whatsappLink()} className="hover:text-lemon" rel="noopener" target="_blank">
-                WhatsApp
+              <a href={site.contact.instagramDm} className="hover:text-lemon" rel="noopener" target="_blank">
+                Message us on Instagram
               </a>
             </li>
             <li>

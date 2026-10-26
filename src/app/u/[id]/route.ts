@@ -8,7 +8,7 @@ export async function GET(_req: Request, ctx: RouteContext<"/u/[id]">) {
   if (!UPLOAD_ID_RE.test(id)) return new Response("Not found", { status: 404 });
   const upload = await getStoreOrNull()?.readUpload(id);
   if (!upload) return new Response("Not found", { status: 404 });
-  const headers = { "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex" };
+  const headers = { "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex", "X-Content-Type-Options": "nosniff" };
   if ("url" in upload) return Response.redirect(upload.url, 302);
   return new Response(new Uint8Array(upload.body), { headers: { ...headers, "Content-Type": upload.contentType } });
 }

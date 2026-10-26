@@ -9,18 +9,31 @@ async function adminLogin(page: Page) {
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
 }
 
-/** Catches the wa.me link instead of leaving for WhatsApp. */
-async function catchWhatsApp(context: BrowserContext) {
+/**
+ * Catches the ig.me link instead of leaving for Instagram, and records
+ * what the page copied for the customer to paste.
+ */
+async function catchInstagram(context: BrowserContext) {
   const urls: string[] = [];
-  await context.route("https://wa.me/**", (route) => {
+  await context.route("https://ig.me/**", (route) => {
     urls.push(route.request().url());
-    return route.fulfill({ contentType: "text/html", body: "<title>WhatsApp</title>ok" });
+    return route.fulfill({ contentType: "text/html", body: "<title>Instagram</title>ok" });
+  });
+  await context.addInitScript(() => {
+    const w = window as unknown as { __copied: string[] };
+    w.__copied = [];
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: async (t: string) => void w.__copied.push(t) },
+    });
   });
   return urls;
 }
 
-test("build a cart with offers and a music card, order on WhatsApp, then manage it in admin", async ({ page, context, isMobile }) => {
-  const wa = await catchWhatsApp(context);
+const copied = (page: Page) => page.evaluate(() => (window as unknown as { __copied: string[] }).__copied);
+
+test("build a cart with offers and a music card, order and send it on Instagram, then manage it in admin", async ({ page, context }) => {
+  const ig = await catchInstagram(context);
 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /your stickers/i })).toBeVisible();
@@ -53,19 +66,36 @@ test("build a cart with offers and a music card, order on WhatsApp, then manage 
   // Music cards have a minimum of 5, so checkout waits until there are 5.
   await page.goto("/cart");
   await expect(page.getByText("Music card: minimum 5 per order. Add 4 more to check out.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Checkout on WhatsApp" })).toBeDisabled();
+  const place = page.getByRole("button", { name: "Place order" });
+  await expect(place).toBeDisabled();
   for (let i = 0; i < 4; i++) await page.getByRole("button", { name: "Increase quantity" }).nth(1).click();
   await expect(page.getByTestId("cart-total")).toHaveText("₹140");
   await expect(page.getByText("Add ₹110 more for free shipping")).toBeVisible();
-  await page.getByPlaceholder("Your name").fill("Asha");
-  await page.getByRole("button", { name: "Checkout on WhatsApp" }).click();
-  // Phones hand over to the WhatsApp app; desktops open it in a new tab.
-  if (isMobile) await expect(page).toHaveURL(/^https:\/\/wa\.me\//);
-  else await expect(page.getByText(/Your order is ready in WhatsApp \(ref SNV-/)).toBeVisible();
-  await expect.poll(() => wa.length).toBe(1);
 
-  const text = new URL(wa[0]).searchParams.get("text")!;
-  expect(new URL(wa[0]).pathname).toBe("/917744020601");
+  // Details are checked before anything is sent.
+  await place.click();
+  await expect(page.getByText("Add your name.")).toBeVisible();
+  await expect(page.getByText("Add a 10-digit mobile number.")).toBeVisible();
+  await page.getByLabel("Name", { exact: true }).fill("Asha");
+  await page.getByLabel("Phone number").fill("+91 98765 43210");
+  await page.getByLabel("Address").fill("12 Rua de Ourem, Fontainhas");
+  await page.getByLabel("City").fill("Panaji");
+  await page.getByLabel("Pincode").fill("403001");
+  await place.click();
+
+  // Everyone lands on their order page, then copies the order into an Instagram DM.
+  await expect(page).toHaveURL(/\/order\/SNV-[A-Z0-9]{6}\?k=[\w-]+&new=1$/);
+  const ref = /SNV-[A-Z0-9]{6}/.exec(page.url())![0];
+  await expect(page.getByRole("heading", { name: ref })).toBeVisible();
+  await expect(page.getByText("12 Rua de Ourem, Fontainhas, Panaji, Goa 403001")).toBeVisible();
+  await expect(page.getByText("Last step: send it to us on Instagram.", { exact: false })).toBeVisible();
+  await expect(page.getByTestId("cart-count")).toHaveText("0");
+  await page.getByRole("link", { name: "Copy order & open Instagram" }).click();
+  await expect(page.getByText("Copied. Paste it in the chat with @stixnvibes and send.")).toBeVisible();
+  await expect.poll(() => ig.length).toBe(1);
+  expect(new URL(ig[0]).pathname).toBe("/m/stixnvibes");
+
+  const text = (await copied(page))[0];
   expect(text).toContain("Lo-fi 03 × 5 = ₹50");
   expect(text).toContain("Buy 4 stickers, get 1 free: −₹10");
   expect(text).toContain("Spotify song link: https://open.spotify.com/track/abc");
@@ -73,20 +103,78 @@ test("build a cart with offers and a music card, order on WhatsApp, then manage 
   expect(text).toContain("Music card × 5 = ₹100");
   expect(text).toContain("Total: ₹140");
   expect(text).toContain("Shipping: please share the charge for my area");
-  const ref = /Order ref: (SNV-[A-Z0-9]{6})/.exec(text)![1];
+  expect(text).toContain("Phone: 98765 43210");
+  expect(text).toContain(`Order ref: ${ref}`);
+  expect(text).toMatch(new RegExp(`Order page: https?://\\S+/order/${ref}\\?k=`));
+
+  // A wrong key is a 404, not someone else's order.
+  const bad = await page.request.get(`/order/${ref}?k=nope`);
+  expect(bad.status()).toBe(404);
 
   // Admin sees the order, its photo and the numbers.
   await page.goto("/admin");
   await expect(page).toHaveURL(/\/admin\/login/);
   await adminLogin(page);
-  await expect(page.getByTestId("stat-Orders sent to WhatsApp")).not.toHaveText("0");
+  await expect(page.getByTestId("stat-Orders placed")).not.toHaveText("0");
   await page.getByRole("link", { name: ref }).click();
   await expect(page.getByRole("heading", { name: ref })).toBeVisible();
   await expect(page.getByText("Customer note")).toHaveCount(0);
   await expect(page.getByAltText("Your photo")).toBeVisible();
+  await expect(page.getByText("12 Rua de Ourem, Fontainhas, Panaji, Goa 403001")).toBeVisible();
   await page.getByLabel("Status").selectOption("paid");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Saved.")).toBeVisible();
+
+  // The customer shows up in Customers, built from their orders.
+  await page.goto("/admin/customers");
+  await page.getByRole("link", { name: "Asha" }).first().click();
+  await expect(page.getByRole("heading", { name: "Asha" })).toBeVisible();
+  await expect(page.getByRole("link", { name: ref })).toBeVisible();
+});
+
+test("UPI QR on the order page for a stall pickup", async ({ page, context }) => {
+  await catchInstagram(context);
+  await adminLogin(page);
+  await page.goto("/admin/settings");
+  await page.getByLabel(/UPI ID for online payments/).fill("stixnvibes@okicici");
+  await page.getByRole("button", { name: /Save/ }).click();
+  await expect(page.getByText("Settings saved.")).toBeVisible();
+
+  await page.goto("/shop/lofi-05");
+  await page.getByRole("button", { name: "Add to cart" }).click();
+  await page.goto("/cart");
+  await page.getByLabel("Name", { exact: true }).fill("Kabir");
+  await page.getByLabel("Phone number").fill("9123456780");
+  await page.getByText("Pick up at a stall").click();
+  await expect(page.getByLabel("Address")).toHaveCount(0);
+  await page.getByRole("button", { name: "Place order" }).click();
+  await expect(page).toHaveURL(/\/order\/SNV-/);
+  await expect(page.getByRole("heading", { name: "Pay with UPI" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "UPI QR code" })).toBeVisible();
+  await expect(page.getByText("Paying to stixnvibes@okicici.")).toBeVisible();
+});
+
+test("a festival campaign from a template runs with its banner, then switches off", async ({ page }) => {
+  await adminLogin(page);
+  await page.goto("/admin/offers");
+  await page.getByRole("link", { name: /Valentine's: 20% off music cards/ }).click();
+  const form = page.locator("#new-offer");
+  await expect(form.getByLabel("Name customers see")).toHaveValue("Valentine's: 20% off music cards");
+  // Start it now instead of in February.
+  await form.getByLabel(/Starts/).fill("");
+  await form.getByLabel(/Ends/).fill("");
+  await form.getByRole("button", { name: "Add offer" }).click();
+  await expect(form.getByText("Saved.")).toBeVisible();
+
+  await page.goto("/shop/music-card");
+  await expect(page.getByText("Valentine's week: 20% off music cards. Dedicate a song.")).toBeVisible();
+
+  // Switch it off so other tests see normal prices.
+  await page.goto("/admin/offers");
+  const card = page.locator("li", { has: page.locator('input[value="Valentine\'s: 20% off music cards"]') }).last();
+  await card.getByLabel("Active").uncheck();
+  await card.getByRole("button", { name: "Save" }).click();
+  await expect(card.getByText("Saved.")).toBeVisible();
 });
 
 test("admin adds a poster with options and it shows in the shop", async ({ page }) => {

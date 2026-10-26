@@ -192,7 +192,9 @@ export class MemoryStore implements Store {
     return clone(
       this.s.orders
         .filter((o) => !filter?.status || o.status === filter.status)
-        .filter((o) => !q || o.number.toLowerCase().includes(q) || o.customerName.toLowerCase().includes(q))
+        .filter((o) => !q || o.number.toLowerCase().includes(q) || o.customerName.toLowerCase().includes(q) || o.customerPhone.includes(q))
+        .filter((o) => !filter?.updatedSince || o.updatedAt > filter.updatedSince)
+        .sort((a, b) => (filter?.updatedSince ? a.updatedAt.localeCompare(b.updatedAt) : 0))
         .slice(0, filter?.limit ?? 200),
     );
   }

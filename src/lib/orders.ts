@@ -1,12 +1,12 @@
 import "server-only";
-import { randomInt } from "node:crypto";
+import { randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { site } from "@/content/site";
 import { UPLOAD_ID_RE } from "@/lib/constants";
-import { canOrder, minQtyShortfalls, resolveOptions, totals } from "@/lib/pricing";
+import { canOrder, liveOffers, minQtyShortfalls, resolveOptions, totals } from "@/lib/pricing";
 import { getStore } from "@/lib/store";
 import type { Offer, Order, OrderLine, Product } from "@/lib/types";
 import type { OrderInput } from "@/lib/validation";
-import { orderMessage, waLink } from "@/lib/whatsapp";
+import { orderMessage } from "@/lib/instagram";
 
 export class OrderError extends Error {
   constructor(message: string, public problems: { productId: string; reason: string }[] = []) {
@@ -23,6 +23,35 @@ export function orderNumber(): string {
 }
 
 export const uploadUrl = (id: string) => `${site.url}/u/${id}`;
+
+/** 128-bit secret for the customer's order page link. */
+export const newViewKey = () => randomBytes(16).toString("base64url");
+
+export const orderPath = (o: Pick<Order, "number" | "viewKey">) => `/order/${o.number}?k=${o.viewKey}`;
+export const orderUrl = (o: Pick<Order, "number" | "viewKey">) => `${site.url}${orderPath(o)}`;
+
+/** Constant-time check of the key in an order page link. */
+export function viewKeyMatches(order: Pick<Order, "viewKey">, key: string | undefined): boolean {
+  if (!order.viewKey || !key) return false;
+  const a = Buffer.from(order.viewKey);
+  const b = Buffer.from(key);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/** The message the customer sends us for an order, with their details and page link. */
+export function messageFor(order: Order, freeShippingAbovePaise: number | null) {
+  return orderMessage({ ...order, freeShippingAbovePaise, link: orderUrl(order) });
+}
+
+/** An http(s) link as typed, or null for anything else (javascript:, data:, plain text). */
+export function webLink(value: string): string | null {
+  try {
+    const u = new URL(value);
+    return u.protocol === "https:" || u.protocol === "http:" ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Prices the cart from the live catalog. The browser only sends ids,
@@ -56,6 +85,14 @@ export function priceLines(input: OrderInput["lines"], products: Product[], offe
           continue;
         }
         custom.push({ label: f.label, value: uploadUrl(value), kind: f.kind });
+      } else if (f.kind === "link") {
+        // Shown as a clickable link in admin and in the message, so only web links.
+        const url = webLink(value);
+        if (!url) {
+          problems.push({ productId: p.id, reason: `${p.name}: "${f.label}" needs a link starting with https://` });
+          continue;
+        }
+        custom.push({ label: f.label, value: url, kind: f.kind });
       } else {
         custom.push({ label: f.label, value, kind: f.kind });
       }
@@ -82,13 +119,13 @@ export function priceLines(input: OrderInput["lines"], products: Product[], offe
   return { lines, problems, ...t };
 }
 
-/** Records the order and returns the WhatsApp link that sends it. */
-export async function createOrder(input: OrderInput): Promise<{ order: Order; whatsappUrl: string }> {
+/** Records the order. The customer then sends it to us from the order page. */
+export async function createOrder(input: OrderInput): Promise<{ order: Order }> {
   const store = getStore();
-  const [products, offers, settings] = await Promise.all([store.listProducts(), store.listOffers(), store.getSettings()]);
-  if (!settings.storeOpen) throw new OrderError("Online orders are paused. Message us on WhatsApp.");
+  const [products, allOffers, settings] = await Promise.all([store.listProducts(), store.listOffers(), store.getSettings()]);
+  if (!settings.storeOpen) throw new OrderError("Online orders are paused. Message us on Instagram.");
 
-  const priced = priceLines(input.lines, products, offers);
+  const priced = priceLines(input.lines, products, liveOffers(allOffers));
   if (priced.problems.length) throw new OrderError(priced.problems[0].reason, priced.problems);
 
   let order: Order | null = null;
@@ -96,7 +133,11 @@ export async function createOrder(input: OrderInput): Promise<{ order: Order; wh
     try {
       order = await store.createOrder({
         number: orderNumber(),
+        viewKey: newViewKey(),
         customerName: input.customerName,
+        customerPhone: input.customerPhone,
+        fulfilment: input.fulfilment,
+        address: input.address,
         customerNote: input.customerNote,
         lines: priced.lines,
         subtotalPaise: priced.subtotalPaise,
@@ -109,6 +150,5 @@ export async function createOrder(input: OrderInput): Promise<{ order: Order; wh
     }
   }
 
-  const text = orderMessage({ ...order!, freeShippingAbovePaise: settings.freeShippingAbovePaise });
-  return { order: order!, whatsappUrl: waLink(settings.whatsappNumber, text) };
+  return { order: order! };
 }

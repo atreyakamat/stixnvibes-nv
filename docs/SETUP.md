@@ -20,19 +20,35 @@ On the Netlify site for shop.stixnvibes.com:
    - `ADMIN_EMAILS` = `you@example.com,partner@example.com`
    - `ADMIN_SESSION_SECRET` = 32+ random characters (`openssl rand -base64 48`)
    - `NEXT_PUBLIC_SITE_URL` = `https://shop.stixnvibes.com`
+   - Optional, for InWoice: `INWOICE_SYNC_TOKEN` = 32+ random characters. InWoice sends it as `Authorization: Bearer …` to `GET /api/integrations/orders?since=<ISO time>&limit=100` and gets orders changed since then, oldest first (`next` is the cursor for the following call). Unset = the feed returns 404.
 2. **Build settings**: netlify.toml sets them (build `npm run build`, publish `.next`).
 3. Deploy previews and branch deploys always run in demo mode (`netlify.toml` + `next.config.ts`), so previews never touch real orders. Demo data is in memory and resets now and then.
+
+### Upgrading an existing shop to v4
+
+Run `supabase/migrations/0002_checkout_campaigns.sql` in **SQL Editor → New query** before the v4 code deploys. It adds the customer phone, delivery/pickup and address to orders, a private view key for order pages, and % off sales with start and end dates. Then in **Admin → Settings** add your UPI ID so order pages show a pay-by-UPI QR.
+
+v4 takes orders through Instagram DMs instead of WhatsApp. In **Admin → Settings**, check the Instagram account (default `stixnvibes`) and rewrite the **How payment and confirmation work** note, because the saved one still says WhatsApp. Save.
 
 ## 3. Open the shop
 
 1. Go to `https://shop.stixnvibes.com/admin` and log in.
 2. **Products**: check the prices and upload real photos. **Offers** holds the bulk prices and free-item deals.
 3. **Products → Bulk add**: upload a folder of designs into a collection in one go.
-4. **Settings**: check the WhatsApp number and the notes. Save.
+4. **Settings**: check the Instagram account and the notes. Save.
 5. Place a test order from your phone and check it lands in **Orders** and on the **Dashboard**.
 
 ## Daily routine
 
-- A WhatsApp order arrives with a ref (`SNV-XXXXXX`). Open **Orders**, find the ref, check the items and any photos.
+- A customer DMs the shop on Instagram with their order and its ref (`SNV-XXXXXX`). Open **Orders**, find the ref, check the items and any photos. Only confirm orders whose DM has come in: a confirmed order becomes an invoice in InWoice.
 - Move it along: Confirmed → Paid → Shipped → Done. Keep the phone number, address and courier in the private note.
 - New designs: **Bulk add** or **Add product**. Upcoming designs: status "Coming soon".
+
+## Running the shop in Docker (optional)
+
+Netlify stays the main host. The Docker setup is for running a copy on the home lab or any server, e.g. if Netlify is down.
+
+1. `cp .env.example .env` and fill in the same values as on Netlify (Supabase keys, `ADMIN_EMAILS`, `ADMIN_SESSION_SECRET`, optional `INWOICE_SYNC_TOKEN`).
+2. `docker compose up -d --build`, then open `http://<server>:3000`.
+
+It uses the same Supabase database as the live shop, so orders placed on it are real. The container restarts by itself after a reboot or power cut. For a demo copy with in-memory data instead, build with `docker build --build-arg SHOP_DEMO_MODE=true -t shop-demo .`.

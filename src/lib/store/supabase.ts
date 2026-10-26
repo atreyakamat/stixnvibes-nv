@@ -77,6 +77,10 @@ function toOffer(r: Row): Offer {
     name: r.name as string,
     description: r.description as string,
     pricePaise: (r.price_paise as number | null) ?? null,
+    percent: (r.percent as number | null) ?? null,
+    startsAt: (r.starts_at as string | null) ?? null,
+    endsAt: (r.ends_at as string | null) ?? null,
+    banner: (r.banner as string) ?? "",
     productType: (r.product_type as Offer["productType"]) ?? null,
     buy: r.buy as number,
     free: r.free as number,
@@ -89,8 +93,12 @@ function toOrder(r: Row): Order {
   return {
     id: r.id as string,
     number: r.number as string,
+    viewKey: (r.view_key as string) ?? "",
     status: r.status as Order["status"],
     customerName: r.customer_name as string,
+    customerPhone: (r.customer_phone as string) ?? "",
+    fulfilment: (r.fulfilment as Order["fulfilment"]) ?? "delivery",
+    address: { line: "", city: "", state: "", pincode: "", ...((r.address as Partial<Order["address"]>) ?? {}) },
     customerNote: r.customer_note as string,
     lines: r.lines as Order["lines"],
     subtotalPaise: r.subtotal_paise as number,
@@ -198,6 +206,10 @@ export class SupabaseStore implements Store {
       buy: o.buy,
       free: o.free,
       price_paise: o.pricePaise,
+      percent: o.percent,
+      starts_at: o.startsAt,
+      ends_at: o.endsAt,
+      banner: o.banner,
       active: o.active,
       sort_order: o.sortOrder,
     };
@@ -214,7 +226,11 @@ export class SupabaseStore implements Store {
   async createOrder(o: NewOrder) {
     const row = {
       number: o.number,
+      view_key: o.viewKey,
       customer_name: o.customerName,
+      customer_phone: o.customerPhone,
+      fulfilment: o.fulfilment,
+      address: o.address,
       customer_note: o.customerNote,
       lines: o.lines,
       subtotal_paise: o.subtotalPaise,
@@ -233,10 +249,17 @@ export class SupabaseStore implements Store {
   }
 
   async listOrders(filter?: OrderFilter) {
-    let q = this.db.from("orders").select("*").order("created_at", { ascending: false }).limit(filter?.limit ?? 200);
+    // The sync reads oldest change first so it can resume where it stopped.
+    const sync = Boolean(filter?.updatedSince);
+    let q = this.db
+      .from("orders")
+      .select("*")
+      .order(sync ? "updated_at" : "created_at", { ascending: sync })
+      .limit(filter?.limit ?? 200);
     if (filter?.status) q = q.eq("status", filter.status);
     const s = filter?.search?.trim().replace(/[%,()"]/g, "");
-    if (s) q = q.or(`number.ilike.%${s}%,customer_name.ilike.%${s}%`);
+    if (s) q = q.or(`number.ilike.%${s}%,customer_name.ilike.%${s}%,customer_phone.ilike.%${s}%`);
+    if (filter?.updatedSince) q = q.gt("updated_at", filter.updatedSince);
     return (check(await q) as Row[]).map(toOrder);
   }
 

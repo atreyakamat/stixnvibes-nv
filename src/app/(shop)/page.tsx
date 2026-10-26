@@ -3,9 +3,10 @@ import { CollectionCard } from "@/components/collection-card";
 import { OfferStrip } from "@/components/offer-strip";
 import { ProductCard } from "@/components/product/product-card";
 import { Reveal } from "@/components/reveal";
+import { StallReels } from "@/components/stall-reels";
 import { collectionCover, getShopState } from "@/lib/shop";
 import { PRODUCT_TYPES } from "@/lib/types";
-import { waLink } from "@/lib/whatsapp";
+import { dmLink } from "@/lib/instagram";
 
 export const revalidate = 60;
 
@@ -42,7 +43,7 @@ export default async function HomePage() {
             </span>
           </h1>
           <p className="fade-up mt-6 max-w-md text-lg text-paper/75" style={{ ["--d" as string]: "300ms" }}>
-            Stickers from ₹10, posters, Spotify music cards and wall cards. Fill your cart and order in one tap on WhatsApp.
+            Stickers from ₹10, posters, Spotify music cards and wall cards. Fill your cart and order in a few taps, then send it to us on Instagram.
           </p>
           <OfferStrip offers={offers} className="fade-up mt-6" />
           <div className="fade-up mt-8 flex flex-wrap gap-3" style={{ ["--d" as string]: "400ms" }}>
@@ -156,7 +157,7 @@ export default async function HomePage() {
         <ol className="mt-8 grid gap-4 md:grid-cols-3">
           {[
             { t: "Fill your cart", b: "Pick designs, sizes and finishes. Offers apply on their own." },
-            { t: "Checkout on WhatsApp", b: "One tap sends us your full order. We reply to confirm and share UPI details." },
+            { t: "Place your order", b: "Add your details and tap once. You get an order page to track it, and send the order to us in an Instagram DM." },
             { t: "Stick it", b: settings.deliveryNote || "We pack it and send it your way." },
           ].map((s, i) => (
             <li key={s.t} className="rounded-[1.5rem] border border-line p-6 md:p-8">
@@ -168,6 +169,20 @@ export default async function HomePage() {
         </ol>
       </section>
 
+      <section className="container-x pt-20 md:pt-28" aria-labelledby="stalls">
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <h2 id="stalls" className="display text-[clamp(2.6rem,7vw,5.5rem)]">
+            At our <span className="text-lemon">stalls</span>
+          </h2>
+          <a href="https://instagram.com/stixnvibes" target="_blank" rel="noopener" className="label text-mute hover:text-lemon">
+            More on Instagram →
+          </a>
+        </div>
+        <div className="mt-8">
+          <StallReels />
+        </div>
+      </section>
+
       <section className="container-x pt-20 md:pt-28">
         <Reveal className="relative overflow-hidden rounded-[2rem] border border-line px-6 py-16 text-center md:px-16 md:py-24">
           <img src="/lofi/lofi-04.webp" alt="" className="sticker-shadow absolute left-6 top-6 hidden w-28 -rotate-12 md:block" />
@@ -175,8 +190,8 @@ export default async function HomePage() {
           <h2 className="display text-[clamp(2.8rem,9vw,8rem)]">Bulk or custom?</h2>
           <p className="mx-auto mt-6 max-w-lg text-paper/75">{settings.bulkNote || "Clubs, fests, shops, your own artwork: message us and we'll quote."}</p>
           <div className="mt-10 flex flex-wrap justify-center gap-3">
-            <a href={waLink(settings.whatsappNumber, "Hi Stix N Vibes! I'd like a bulk / custom order.")} className="btn btn-primary" target="_blank" rel="noopener">
-              Message us on WhatsApp
+            <a href={dmLink(settings.instagramHandle)} className="btn btn-primary" target="_blank" rel="noopener">
+              Message us on Instagram
             </a>
           </div>
         </Reveal>

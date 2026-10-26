@@ -4,10 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { useCart } from "@/components/cart/cart-context";
 import { QtyStepper } from "@/components/cart/qty-stepper";
 import { formatINR } from "@/lib/money";
-import { canOrder, defaultSelections, resolveOptions } from "@/lib/pricing";
+import { canOrder, defaultSelections, mrpFor, resolveOptions } from "@/lib/pricing";
 import { track } from "@/lib/track";
 import type { Product } from "@/lib/types";
-import { askMessage, waLink } from "@/lib/whatsapp";
+import { askMessage } from "@/lib/instagram";
+import { CopyAndDm } from "../copy-and-dm";
 
 type UploadState = { id: string; preview: string } | { busy: true } | { error: string };
 
@@ -29,9 +30,9 @@ export function BuyBox({ product, url }: { product: Product; url: string }) {
 
   const resolved = resolveOptions(product, selections);
   const unit = product.pricePaise === null || !resolved ? null : Math.max(0, product.pricePaise + resolved.deltaPaise);
+  const mrp = product.status === "live" ? mrpFor(unit, product.compareAtPaise, config.mrpMarkupPercent) : null;
   const orderable = canOrder(product) && config.storeOpen;
   const offers = config.offers.filter((o) => o.productType === product.type);
-  const ask = waLink(config.whatsappNumber, askMessage(product.name, url));
 
   async function upload(fieldId: string, file: File | undefined) {
     if (!file) return;
@@ -96,8 +97,13 @@ export function BuyBox({ product, url }: { product: Product; url: string }) {
         <p className="text-3xl font-semibold tabular-nums text-lemon" data-testid="price">
           {product.status === "upcoming" ? "Coming soon" : unit !== null ? formatINR(unit) : "Ask for price"}
         </p>
-        {product.status !== "upcoming" && unit !== null && product.compareAtPaise !== null && product.compareAtPaise > unit && (
-          <p className="text-lg tabular-nums text-mute line-through">{formatINR(product.compareAtPaise)}</p>
+        {mrp !== null && unit !== null && (
+          <>
+            <p className="text-lg tabular-nums text-mute">
+              MRP <s>{formatINR(mrp)}</s>
+            </p>
+            <p className="rounded-full bg-lemon/10 px-2.5 py-1 text-sm font-medium text-lemon">{Math.round(((mrp - unit) / mrp) * 100)}% off</p>
+          </>
         )}
       </div>
       {product.minQty > 1 && product.status === "live" && <p className="text-sm text-paper/70">Minimum {product.minQty} per order. Mix different designs or songs.</p>}
@@ -208,9 +214,13 @@ export function BuyBox({ product, url }: { product: Product; url: string }) {
                   ? "Online orders are paused. Message us and we'll sort it out."
                   : "Message us for the price and options."}
           </p>
-          <a href={ask} target="_blank" rel="noopener" className="btn btn-primary" onClick={() => track("ask_click", product.id)}>
-            Ask on WhatsApp
-          </a>
+          <CopyAndDm
+            handle={config.instagramHandle}
+            message={askMessage(product.name, url)}
+            label="Ask on Instagram"
+            className="btn btn-primary"
+            onSent={() => track("ask_click", product.id)}
+          />
         </div>
       )}
     </div>

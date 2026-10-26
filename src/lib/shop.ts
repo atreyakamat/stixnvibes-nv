@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { liveOffers } from "@/lib/pricing";
 import { getStoreOrNull } from "@/lib/store";
 import { DEFAULT_SETTINGS } from "@/lib/store/seed";
 import type { Collection, Offer, Product, Settings } from "@/lib/types";
@@ -28,7 +29,8 @@ export const getShopState = cache(async (): Promise<ShopState> => {
       store.listOffers(),
       store.getSettings(),
     ]);
-    return { products, collections, offers, settings, mode: store.mode };
+    // Campaigns outside their dates drop out here; pages refresh every minute.
+    return { products, collections, offers: liveOffers(offers), settings, mode: store.mode };
   } catch (err) {
     console.error("[shop] failed to load catalog", err);
     return { ...empty, mode: store.mode };

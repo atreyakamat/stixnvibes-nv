@@ -7,7 +7,7 @@ import { getShopState } from "@/lib/shop";
 export const revalidate = 60;
 export const metadata: Metadata = {
   title: "Shop all",
-  description: "Stickers from ₹10, super sheets, A4 and A3 posters, Spotify music cards and wall cards. Order on WhatsApp.",
+  description: "Stickers from ₹10, super sheets, A4 and A3 posters, Spotify music cards and wall cards. Order on Instagram.",
 };
 
 export default async function ShopPage() {

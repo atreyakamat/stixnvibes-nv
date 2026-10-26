@@ -1,0 +1,16 @@
+# Runs the shop in Docker, e.g. on the home lab as a backup of the Netlify site.
+#   1. cp .env.example .env and fill in the Supabase keys, admin emails and secrets
+#   2. docker compose up -d --build
+#   3. open http://<server>:3000
+# It uses the same Supabase database as the live shop: orders placed here are real.
+services:
+  shop:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://shop.stixnvibes.com}
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "3000:3000"
+    mem_limit: 512m

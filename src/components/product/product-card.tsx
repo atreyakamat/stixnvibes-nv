@@ -1,14 +1,7 @@
 import Link from "next/link";
-import { formatINR } from "@/lib/money";
-import { canOrder, fromPrice, hasPriceRange } from "@/lib/pricing";
 import type { Product } from "@/lib/types";
+import { CardPrice } from "./card-price";
 
-export function priceLabel(product: Product): string {
-  if (product.status === "upcoming") return "Coming soon";
-  const price = fromPrice(product);
-  if (price === null) return "Ask on WhatsApp";
-  return `${hasPriceRange(product) ? "From " : ""}${formatINR(price)}`;
-}
 
 export function ProductCard({ product, priority = false }: { product: Product; priority?: boolean }) {
   const [first, ...rest] = product.images;
@@ -41,7 +34,7 @@ export function ProductCard({ product, priority = false }: { product: Product; p
       </div>
       <div className="mt-4 flex flex-1 items-end justify-between gap-3">
         <h3 className="font-semibold leading-tight md:text-lg">{product.name}</h3>
-        <p className={`shrink-0 text-right text-sm tabular-nums ${canOrder(product) ? "text-lemon" : "text-mute"}`}>{priceLabel(product)}</p>
+        <CardPrice product={product} />
       </div>
     </Link>
   );

@@ -59,7 +59,35 @@ export function canOrder(product: Pick<Product, "status" | "soldOut" | "pricePai
 export type PricedLine = { type: ProductType; unitPricePaise: number; qty: number };
 
 const validOffer = (o: Offer) =>
-  o.active && o.buy > 0 && (o.kind === "volume" ? o.pricePaise !== null && o.pricePaise >= 0 : o.free > 0);
+  o.active &&
+  (o.kind === "percent"
+    ? o.percent !== null && o.percent > 0 && o.percent <= 90
+    : o.buy > 0 && (o.kind === "volume" ? o.pricePaise !== null && o.pricePaise >= 0 : o.free > 0));
+
+/** Offers switched on and inside their date window at `now`. */
+export function liveOffers(offers: Offer[], now: Date = new Date()): Offer[] {
+  const t = now.getTime();
+  return offers.filter(
+    (o) => o.active && (!o.startsAt || Date.parse(o.startsAt) <= t) && (!o.endsAt || Date.parse(o.endsAt) > t),
+  );
+}
+
+/** The banner of the first running campaign that has one. */
+export function campaignBanner(offers: Offer[], now: Date = new Date()): string {
+  return liveOffers(offers, now).find((o) => o.kind === "percent" && o.banner.trim())?.banner.trim() ?? "";
+}
+
+/**
+ * The struck-through MRP for a price: the product's own "was" price, or the
+ * price plus the shop's markup rounded up to a whole rupee (₹10 at 20% → ₹12).
+ * null when there's nothing higher to show.
+ */
+export function mrpFor(pricePaise: number | null, compareAtPaise: number | null, markupPercent: number | null): number | null {
+  if (pricePaise === null || pricePaise <= 0) return null;
+  if (compareAtPaise !== null && compareAtPaise > pricePaise) return compareAtPaise;
+  if (!markupPercent || markupPercent <= 0) return null;
+  return Math.ceil((pricePaise * (100 + markupPercent)) / 100 / 100) * 100;
+}
 const matches = (o: Offer, type: ProductType) => o.productType === null || o.productType === type;
 
 /** The volume tier that applies to `n` items, if any: the lowest price reached. */
@@ -68,7 +96,7 @@ function volumeTier(offers: Offer[], n: number) {
 }
 
 /**
- * Applies offers in two passes.
+ * Applies offers in three passes.
  *
  * 1. Volume pricing: for each product type with volume tiers, once the cart
  *    holds `buy` or more of that type, every unit costs the tier price
@@ -77,6 +105,9 @@ function volumeTier(offers: Offer[], n: number) {
  *    least expensive and cut into groups of (buy + free); in every full
  *    group the cheapest `free` units cost nothing. A unit counts toward one
  *    offer only, and offers apply in their sort order.
+ * 3. Campaigns (percent): each remaining unit gets the biggest % off that
+ *    covers its type, on its price after passes 1 and 2. Rounded down to
+ *    the paisa per unit, so the shop never gives away more than it says.
  */
 export function applyOffers(lines: PricedLine[], offers: Offer[]) {
   const active = offers.filter(validOffer).sort((a, b) => a.sortOrder - b.sortOrder);
@@ -99,7 +130,7 @@ export function applyOffers(lines: PricedLine[], offers: Offer[]) {
   }
 
   const units = lines.flatMap((l, li) => Array.from({ length: l.qty }, () => ({ type: l.type, price: prices[li], taken: false })));
-  for (const offer of active.filter((o) => o.kind !== "volume")) {
+  for (const offer of active.filter((o) => o.kind === "bxgy")) {
     const size = offer.buy + offer.free;
     const eligible = units.filter((u) => !u.taken && matches(offer, u.type)).sort((a, b) => b.price - a.price);
     const groups = Math.floor(eligible.length / size);
@@ -108,9 +139,27 @@ export function applyOffers(lines: PricedLine[], offers: Offer[]) {
     for (let g = 0; g < groups; g++) {
       const chunk = eligible.slice(g * size, (g + 1) * size);
       chunk.forEach((u) => (u.taken = true));
-      for (const u of chunk.slice(offer.buy)) discount += u.price;
+      for (const u of chunk.slice(offer.buy)) {
+        discount += u.price;
+        u.price = 0;
+      }
     }
     applied.push({ offerId: offer.id, name: offer.name, freeUnits: groups * offer.free, discountPaise: discount });
+  }
+
+  const percent = active.filter((o) => o.kind === "percent");
+  if (percent.length) {
+    const byOffer = new Map<string, number>();
+    for (const u of units) {
+      if (u.price <= 0) continue;
+      const best = percent.filter((o) => matches(o, u.type)).sort((a, b) => b.percent! - a.percent! || a.sortOrder - b.sortOrder)[0];
+      if (!best) continue;
+      byOffer.set(best.id, (byOffer.get(best.id) ?? 0) + Math.floor((u.price * best.percent!) / 100));
+    }
+    for (const o of percent) {
+      const d = byOffer.get(o.id) ?? 0;
+      if (d > 0) applied.push({ offerId: o.id, name: o.name, freeUnits: 0, discountPaise: d });
+    }
   }
   const discountPaise = applied.reduce((n, a) => n + a.discountPaise, 0);
   return { applied, discountPaise };
@@ -139,7 +188,7 @@ export function offerHints(lines: PricedLine[], offers: Offer[], label: (type: P
     hints.push(`Add ${need} more ${label(scope, need)} to pay ${formatINR(next.pricePaise!)} each.`);
   }
 
-  for (const o of active.filter((x) => x.kind !== "volume")) {
+  for (const o of active.filter((x) => x.kind === "bxgy")) {
     const n = count(o);
     if (n === 0) continue;
     const size = o.buy + o.free;
