@@ -60,6 +60,14 @@ export function SettingsForm({ settings: s }: { settings: Settings }) {
           hint="Customers see a UPI QR with the exact amount on their order page. You check the payment in your bank app and mark the order paid."
         />
         <Text name="upiName" label="Name shown in the customer's UPI app" defaultValue={s.upiName} maxLength={60} />
+        <Text
+          name="whatsappNumber"
+          label="WhatsApp number for payment screenshots (blank = don't show)"
+          defaultValue={s.whatsappNumber}
+          inputMode="tel"
+          placeholder="98765 43210"
+          hint="When online payment is off or down, the order page shows the UPI QR and a button that opens WhatsApp to this number with the order ref filled in."
+        />
       </Section>
       <Section title="Pricing">
         <Text

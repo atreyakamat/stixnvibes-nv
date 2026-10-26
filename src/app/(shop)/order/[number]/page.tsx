@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 import QRCode from "qrcode";
 import { formatINR } from "@/lib/money";
 import { CopyAndDm, InstagramIcon } from "@/components/copy-and-dm";
-import { messageFor, viewKeyMatches } from "@/lib/orders";
+import { PayPanel } from "@/components/order/pay-panel";
+import { youpiConfig } from "@/lib/env";
+import { awaitingPayment, messageFor, totalIsFinal, viewKeyMatches } from "@/lib/orders";
 import { formatPhone } from "@/lib/phone";
 import { getStoreOrNull } from "@/lib/store";
 import type { Order, OrderStatus } from "@/lib/types";
@@ -58,12 +60,28 @@ export default async function OrderPage({ params, searchParams }: PageProps<"/or
 
   const message = messageFor(order, settings.freeShippingAbovePaise);
   const handle = settings.instagramHandle;
-  const shippingKnown = order.fulfilment === "pickup" || (settings.freeShippingAbovePaise !== null && order.totalPaise >= settings.freeShippingAbovePaise);
-  const canPay = Boolean(settings.upiId) && (order.status === "new" || order.status === "confirmed");
-  const upi = canPay
-    ? upiLink({ upiId: settings.upiId, name: settings.upiName || "Stix N Vibes", amountPaise: shippingKnown ? order.totalPaise : null, note: `Stix N Vibes ${order.number}` })
+  const shippingKnown = totalIsFinal(order, settings.freeShippingAbovePaise);
+  const unpaid = awaitingPayment(order);
+  const online = unpaid && shippingKnown && youpiConfig() !== null;
+  const upi =
+    unpaid && settings.upiId
+      ? upiLink({ upiId: settings.upiId, name: settings.upiName || "Stix N Vibes", amountPaise: shippingKnown ? order.totalPaise : null, note: `Stix N Vibes ${order.number}` })
+      : null;
+  const qrColors = { dark: "#0b0b0a", light: "#f5f5ef" };
+  const qr = upi
+    ? {
+        svg: await QRCode.toString(upi, { type: "svg", margin: 1, errorCorrectionLevel: "M", color: qrColors }),
+        // A bigger PNG to save, with a white margin so any UPI app can scan it from the gallery.
+        png: await QRCode.toDataURL(upi, { width: 720, margin: 3, errorCorrectionLevel: "M", color: { dark: "#000000", light: "#ffffff" } }),
+        link: upi,
+        upiId: settings.upiId,
+        amountFixed: shippingKnown,
+      }
     : null;
-  const qr = upi ? await QRCode.toString(upi, { type: "svg", margin: 1, errorCorrectionLevel: "M", color: { dark: "#0b0b0a", light: "#f5f5ef" } }) : null;
+  const whatsapp =
+    unpaid && settings.whatsappNumber
+      ? `https://wa.me/91${settings.whatsappNumber}?text=${encodeURIComponent(`Hi! I paid for order ${order.number} (${formatINR(order.totalPaise)}). Screenshot attached.`)}`
+      : null;
   const fresh = sp.new === "1" && order.status === "new";
 
   return (
@@ -94,29 +112,15 @@ export default async function OrderPage({ params, searchParams }: PageProps<"/or
         )}
       </div>
 
-      {upi && qr && (
-        <div className="mt-6 grid gap-5 rounded-[1.5rem] border border-line p-5 md:grid-cols-[11rem_1fr] md:items-center md:p-6">
-          <div className="mx-auto w-44 overflow-hidden rounded-2xl md:mx-0" role="img" aria-label="UPI QR code" dangerouslySetInnerHTML={{ __html: qr }} />
-          <div className="space-y-3">
-            <h2 className="text-xl font-semibold">Pay with UPI</h2>
-            {shippingKnown ? (
-              <p className="text-paper/80">
-                Scan with any UPI app, or tap below on your phone. Amount: <strong className="tabular-nums text-lemon">{formatINR(order.totalPaise)}</strong>.
-              </p>
-            ) : (
-              <p className="text-paper/80">
-                Items come to <strong className="tabular-nums">{formatINR(order.totalPaise)}</strong>. We&apos;ll confirm the delivery charge on Instagram first, then pay the total here.
-              </p>
-            )}
-            <a href={upi} className="btn btn-primary !py-2.5 md:hidden">
-              Pay with a UPI app
-            </a>
-            <p className="text-xs text-mute">
-              Paying to {settings.upiId}. Send the payment screenshot on Instagram with your order ref {order.number}.
-            </p>
-          </div>
-        </div>
-      )}
+      <PayPanel
+        number={order.number}
+        viewKey={key ?? ""}
+        amount={formatINR(order.totalPaise)}
+        online={online}
+        returning={sp.paid === "1" && unpaid}
+        qr={qr}
+        whatsapp={whatsapp}
+      />
 
       <div className="mt-6 rounded-[1.5rem] border border-line">
         <ul className="divide-y divide-line">
@@ -182,6 +186,10 @@ export default async function OrderPage({ params, searchParams }: PageProps<"/or
           </div>
         )}
       </dl>
+
+      <a href={`/receipt/${order.number}?k=${encodeURIComponent(key ?? "")}`} className="btn btn-ghost mt-6 !py-2.5 text-sm">
+        Download receipt
+      </a>
 
       <p className="mt-6 text-sm text-mute">
         Questions?{" "}

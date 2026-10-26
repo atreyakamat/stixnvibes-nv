@@ -11,6 +11,7 @@ import { istInputToIso, rupeesToPaise } from "@/lib/money";
 import { clearRateLimit, rateLimit } from "@/lib/rate-limit";
 import { cleanHandle, INSTAGRAM_HANDLE_RE } from "@/lib/instagram";
 import { setOrderStatus } from "@/lib/orders";
+import { normalizePhone } from "@/lib/phone";
 import { getStore } from "@/lib/store";
 import { TEMPLATES } from "@/lib/store/seed";
 import type { ProductInput } from "@/lib/store/types";
@@ -568,6 +569,10 @@ export async function saveSettingsAction(_: FormState, form: FormData): Promise<
   const upiId = text("upiId", 100).replace(/\s/g, "");
   if (upiId && !UPI_ID_RE.test(upiId)) return { error: "UPI ID should look like yourname@okicici, or leave it blank." };
 
+  const whatsappText = text("whatsappNumber", 20);
+  const whatsappNumber = whatsappText ? normalizePhone(whatsappText) : "";
+  if (whatsappNumber === null) return { error: "WhatsApp number should be a 10-digit Indian mobile number, or blank." };
+
   const markupText = text("mrpMarkupPercent", 3);
   const markup = markupText === "" ? null : Number(markupText);
   if (markup !== null && (!Number.isInteger(markup) || markup < 0 || markup > 100)) return { error: "MRP markup is a whole % from 0 to 100, or blank." };
@@ -582,6 +587,7 @@ export async function saveSettingsAction(_: FormState, form: FormData): Promise<
     freeShippingAbovePaise: freeAbove,
     upiId,
     upiName: text("upiName", 60) || "Stix N Vibes",
+    whatsappNumber,
     mrpMarkupPercent: markup,
   };
   await getStore().saveSettings(settings);
