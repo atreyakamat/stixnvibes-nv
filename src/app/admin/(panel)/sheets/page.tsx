@@ -35,8 +35,8 @@ export default async function SheetsPage({ searchParams }: PageProps<"/admin/she
       <div>
         <h1 className="display text-5xl">Cricut sheets</h1>
         <p className="mt-2 max-w-2xl text-sm text-mute">
-          Pick designs and how many of each. The sheet maker lays them out with a white cut border, splits them across as many sheets as needed, and gives you
-          transparent PNGs ready for Print Then Cut.
+          Drop in your outlined stickers and say how many of each. The sheet maker turns and packs them by their real shape on Cricut&apos;s A4 Print Then Cut
+          template, with no overlaps, spills onto more sheets as needed, and gives you transparent PNGs with no background.
           {order && ` Loaded the stickers from order ${order.number}.`}
           {custom && ` Loaded the designs from ${custom.number} (${custom.qty} wanted in total).`}
         </p>

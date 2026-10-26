@@ -1,104 +1,99 @@
-// Lays stickers out on Cricut Print Then Cut sheets. Pure functions (no
-// canvas) so they can be tested; the sheet maker draws what they return.
+// The Cricut A4 Print Then Cut template, and helpers to fill it.
 //
-// Cricut Design Space prints Print Then Cut images up to 6.75 × 9.25 in on
-// A4 or Letter. It cuts around the outer edge of every separate shape in a
-// transparent PNG, so each sticker gets a white border (the cut runs on its
-// edge) and a gap to the next one.
+// Design Space prints Print Then Cut images up to 7.2 × 10.62 in on A4. The
+// corners are cut out in two steps where the printer puts its registration
+// marks, so nothing may sit there (measured from the owner's template PNG at
+// 300 DPI: 2161 × 3187 px). Design Space cuts around the outer edge of each
+// separate shape in a transparent PNG, so the sheet is exported with no
+// background and the stickers' own outlines become the cut lines.
+
+import { Sheet } from "./nest";
+
+export const A4_TEMPLATE = {
+  widthIn: 7.2,
+  heightIn: 10.62,
+  /** Each corner is blocked for this long along one edge and this deep along the other, twice (an L in steps). */
+  notchLongIn: 1.28,
+  notchShortIn: 0.34,
+} as const;
+
+export const DPI = 300;
+/** Nesting works on a grid of 0.02 in cells (6 px at 300 DPI). */
+export const CELL_IN = 0.02;
+export const CELL_PX = Math.round(CELL_IN * DPI);
+export const SHEET_PX = { w: Math.round(A4_TEMPLATE.widthIn * DPI), h: Math.round(A4_TEMPLATE.heightIn * DPI) };
+const SHEET_CELLS = { w: Math.round(A4_TEMPLATE.widthIn / CELL_IN), h: Math.round(A4_TEMPLATE.heightIn / CELL_IN) };
+
+/** Whether a point (in inches from the top left) is inside the printable template. */
+export function inPrintArea(x: number, y: number): boolean {
+  const { widthIn: W, heightIn: H, notchLongIn: L, notchShortIn: S } = A4_TEMPLATE;
+  if (x < 0 || y < 0 || x >= W || y >= H) return false;
+  const dx = Math.min(x, W - x);
+  const dy = Math.min(y, H - y);
+  return !((dx < L && dy < S) || (dx < S && dy < L));
+}
+
+/** An empty sheet grid with the template's corners blocked. */
+export function blankSheet(): Sheet {
+  const g = new Sheet(SHEET_CELLS.w, SHEET_CELLS.h);
+  const L = Math.round(A4_TEMPLATE.notchLongIn / CELL_IN);
+  const S = Math.round(A4_TEMPLATE.notchShortIn / CELL_IN);
+  for (let y = 0; y < g.h; y++) {
+    const dy = Math.min(y, g.h - 1 - y);
+    for (let x = 0; x < g.w; x++) {
+      const dx = Math.min(x, g.w - 1 - x);
+      if ((dx < L && dy < S) || (dx < S && dy < L)) g.block(x, y);
+    }
+  }
+  return g;
+}
+
+/** The template outline as an SVG path in inches, for the preview. */
+export function templatePath(): string {
+  const { widthIn: W, heightIn: H, notchLongIn: L, notchShortIn: S } = A4_TEMPLATE;
+  return `M${L} 0H${W - L}V${S}H${W - S}V${L}H${W}V${H - L}H${W - S}V${H - S}H${W - L}V${H}H${L}V${H - S}H${S}V${H - L}H0V${L}H${S}V${S}H${L}Z`;
+}
 
 export type SheetSpec = {
-  /** Printable area in inches. */
-  widthIn: number;
-  heightIn: number;
-  /** Pixels per inch of the exported PNG. */
-  dpi: number;
-  /** Longest side of each design, before the border, in inches. */
+  /** Longest side of each design, outline included, in inches. */
   sizeIn: number;
-  /** White border around each design, in inches. The cut follows its edge. */
+  /** Extra white outline to add around each design, in inches. 0 when the files already have one. */
   borderIn: number;
-  /** Space between bordered stickers, in inches. */
+  /** Space between stickers, and from the edge, in inches. */
   gapIn: number;
+  /** Turn stickers in steps of this many degrees to fit more. 0 = never turn. */
+  angleStep: number;
 };
 
-export const PRINT_THEN_CUT_MAX = { widthIn: 6.75, heightIn: 9.25 } as const;
+export const DEFAULT_SPEC: SheetSpec = { sizeIn: 2, borderIn: 0, gapIn: 0.12, angleStep: 15 };
 
-export const DEFAULT_SPEC: SheetSpec = { ...PRINT_THEN_CUT_MAX, dpi: 300, sizeIn: 2, borderIn: 0.06, gapIn: 0.15 };
+export const ANGLE_STEPS = [
+  { step: 0, label: "Don't turn them" },
+  { step: 90, label: "Quarter turns" },
+  { step: 45, label: "Every 45°" },
+  { step: 15, label: "Every 15° (fits the most)" },
+] as const;
 
-export type SheetItem = { key: string; aspect: number; qty: number };
-/** Pixel boxes on the sheet: `x,y,w,h` is the design, `outer` adds the border. */
-export type Placement = { key: string; x: number; y: number; w: number; h: number };
-export type Sheet = { widthPx: number; heightPx: number; placements: Placement[] };
+export const anglesFor = (step: number) => (step > 0 ? Array.from({ length: Math.floor(360 / step) }, (_, i) => i * step) : [0]);
 
-const px = (inches: number, dpi: number) => Math.round(inches * dpi);
+/** Gap in grid cells, rounded up so stickers are never closer than asked. */
+export const gapCells = (gapIn: number) => Math.max(1, Math.ceil(gapIn / CELL_IN));
 
-/** The design's size in pixels: longest side = sizeIn, aspect kept. */
-export function designBox(aspect: number, spec: SheetSpec) {
-  const long = px(spec.sizeIn, spec.dpi);
+/** The design's size in pixels before turning: longest side = sizeIn, aspect kept. */
+export function designBox(aspect: number, sizeIn: number) {
+  const long = Math.round(sizeIn * DPI);
   const a = Number.isFinite(aspect) && aspect > 0 ? aspect : 1;
   return a >= 1 ? { w: long, h: Math.max(1, Math.round(long / a)) } : { w: Math.max(1, Math.round(long * a)), h: long };
 }
 
-/** Why the spec can't work, or null. */
+/** Why the settings can't work, or null. */
 export function specProblem(spec: SheetSpec): string | null {
-  if (!(spec.widthIn > 0 && spec.heightIn > 0)) return "Set the sheet size.";
   if (!(spec.sizeIn > 0)) return "Set the sticker size.";
-  if (spec.borderIn < 0 || spec.gapIn < 0) return "Border and gap can't be negative.";
-  const foot = spec.sizeIn + 2 * spec.borderIn;
-  if (foot > spec.widthIn || foot > spec.heightIn) return "Stickers that size don't fit on the sheet. Make them smaller.";
+  if (spec.borderIn < 0 || spec.gapIn < 0) return "Outline and gap can't be negative.";
+  const foot = spec.sizeIn + 2 * spec.borderIn + 2 * spec.gapIn;
+  if (foot > A4_TEMPLATE.widthIn - 2 * A4_TEMPLATE.notchShortIn && foot > A4_TEMPLATE.heightIn - 2 * A4_TEMPLATE.notchLongIn)
+    return "Stickers that size don't fit on the sheet. Make them smaller.";
   return null;
-}
-
-/**
- * Shelf packing: tallest stickers first, left to right, a new row when the
- * width runs out, a new sheet when the height does. Same designs stay
- * together so a sheet is easy to check by eye.
- */
-export function layoutSheets(items: SheetItem[], spec: SheetSpec): Sheet[] {
-  const W = px(spec.widthIn, spec.dpi);
-  const H = px(spec.heightIn, spec.dpi);
-  const b = px(spec.borderIn, spec.dpi);
-  const g = px(spec.gapIn, spec.dpi);
-  const units = items
-    .filter((i) => i.qty > 0)
-    .map((i, order) => ({ ...i, order, box: designBox(i.aspect, spec) }))
-    .sort((a, c) => c.box.h - a.box.h || a.order - c.order)
-    .flatMap((i) => Array.from({ length: Math.floor(i.qty) }, () => i));
-
-  const sheets: Sheet[] = [];
-  let sheet: Sheet | null = null;
-  let x = 0;
-  let y = 0;
-  let rowH = 0;
-  for (const u of units) {
-    const ow = u.box.w + 2 * b;
-    const oh = u.box.h + 2 * b;
-    if (ow > W || oh > H) throw new Error("A sticker is bigger than the sheet.");
-    if (sheet && x + ow > W) {
-      x = 0;
-      y += rowH + g;
-      rowH = 0;
-    }
-    if (!sheet || y + oh > H) {
-      sheet = { widthPx: W, heightPx: H, placements: [] };
-      sheets.push(sheet);
-      x = 0;
-      y = 0;
-      rowH = 0;
-    }
-    sheet.placements.push({ key: u.key, x: x + b, y: y + b, w: u.box.w, h: u.box.h });
-    x += ow + g;
-    rowH = Math.max(rowH, oh);
-  }
-  return sheets;
-}
-
-/** How many of one design fit on a single sheet, to suggest "fill the sheet". */
-export function perSheet(aspect: number, spec: SheetSpec): number {
-  try {
-    return layoutSheets([{ key: "x", aspect, qty: 500 }], spec)[0]?.placements.length ?? 0;
-  } catch {
-    return 0;
-  }
 }
 
 // PNG resolution ----------------------------------------------------------
