@@ -1,4 +1,5 @@
 import { handleError, json, readJson } from "@/lib/api";
+import { notifyNewOrder } from "@/lib/notify";
 import { createOrder, orderPath } from "@/lib/orders";
 import { rateLimit } from "@/lib/rate-limit";
 import { getStoreOrNull } from "@/lib/store";
@@ -11,7 +12,8 @@ export async function POST(req: Request) {
   if (parsed.data.company) return json({ error: "Invalid request." }, 400);
   try {
     const { order } = await createOrder(parsed.data);
-    await getStoreOrNull()?.track([{ type: "order_click", productId: null, path: "/cart" }]).catch(() => {});
+    await getStoreOrNull()?.track([{ type: "order_click", productId: null, path: "/cart", source: order.source }]).catch(() => {});
+    await notifyNewOrder(order);
     return json({ number: order.number, totalPaise: order.totalPaise, orderPath: orderPath(order) });
   } catch (err) {
     return handleError(err, "order");

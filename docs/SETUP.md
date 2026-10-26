@@ -30,6 +30,18 @@ Run `supabase/migrations/0002_checkout_campaigns.sql` in **SQL Editor → New qu
 
 v4 takes orders through Instagram DMs instead of WhatsApp. In **Admin → Settings**, check the Instagram account (default `stixnvibes`) and rewrite the **How payment and confirmation work** note, because the saved one still says WhatsApp. Save.
 
+### Upgrading an existing shop to v5
+
+1. Run `supabase/migrations/0003_growth.sql` in **SQL Editor → New query** before the v5 code deploys. It adds codes, stock counts, custom requests, the Instagram username and "came from" on orders, and a bigger stats function. It is safe to run twice.
+2. Optional, to get an email for every order and custom request (with the customer's designs attached):
+   - Make a free account at resend.com (3,000 emails a month free). Without your own domain it can only email the address you signed up with, which is enough here.
+   - **API Keys → Create**, with the "Sending access" permission only.
+   - In Netlify, add to **Production** only: `RESEND_API_KEY` (the key), `NOTIFY_EMAIL` (your inbox), and later, once stixnvibes.com is verified in Resend, `MAIL_FROM` = `Stix N Vibes <shop@stixnvibes.com>`.
+   - Unset = no emails; orders and requests still land in admin.
+3. **Products**: put a number in **Stock** for anything you count. It goes down when you mark an order Confirmed (or Paid, Shipped, Done) and comes back if you cancel it. Blank = not counted.
+4. **Codes & QR**: make a code per stall (e.g. `WORDSUP10`, "Where you hand it out" = `stall-wordsup`) and print its QR card. **Analytics** then shows visits, orders and sales per stall and per code.
+5. Read **Privacy** and **Terms** on the shop and check the promises are ones you'll keep: delete unused custom requests within 12 months, reply to data requests within 7 days, and the email address shown.
+
 ## 3. Open the shop
 
 1. Go to `https://shop.stixnvibes.com/admin` and log in.
@@ -43,6 +55,8 @@ v4 takes orders through Instagram DMs instead of WhatsApp. In **Admin → Settin
 - A customer DMs the shop on Instagram with their order and its ref (`SNV-XXXXXX`). Open **Orders**, find the ref, check the items and any photos. Only confirm orders whose DM has come in: a confirmed order becomes an invoice in InWoice.
 - Move it along: Confirmed → Paid → Shipped → Done. Keep the phone number, address and courier in the private note.
 - New designs: **Bulk add** or **Add product**. Upcoming designs: status "Coming soon".
+- Custom requests come in under **Custom requests** (and by email if set up). Quote on WhatsApp or Instagram, then set it to Quoted, Won or Lost.
+- Printing: **Cricut sheets** packs designs onto 6.75 × 9.25 in Print Then Cut sheets with no overlaps. Drop in files, or open it from an order or a custom request. Download each sheet as a PNG, upload it to Design Space as one image, and set its width to 6.75 in.
 
 ## Running the shop in Docker (optional)
 

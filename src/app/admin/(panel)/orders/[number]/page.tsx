@@ -9,7 +9,7 @@ import { formatINR } from "@/lib/money";
 import { orderUrl } from "@/lib/orders";
 import { formatPhone, telNumber } from "@/lib/phone";
 import { getStore } from "@/lib/store";
-import { addressText } from "@/lib/instagram";
+import { addressText, dmLink } from "@/lib/instagram";
 
 export const metadata: Metadata = { title: "Order" };
 
@@ -48,7 +48,15 @@ export default async function OrderPage({ params }: PageProps<"/admin/orders/[nu
                 <a href={`tel:+${telNumber(order.customerPhone)}`} className="tabular-nums text-paper/70 hover:text-lemon">
                   {formatPhone(order.customerPhone)}
                 </a>
+                <a href={`https://wa.me/${telNumber(order.customerPhone)}`} target="_blank" rel="noopener" className="text-lemon underline underline-offset-2">
+                  WhatsApp
+                </a>
               </span>
+            )}
+            {order.instagram && (
+              <a href={dmLink(order.instagram)} target="_blank" rel="noopener" className="mt-1 block text-lemon underline underline-offset-2">
+                @{order.instagram} on Instagram
+              </a>
             )}
           </dd>
         </div>
@@ -56,6 +64,15 @@ export default async function OrderPage({ params }: PageProps<"/admin/orders/[nu
           <dt className="text-mute">{order.fulfilment === "pickup" ? "Pickup at a stall" : "Deliver to"}</dt>
           <dd className="mt-1 whitespace-pre-line">{order.fulfilment === "pickup" ? "Customer picks up" : addressText(order.address) || <span className="text-mute">No address</span>}</dd>
         </div>
+        {(order.source || order.couponCode) && (
+          <div>
+            <dt className="text-mute">Came from</dt>
+            <dd className="mt-1">
+              {order.source || "Direct"}
+              {order.couponCode && <span className="block text-mute">Code {order.couponCode}</span>}
+            </dd>
+          </div>
+        )}
         {order.viewKey && (
           <div>
             <dt className="text-mute">Customer&apos;s order page</dt>
@@ -129,7 +146,13 @@ export default async function OrderPage({ params }: PageProps<"/admin/orders/[nu
             </p>
           )}
         </section>
-        <OrderForm order={order} />
+        <div className="space-y-3">
+          <OrderForm order={order} />
+          <Link href={`/admin/sheets?order=${order.number}`} className="btn btn-ghost w-full justify-center !py-2.5">
+            Make a Cricut sheet from this order
+          </Link>
+          {order.stockTaken && <p className="text-xs text-mute">Items are taken off stock. Cancelling puts them back.</p>}
+        </div>
       </div>
     </div>
   );

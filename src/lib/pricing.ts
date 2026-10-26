@@ -1,5 +1,5 @@
 import { formatINR } from "./money";
-import type { AppliedOffer, Offer, Product, ProductType } from "./types";
+import type { AppliedOffer, Coupon, Offer, Product, ProductType } from "./types";
 
 // Pricing rules shared by the browser (cart totals) and the server (the
 // order record). Pure functions, no I/O.
@@ -52,8 +52,11 @@ export function hasPriceRange(product: Pick<Product, "options">): boolean {
   return product.options.some((g) => new Set(g.values.map((v) => v.priceDeltaPaise)).size > 1);
 }
 
-export function canOrder(product: Pick<Product, "status" | "soldOut" | "pricePaise">): boolean {
-  return product.status === "live" && !product.soldOut && product.pricePaise !== null;
+/** Marked sold out, or a stock count that has run out. */
+export const isSoldOut = (product: Pick<Product, "soldOut" | "stock">) => product.soldOut || product.stock === 0;
+
+export function canOrder(product: Pick<Product, "status" | "soldOut" | "stock" | "pricePaise">): boolean {
+  return product.status === "live" && !isSoldOut(product) && product.pricePaise !== null;
 }
 
 export type PricedLine = { type: ProductType; unitPricePaise: number; qty: number };
@@ -165,10 +168,48 @@ export function applyOffers(lines: PricedLine[], offers: Offer[]) {
   return { applied, discountPaise };
 }
 
-export function totals(lines: PricedLine[], offers: Offer[]) {
+/** Coupon codes are typed in any case, stored uppercase. */
+export const normalizeCode = (code: string) => code.trim().toUpperCase().replace(/\s+/g, "");
+export const COUPON_CODE_RE = /^[A-Z0-9-]{3,20}$/;
+
+/**
+ * Why a coupon can't be used right now, or null when it can. `uses` is the
+ * count of orders already placed with it (server only; the browser passes 0).
+ */
+export function couponProblem(c: Coupon, totalPaise: number, uses = 0, now: Date = new Date()): string | null {
+  const t = now.getTime();
+  if (!c.active || (c.startsAt && Date.parse(c.startsAt) > t) || (c.endsAt && Date.parse(c.endsAt) <= t)) return `The code ${c.code} isn't running right now.`;
+  if (c.maxUses !== null && uses >= c.maxUses) return `The code ${c.code} has been used up.`;
+  if (totalPaise < c.minOrderPaise) return `${c.code} works on orders of ${formatINR(c.minOrderPaise)} or more.`;
+  return null;
+}
+
+/** The coupon's discount on what's left after offers. Never more than the total. */
+export function couponDiscount(c: Pick<Coupon, "percent" | "amountPaise">, totalPaise: number): number {
+  const d = c.percent !== null ? Math.floor((totalPaise * c.percent) / 100) : (c.amountPaise ?? 0);
+  return Math.max(0, Math.min(totalPaise, d));
+}
+
+/**
+ * Cart totals: offers first, then the coupon (if it applies) on what's
+ * left. The coupon shows in `applied` as offerId "coupon:<CODE>".
+ */
+export function totals(lines: PricedLine[], offers: Offer[], coupon?: Coupon | null, uses = 0) {
   const subtotalPaise = lines.reduce((n, l) => n + l.unitPricePaise * l.qty, 0);
   const { applied, discountPaise } = applyOffers(lines, offers);
-  return { subtotalPaise, discountPaise, totalPaise: subtotalPaise - discountPaise, applied };
+  let total = subtotalPaise - discountPaise;
+  let couponProblemText: string | null = null;
+  let couponCode = "";
+  if (coupon) {
+    couponProblemText = couponProblem(coupon, total, uses);
+    const d = couponProblemText ? 0 : couponDiscount(coupon, total);
+    if (d > 0) {
+      applied.push({ offerId: `coupon:${coupon.code}`, name: `Code ${coupon.code}`, freeUnits: 0, discountPaise: d });
+      total -= d;
+      couponCode = coupon.code;
+    }
+  }
+  return { subtotalPaise, discountPaise: subtotalPaise - total, totalPaise: total, applied, couponCode, couponProblem: couponProblemText };
 }
 
 /** "Add 1 more sticker and it's free" nudges for the cart. */
@@ -211,6 +252,15 @@ export function minQtyShortfalls(lines: { productId: string; qty: number }[], pr
   return products
     .filter((p) => qty.has(p.id) && qty.get(p.id)! < p.minQty)
     .map((p) => ({ productId: p.id, name: p.name, minQty: p.minQty, need: p.minQty - qty.get(p.id)! }));
+}
+
+/** Lines asking for more than a counted stock holds (summed per product). */
+export function stockShortfalls(lines: { productId: string; qty: number }[], products: { id: string; name: string; stock: number | null }[]) {
+  const qty = new Map<string, number>();
+  for (const l of lines) qty.set(l.productId, (qty.get(l.productId) ?? 0) + l.qty);
+  return products
+    .filter((p) => p.stock !== null && qty.has(p.id) && qty.get(p.id)! > p.stock)
+    .map((p) => ({ productId: p.id, name: p.name, stock: p.stock! }));
 }
 
 /** Free shipping nudge; null when there's no threshold. */

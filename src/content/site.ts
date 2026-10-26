@@ -22,4 +22,5 @@ export const nav = [
   { href: "/shop?type=poster", label: "Posters" },
   { href: "/shop?type=music-card", label: "Music cards" },
   { href: "/collections", label: "Collections" },
+  { href: "/custom", label: "Custom" },
 ] as const;

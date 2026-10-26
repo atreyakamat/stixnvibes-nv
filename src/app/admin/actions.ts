@@ -4,14 +4,17 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { login, logout, requireAdmin } from "@/lib/admin/session";
-import { ORDER_NUMBER_RE } from "@/lib/constants";
+import { CUSTOM_NUMBER_RE, ORDER_NUMBER_RE } from "@/lib/constants";
+import { COUPON_CODE_RE, normalizeCode } from "@/lib/pricing";
+import { cleanSource } from "@/lib/validation";
 import { istInputToIso, rupeesToPaise } from "@/lib/money";
-import { rateLimit } from "@/lib/rate-limit";
+import { clearRateLimit, rateLimit } from "@/lib/rate-limit";
 import { cleanHandle, INSTAGRAM_HANDLE_RE } from "@/lib/instagram";
+import { setOrderStatus } from "@/lib/orders";
 import { getStore } from "@/lib/store";
 import { TEMPLATES } from "@/lib/store/seed";
 import type { ProductInput } from "@/lib/store/types";
-import { CUSTOM_FIELD_KINDS, OFFER_KINDS, ORDER_STATUSES, PRODUCT_STATUSES, PRODUCT_TYPE_IDS, type Product, type Settings } from "@/lib/types";
+import { CUSTOM_FIELD_KINDS, CUSTOM_STATUSES, OFFER_KINDS, ORDER_STATUSES, PRODUCT_STATUSES, PRODUCT_TYPE_IDS, type Product, type Settings } from "@/lib/types";
 import { UPI_ID_RE } from "@/lib/upi";
 
 export type FormState = { ok?: boolean; error?: string; message?: string };
@@ -37,6 +40,8 @@ export async function loginAction(_: FormState, form: FormData): Promise<FormSta
   if (!(await rateLimit("admin-login", 8, 15 * 60_000))) return { error: "Too many attempts. Wait 15 minutes." };
   const res = await login(String(form.get("email") ?? ""), String(form.get("password") ?? ""));
   if (!res.ok) return { error: res.error };
+  // Only failed attempts should count towards the limit.
+  await clearRateLimit("admin-login");
   redirect("/admin");
 }
 
@@ -57,12 +62,13 @@ export async function updateOrderAction(_: FormState, form: FormData): Promise<F
   await requireAdmin();
   const parsed = orderUpdateSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) return { error: "Check the fields." };
-  const { number, ...patch } = parsed.data;
+  const { number, status, adminNote } = parsed.data;
   try {
-    await getStore().updateOrder(number, patch);
+    await setOrderStatus(number, status, adminNote);
   } catch (err) {
     return { error: (err as Error).message };
   }
+  refreshShop(); // stock may have changed
   revalidatePath(`/admin/orders/${number}`);
   revalidatePath("/admin/orders");
   return { ok: true, message: "Saved." };
@@ -73,7 +79,8 @@ export async function quickOrderStatusAction(form: FormData) {
   const number = String(form.get("number") ?? "");
   const status = z.enum(ORDER_STATUSES).safeParse(form.get("status"));
   if (!ORDER_NUMBER_RE.test(number) || !status.success) return;
-  await getStore().updateOrder(number, { status: status.data });
+  await setOrderStatus(number, status.data);
+  refreshShop();
   revalidatePath("/admin/orders");
   revalidatePath("/admin");
 }
@@ -148,6 +155,20 @@ const productSchema = z.object({
       }),
     )
     .max(8),
+  stock: z
+    .string()
+    .trim()
+    .max(6)
+    .transform((v, ctx) => {
+      if (v === "") return null;
+      const n = Number(v);
+      if (!Number.isInteger(n) || n < 0 || n > 99999) {
+        ctx.addIssue({ code: "custom", message: "Stock is a whole number like 25, or blank for made to order." });
+        return z.NEVER;
+      }
+      return n;
+    }),
+  lowStockAt: z.coerce.number().int().min(0).max(9999),
 });
 
 function editable(p: Product): ProductInput {
@@ -170,6 +191,8 @@ function editable(p: Product): ProductInput {
     minQty: p.minQty,
     options: p.options,
     customFields: p.customFields,
+    stock: p.stock,
+    lowStockAt: p.lowStockAt,
   };
 }
 
@@ -196,6 +219,8 @@ function toProductInput(p: z.infer<typeof productSchema>): ProductInput {
     minQty: p.minQty,
     options: p.options.map((g) => ({ id: g.id, name: g.name, values: g.values.map((v) => ({ id: v.id, label: v.label, priceDeltaPaise: v.delta })) })),
     customFields: p.customFields,
+    stock: p.stock,
+    lowStockAt: p.lowStockAt,
   };
 }
 
@@ -320,6 +345,8 @@ export async function bulkCreateAction(_: FormState, form: FormData): Promise<Fo
       minQty: 1,
       options: structuredClone(t.options),
       customFields: structuredClone(t.customFields),
+      stock: null,
+      lowStockAt: 5,
     });
     created++;
   }
@@ -442,6 +469,89 @@ export async function deleteOfferAction(form: FormData) {
   if (id) await getStore().deleteOffer(id);
   refreshShop();
   revalidatePath("/admin/offers");
+}
+
+// Coupons -------------------------------------------------------------
+
+const couponSchema = z.object({
+  code: z
+    .string()
+    .transform((v) => normalizeCode(v))
+    .pipe(z.string().regex(COUPON_CODE_RE, "Code: 3 to 20 letters, numbers or dashes, like WORDSUP10.")),
+  isNew: z.enum(["1", "0"]),
+  description: z.string().trim().max(160),
+  kind: z.enum(["percent", "amount"]),
+  value: z.string().trim().max(12),
+  minOrder: z.string().trim().max(12),
+  maxUses: z.string().trim().max(6),
+  source: z.string().trim().max(40),
+});
+
+export async function saveCouponAction(_: FormState, form: FormData): Promise<FormState> {
+  await requireAdmin();
+  const parsed = couponSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the fields." };
+  const c = parsed.data;
+  let percent: number | null = null;
+  let amountPaise: number | null = null;
+  if (c.kind === "percent") {
+    percent = Number(c.value);
+    if (!Number.isInteger(percent) || percent < 1 || percent > 90) return { error: "% off is a whole number from 1 to 90." };
+  } else {
+    amountPaise = rupeesToPaise(c.value);
+    if (!amountPaise || Number.isNaN(amountPaise) || amountPaise <= 0) return { error: "Set the ₹ off, like 20." };
+  }
+  const minOrderPaise = c.minOrder ? rupeesToPaise(c.minOrder) : 0;
+  if (minOrderPaise === null || Number.isNaN(minOrderPaise)) return { error: "Minimum order is an amount like 150, or blank." };
+  const maxUses = c.maxUses ? Number(c.maxUses) : null;
+  if (maxUses !== null && (!Number.isInteger(maxUses) || maxUses < 1)) return { error: "Max uses is a whole number, or blank for no limit." };
+  const startsAt = istInputToIso(String(form.get("startsAt") ?? ""));
+  const endsAt = istInputToIso(String(form.get("endsAt") ?? ""));
+  if (startsAt === undefined || endsAt === undefined) return { error: "Pick start and end dates with the date picker, or leave them blank." };
+  if (startsAt && endsAt && endsAt <= startsAt) return { error: "The end has to be after the start." };
+  try {
+    await getStore().saveCoupon(
+      {
+        code: c.code,
+        description: c.description,
+        percent,
+        amountPaise,
+        minOrderPaise,
+        maxUses,
+        startsAt,
+        endsAt,
+        source: cleanSource(c.source),
+        active: form.get("active") === "on",
+      },
+      c.isNew === "1",
+    );
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
+  revalidatePath("/admin/coupons");
+  return { ok: true, message: c.isNew === "1" ? `Code ${c.code} added.` : "Saved." };
+}
+
+export async function deleteCouponAction(form: FormData) {
+  await requireAdmin();
+  const code = normalizeCode(String(form.get("code") ?? ""));
+  if (COUPON_CODE_RE.test(code)) await getStore().deleteCoupon(code);
+  revalidatePath("/admin/coupons");
+}
+
+// Custom requests -----------------------------------------------------
+
+export async function updateCustomRequestAction(_: FormState, form: FormData): Promise<FormState> {
+  await requireAdmin();
+  const parsed = z
+    .object({ number: z.string().regex(CUSTOM_NUMBER_RE), status: z.enum(CUSTOM_STATUSES), adminNote: z.string().trim().max(2000) })
+    .safeParse(Object.fromEntries(form));
+  if (!parsed.success) return { error: "Check the fields." };
+  const { number, ...patch } = parsed.data;
+  await getStore().updateCustomRequest(number, patch);
+  revalidatePath(`/admin/custom/${number}`);
+  revalidatePath("/admin/custom");
+  return { ok: true, message: "Saved." };
 }
 
 // Settings ------------------------------------------------------------

@@ -3,6 +3,7 @@ import { CartDrawer } from "@/components/cart/cart-drawer";
 import { GlassSheen } from "@/components/glass-sheen";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { VisitTracker } from "@/components/visit-tracker";
 import { campaignBanner } from "@/lib/pricing";
 import { getShopState } from "@/lib/shop";
 
@@ -33,6 +34,7 @@ export default async function ShopLayout({ children }: LayoutProps<"/">) {
         {children}
       </main>
       <SiteFooter />
+      <VisitTracker />
       <CartDrawer />
       <div className="grain" aria-hidden="true" />
     </CartProvider>

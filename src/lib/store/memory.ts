@@ -1,6 +1,6 @@
-import type { Collection, Offer, Order, Product, Settings, Stats, Upload } from "@/lib/types";
-import { DEMO_SETTINGS, demoProducts, seedCollections, seedOffers } from "./seed";
-import type { CollectionInput, NewOrder, OfferInput, OrderFilter, OrderPatch, ProductInput, Store, TrackEvent } from "./types";
+import type { Collection, Coupon, CustomRequest, Offer, Order, Product, Settings, Stats, Upload } from "@/lib/types";
+import { DEMO_SETTINGS, demoCoupons, demoProducts, seedCollections, seedOffers } from "./seed";
+import type { CollectionInput, CouponInput, CustomRequestPatch, NewCustomRequest, NewOrder, OfferInput, OrderFilter, OrderPatch, ProductInput, Store, TrackEvent } from "./types";
 
 type StoredEvent = TrackEvent & { at: string };
 
@@ -9,6 +9,8 @@ type State = {
   collections: Collection[];
   offers: Offer[];
   orders: Order[];
+  coupons: Coupon[];
+  customRequests: CustomRequest[];
   uploads: Map<string, Upload & { body: Buffer }>;
   events: StoredEvent[];
   settings: Settings;
@@ -26,30 +28,106 @@ async function toDataUrl(file: File): Promise<string> {
   return `data:${file.type};base64,${buf.toString("base64")}`;
 }
 
+export const EMPTY_STATS: Stats = {
+  visits: 0,
+  views: 0,
+  addToCart: 0,
+  checkouts: 0,
+  orderClicks: 0,
+  askClicks: 0,
+  orders: 0,
+  orderValuePaise: 0,
+  sales: 0,
+  salesPaise: 0,
+  paid: 0,
+  topViewed: [],
+  topOrdered: [],
+  byType: [],
+  bySource: [],
+  byCoupon: [],
+  daily: [],
+};
+
+const SOLD: Order["status"][] = ["confirmed", "paid", "shipped", "done"];
+
+/** Same numbers as the shop_stats SQL function, for the in-memory store. */
 export function computeStats(events: StoredEvent[], orders: Order[], sinceIso: string): Stats {
   const ev = events.filter((e) => e.at >= sinceIso);
   const ord = orders.filter((o) => o.createdAt >= sinceIso && o.status !== "cancelled");
+  const sold = ord.filter((o) => SOLD.includes(o.status));
   const count = (t: TrackEvent["type"]) => ev.filter((e) => e.type === t).length;
+  const sum = (list: Order[]) => list.reduce((n, o) => n + o.totalPaise, 0);
 
   const viewed = new Map<string, number>();
   for (const e of ev) if (e.type === "view" && e.productId) viewed.set(e.productId, (viewed.get(e.productId) ?? 0) + 1);
   const ordered = new Map<string, number>();
   for (const o of ord) for (const l of o.lines) ordered.set(l.productId, (ordered.get(l.productId) ?? 0) + l.qty);
 
-  const days = new Map<string, { views: number; orders: number }>();
-  const day = (iso: string) => iso.slice(0, 10);
-  for (const e of ev) if (e.type === "view") (days.get(day(e.at)) ?? days.set(day(e.at), { views: 0, orders: 0 }).get(day(e.at))!).views++;
-  for (const o of ord) (days.get(day(o.createdAt)) ?? days.set(day(o.createdAt), { views: 0, orders: 0 }).get(day(o.createdAt))!).orders++;
+  const byType = new Map<string, { qty: number; paise: number }>();
+  for (const o of sold)
+    for (const l of o.lines) {
+      const t = byType.get(l.type) ?? byType.set(l.type, { qty: 0, paise: 0 }).get(l.type)!;
+      t.qty += l.qty;
+      t.paise += l.lineTotalPaise;
+    }
+
+  type Src = { visits: number | null; orders: number | null; sales: number | null; salesPaise: number | null };
+  const bySource = new Map<string, Src>();
+  const src = (s: string | undefined) => {
+    const k = s || "direct";
+    return bySource.get(k) ?? bySource.set(k, { visits: null, orders: null, sales: null, salesPaise: null }).get(k)!;
+  };
+  for (const e of ev) if (e.type === "visit") src(e.source).visits = (src(e.source).visits ?? 0) + 1;
+  for (const o of ord) src(o.source).orders = (src(o.source).orders ?? 0) + 1;
+  for (const o of sold) {
+    const x = src(o.source);
+    x.sales = (x.sales ?? 0) + 1;
+    x.salesPaise = (x.salesPaise ?? 0) + o.totalPaise;
+  }
+
+  const byCoupon = new Map<string, Stats["byCoupon"][number]>();
+  for (const o of ord) {
+    if (!o.couponCode) continue;
+    const c = byCoupon.get(o.couponCode) ?? byCoupon.set(o.couponCode, { code: o.couponCode, orders: 0, sales: 0, salesPaise: 0, discountPaise: 0 }).get(o.couponCode)!;
+    c.orders++;
+    c.discountPaise += o.offers.filter((a) => a.offerId === `coupon:${o.couponCode}`).reduce((n, a) => n + a.discountPaise, 0);
+    if (SOLD.includes(o.status)) {
+      c.sales++;
+      c.salesPaise += o.totalPaise;
+    }
+  }
+
+  const days = new Map<string, { views: number; visits: number; orders: number; salesPaise: number }>();
+  const day = (iso: string) => {
+    const d = iso.slice(0, 10);
+    return days.get(d) ?? days.set(d, { views: 0, visits: 0, orders: 0, salesPaise: 0 }).get(d)!;
+  };
+  for (const e of ev) {
+    if (e.type === "view") day(e.at).views++;
+    if (e.type === "visit") day(e.at).visits++;
+  }
+  for (const o of ord) day(o.createdAt).orders++;
+  for (const o of sold) day(o.createdAt).salesPaise += o.totalPaise;
 
   return {
+    visits: count("visit"),
     views: count("view"),
     addToCart: count("add_to_cart"),
+    checkouts: count("checkout"),
     orderClicks: count("order_click"),
     askClicks: count("ask_click"),
     orders: ord.length,
-    orderValuePaise: ord.reduce((n, o) => n + o.totalPaise, 0),
+    orderValuePaise: sum(ord),
+    sales: sold.length,
+    salesPaise: sum(sold),
+    paid: ord.filter((o) => ["paid", "shipped", "done"].includes(o.status)).length,
     topViewed: [...viewed].map(([productId, c]) => ({ productId, count: c })).sort((a, b) => b.count - a.count).slice(0, 8),
     topOrdered: [...ordered].map(([productId, qty]) => ({ productId, qty })).sort((a, b) => b.qty - a.qty).slice(0, 8),
+    byType: [...byType].map(([type, v]) => ({ type, ...v })).sort((a, b) => b.paise - a.paise),
+    bySource: [...bySource]
+      .map(([source, v]) => ({ source, ...v }))
+      .sort((a, b) => (b.salesPaise ?? 0) - (a.salesPaise ?? 0) || (b.visits ?? 0) - (a.visits ?? 0)),
+    byCoupon: [...byCoupon.values()].sort((a, b) => b.orders - a.orders),
     daily: [...days].map(([d, v]) => ({ day: d, ...v })).sort((a, b) => a.day.localeCompare(b.day)),
   };
 }
@@ -72,6 +150,8 @@ export class MemoryStore implements Store {
       collections: initial?.collections ?? seedCollections(),
       offers: initial?.offers ?? seedOffers(),
       orders: initial?.orders ?? [],
+      coupons: initial?.coupons ?? demoCoupons(),
+      customRequests: initial?.customRequests ?? [],
       uploads: initial?.uploads ?? new Map(),
       events: initial?.events ?? [],
       settings: initial?.settings ?? { ...DEMO_SETTINGS },
@@ -177,7 +257,7 @@ export class MemoryStore implements Store {
 
   async createOrder(input: NewOrder) {
     if (this.s.orders.some((o) => o.number === input.number)) throw new Error("duplicate order number");
-    const order: Order = { ...clone(input), id: uid("o"), status: "new", adminNote: "", createdAt: now(), updatedAt: now() };
+    const order: Order = { ...clone(input), id: uid("o"), status: "new", adminNote: "", stockTaken: false, createdAt: now(), updatedAt: now() };
     this.s.orders.unshift(order);
     return clone(order);
   }
@@ -204,6 +284,70 @@ export class MemoryStore implements Store {
     if (!o) throw new Error("Order not found");
     Object.assign(o, patch, { updatedAt: now() });
     return clone(o);
+  }
+
+  async moveStock(number: string, sign: -1 | 1) {
+    const o = this.s.orders.find((x) => x.number === number);
+    if (!o || o.stockTaken === (sign === -1)) return;
+    o.stockTaken = sign === -1;
+    for (const l of o.lines) {
+      const p = this.s.products.find((x) => x.id === l.productId);
+      if (p && p.stock !== null) p.stock = Math.max(0, p.stock + sign * l.qty);
+    }
+  }
+
+  // Coupons -------------------------------------------------------------
+
+  async listCoupons() {
+    return clone([...this.s.coupons].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+  }
+
+  async getCoupon(code: string) {
+    const c = this.s.coupons.find((x) => x.code === code);
+    return c ? clone(c) : null;
+  }
+
+  async saveCoupon(input: CouponInput, isNew: boolean) {
+    const i = this.s.coupons.findIndex((c) => c.code === input.code);
+    if (isNew && i >= 0) throw new Error(`The code ${input.code} already exists.`);
+    if (!isNew && i < 0) throw new Error("Code not found");
+    const c: Coupon = { ...clone(input), createdAt: i >= 0 ? this.s.coupons[i].createdAt : now() };
+    if (i >= 0) this.s.coupons[i] = c;
+    else this.s.coupons.push(c);
+    return clone(c);
+  }
+
+  async deleteCoupon(code: string) {
+    this.s.coupons = this.s.coupons.filter((c) => c.code !== code);
+  }
+
+  async couponUses(code: string) {
+    return this.s.orders.filter((o) => o.couponCode === code && o.status !== "cancelled").length;
+  }
+
+  // Custom requests -----------------------------------------------------
+
+  async createCustomRequest(input: NewCustomRequest) {
+    if (this.s.customRequests.some((c) => c.number === input.number)) throw new Error("duplicate request number");
+    const c: CustomRequest = { ...clone(input), id: uid("cr"), status: "new", adminNote: "", createdAt: now(), updatedAt: now() };
+    this.s.customRequests.unshift(c);
+    return clone(c);
+  }
+
+  async getCustomRequest(number: string) {
+    const c = this.s.customRequests.find((x) => x.number === number);
+    return c ? clone(c) : null;
+  }
+
+  async listCustomRequests(limit = 200) {
+    return clone(this.s.customRequests.slice(0, limit));
+  }
+
+  async updateCustomRequest(number: string, patch: CustomRequestPatch) {
+    const c = this.s.customRequests.find((x) => x.number === number);
+    if (!c) throw new Error("Request not found");
+    Object.assign(c, patch, { updatedAt: now() });
+    return clone(c);
   }
 
   // Uploads, analytics, settings ---------------------------------------

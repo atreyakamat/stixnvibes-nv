@@ -1,4 +1,4 @@
-import type { Collection, CustomField, Offer, OptionGroup, Product, Settings } from "@/lib/types";
+import type { Collection, Coupon, CustomField, Offer, OptionGroup, Product, Settings } from "@/lib/types";
 import { DEFAULT_INSTAGRAM } from "../instagram";
 
 // Starter catalog, option templates and offers. Prices and offers come from
@@ -109,6 +109,9 @@ function sticker(n: number): Product {
     minQty: 1,
     options: structuredClone(t.options),
     customFields: [],
+    // Demo stickers are counted, so stock shows up in the preview.
+    stock: 40,
+    lowStockAt: 5,
     createdAt: NOW,
     updatedAt: NOW,
   };
@@ -136,6 +139,8 @@ function base(id: string, type: Product["type"], name: string, description: stri
     minQty: 1,
     options: structuredClone(t.options),
     customFields: structuredClone(t.customFields),
+    stock: null,
+    lowStockAt: 5,
     createdAt: NOW,
     updatedAt: NOW,
     ...extra,
@@ -185,6 +190,25 @@ export function seedCollections(): Collection[] {
 
 /** Defaults for the fields only campaigns use. */
 export const NO_CAMPAIGN = { percent: null, startsAt: null, endsAt: null, banner: "" } as const;
+
+/** One code to try in previews: 10% off from a stall QR. */
+export function demoCoupons(): Coupon[] {
+  return [
+    {
+      code: "STALL10",
+      description: "10% off for stall visitors",
+      percent: 10,
+      amountPaise: null,
+      minOrderPaise: 0,
+      maxUses: null,
+      startsAt: null,
+      endsAt: null,
+      source: "stall-demo",
+      active: true,
+      createdAt: NOW,
+    },
+  ];
+}
 
 export function seedOffers(): Offer[] {
   return [

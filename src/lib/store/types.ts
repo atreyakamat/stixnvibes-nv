@@ -1,9 +1,9 @@
-import type { Collection, EventType, Offer, Order, OrderStatus, Product, Settings, Stats, Upload } from "@/lib/types";
+import type { Collection, Coupon, CustomRequest, CustomStatus, EventType, Offer, Order, OrderStatus, Product, Settings, Stats, Upload } from "@/lib/types";
 
 export type ProductInput = Omit<Product, "id" | "createdAt" | "updatedAt">;
 export type CollectionInput = Omit<Collection, "id" | "createdAt">;
 export type OfferInput = Omit<Offer, "id">;
-export type NewOrder = Omit<Order, "id" | "createdAt" | "updatedAt" | "status" | "adminNote">;
+export type NewOrder = Omit<Order, "id" | "createdAt" | "updatedAt" | "status" | "adminNote" | "stockTaken">;
 export type OrderPatch = Partial<Pick<Order, "status" | "adminNote">>;
 export type OrderFilter = {
   status?: OrderStatus;
@@ -13,7 +13,10 @@ export type OrderFilter = {
   /** Only orders changed after this ISO time (for the InWoice sync). */
   updatedSince?: string;
 };
-export type TrackEvent = { type: EventType; productId: string | null; path: string };
+export type TrackEvent = { type: EventType; productId: string | null; path: string; source?: string };
+export type CouponInput = Omit<Coupon, "createdAt">;
+export type NewCustomRequest = Omit<CustomRequest, "id" | "createdAt" | "updatedAt" | "status" | "adminNote">;
+export type CustomRequestPatch = Partial<{ status: CustomStatus; adminNote: string }>;
 
 /**
  * Everything the app needs from persistence. Two implementations: Supabase
@@ -44,6 +47,24 @@ export interface Store {
   getOrder(number: string): Promise<Order | null>;
   listOrders(filter?: OrderFilter): Promise<Order[]>;
   updateOrder(number: string, patch: OrderPatch): Promise<Order>;
+  /**
+   * Takes (sign -1) or returns (+1) the order's items from stock, exactly
+   * once each way: flips stockTaken first and does nothing if it was
+   * already in that state. Products without a stock count are skipped.
+   */
+  moveStock(number: string, sign: -1 | 1): Promise<void>;
+
+  listCoupons(): Promise<Coupon[]>;
+  getCoupon(code: string): Promise<Coupon | null>;
+  saveCoupon(input: CouponInput, isNew: boolean): Promise<Coupon>;
+  deleteCoupon(code: string): Promise<void>;
+  /** Orders with this code that weren't cancelled. */
+  couponUses(code: string): Promise<number>;
+
+  createCustomRequest(input: NewCustomRequest): Promise<CustomRequest>;
+  getCustomRequest(number: string): Promise<CustomRequest | null>;
+  listCustomRequests(limit?: number): Promise<CustomRequest[]>;
+  updateCustomRequest(number: string, patch: CustomRequestPatch): Promise<CustomRequest>;
 
   /** A customer photo for a custom product (music card, etc.). */
   saveUpload(id: string, file: File): Promise<Upload>;

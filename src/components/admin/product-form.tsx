@@ -50,6 +50,8 @@ export function ProductForm({ product, collections, initialType }: { product?: P
   const [price, setPrice] = useState(paiseToRupees(product?.pricePaise ?? (startType === "sticker" && !product ? 1000 : null)));
   const [compareAt, setCompareAt] = useState(paiseToRupees(product?.compareAtPaise ?? null));
   const [minQty, setMinQty] = useState(String(product?.minQty ?? 1));
+  const [stock, setStock] = useState(product?.stock == null ? "" : String(product.stock));
+  const [lowStockAt, setLowStockAt] = useState(String(product?.lowStockAt ?? 5));
   const [groups, setGroups] = useState<GroupRow[]>(groupsFrom(product ?? tpl));
   const [fields, setFields] = useState<FieldRow[]>(product?.customFields ?? tpl.customFields);
 
@@ -70,6 +72,8 @@ export function ProductForm({ product, collections, initialType }: { product?: P
     price,
     compareAt,
     minQty,
+    stock,
+    lowStockAt,
     options: groups.map((g) => ({ id: g.id, name: g.name, values: g.values.map((v) => ({ id: v.id, label: v.label, delta: v.delta })) })),
     customFields: fields,
   });
@@ -187,6 +191,24 @@ export function ProductForm({ product, collections, initialType }: { product?: P
             <label className="block">
               <span className={lbl}>Minimum per order</span>
               <input value={minQty} onChange={(e) => setMinQty(e.target.value)} inputMode="numeric" className="field tabular-nums" />
+            </label>
+          </div>
+        </section>
+
+        <section className={section}>
+          <h2 className="font-medium">Stock</h2>
+          <p className="text-xs text-mute">
+            Leave blank for things you make to order. With a number, each confirmed order takes its items off, a cancelled one puts them back, and the product shows
+            Sold out at 0.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <label className="block">
+              <span className={lbl}>In stock (blank = not counted)</span>
+              <input value={stock} onChange={(e) => setStock(e.target.value.replace(/\D/g, ""))} inputMode="numeric" className="field tabular-nums" />
+            </label>
+            <label className="block">
+              <span className={lbl}>Warn me at or below</span>
+              <input value={lowStockAt} onChange={(e) => setLowStockAt(e.target.value.replace(/\D/g, ""))} inputMode="numeric" className="field tabular-nums" />
             </label>
           </div>
         </section>

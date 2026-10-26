@@ -25,3 +25,8 @@ export async function rateLimit(bucket: string, limit: number, windowMs: number)
   if (hits.size > 5000) hits.clear();
   return true;
 }
+
+/** Clears a bucket for this client, e.g. after a successful login. */
+export async function clearRateLimit(bucket: string): Promise<void> {
+  hits.delete(`${bucket}:${await clientIp()}`);
+}
