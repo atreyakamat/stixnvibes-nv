@@ -193,6 +193,9 @@ export default async function HomePage() {
             <a href={dmLink(settings.instagramHandle)} className="btn btn-primary" target="_blank" rel="noopener">
               Message us on Instagram
             </a>
+            <Link href="/custom" className="btn btn-ghost">
+              Send your design
+            </Link>
           </div>
         </Reveal>
       </section>

@@ -36,7 +36,11 @@ Without Supabase keys the app runs in **demo mode**: data lives in memory, produ
 - **Minimum per order** per product (music cards: 5). Checkout waits until it's met.
 - **Free shipping** above a set amount (₹250), with a cart nudge.
 - **Ordering**: the cart lives in the browser. "Place order" sends the cart to the server, which re-prices it from the database, records the order with a ref (`SNV-XXXXXX`) and opens the customer's order page. Instagram can't prefill a DM, so the order page copies the full order and opens `ig.me/m/<account>` for the customer to paste it. If the server can't be reached, the browser builds the same message itself, so an order is never lost. Payment and delivery are sorted in the Instagram chat.
-- **Analytics**: product views, add-to-cart, order taps and "Ask on Instagram" taps are counted without cookies or personal data.
+- **Analytics**: visits, product views, add-to-cart, checkouts, orders and "Ask on Instagram" taps are counted without cookies or personal data. A visit from `?src=stall-x` (or `utm_source`) is remembered for 30 days so orders and sales show per stall or link.
+- **Codes**: % or ₹ off after offers, with optional dates, minimum order and use limit. `?code=X` on any link applies it in the cart; each code has a printable QR card. The server checks the code again when the order is placed.
+- **Stock**: optional count per product, taken when an order is confirmed and given back if it's cancelled. Low stock shows on the dashboard; the shop says "Only N left" and stops at zero.
+- **Custom requests** (`/custom`): the customer uploads up to 6 designs, says what to make and how many, and gets a `CUS-XXXXXX` ref. With Resend set up, each order and request is emailed to the owner.
+- **Cricut sheets** (`/admin/sheets`): packs designs onto Print Then Cut sheets (shelf packing, white cut border, 300 DPI PNG with its DPI set).
 - **Admin** (`/admin`): dashboard (orders sent, order value, views, conversion, most viewed / ordered, daily chart), orders (status, private notes, customer photos), products (filters, quick hide / sold out / feature, duplicate, full editor with options, custom fields and photos), bulk add (one product per uploaded design), collections, offers, settings (Instagram account, notes, banner, pause orders).
 
 ## Going live

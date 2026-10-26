@@ -6,11 +6,15 @@ import { Wordmark } from "@/components/wordmark";
 
 const links = [
   { href: "/admin", label: "Dashboard" },
+  { href: "/admin/analytics", label: "Analytics" },
   { href: "/admin/orders", label: "Orders" },
+  { href: "/admin/custom", label: "Custom requests" },
   { href: "/admin/customers", label: "Customers" },
   { href: "/admin/products", label: "Products" },
   { href: "/admin/collections", label: "Collections" },
   { href: "/admin/offers", label: "Offers" },
+  { href: "/admin/coupons", label: "Codes & QR" },
+  { href: "/admin/sheets", label: "Cricut sheets" },
   { href: "/admin/settings", label: "Settings" },
 ];
 

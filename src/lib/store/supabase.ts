@@ -1,8 +1,9 @@
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Collection, Offer, Order, Product, Settings, Stats } from "@/lib/types";
+import type { Collection, Coupon, CustomRequest, Offer, Order, Product, Settings, Stats } from "@/lib/types";
+import { EMPTY_STATS } from "./memory";
 import { DEFAULT_SETTINGS } from "./seed";
-import type { CollectionInput, NewOrder, OfferInput, OrderFilter, OrderPatch, ProductInput, Store, TrackEvent } from "./types";
+import type { CollectionInput, CouponInput, CustomRequestPatch, NewCustomRequest, NewOrder, OfferInput, OrderFilter, OrderPatch, ProductInput, Store, TrackEvent } from "./types";
 
 type Row = Record<string, unknown>;
 
@@ -27,6 +28,8 @@ function toProduct(r: Row): Product {
     minQty: (r.min_qty as number) ?? 1,
     options: (r.options as Product["options"]) ?? [],
     customFields: (r.custom_fields as Product["customFields"]) ?? [],
+    stock: (r.stock as number | null) ?? null,
+    lowStockAt: (r.low_stock_at as number) ?? 5,
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
   };
@@ -52,6 +55,8 @@ function productRow(p: ProductInput): Row {
     min_qty: p.minQty,
     options: p.options,
     custom_fields: p.customFields,
+    stock: p.stock,
+    low_stock_at: p.lowStockAt,
     updated_at: new Date().toISOString(),
   };
 }
@@ -106,6 +111,46 @@ function toOrder(r: Row): Order {
     totalPaise: r.total_paise as number,
     offers: (r.offers as Order["offers"]) ?? [],
     adminNote: r.admin_note as string,
+    couponCode: (r.coupon_code as string) ?? "",
+    source: (r.source as string) ?? "",
+    instagram: (r.instagram as string) ?? "",
+    stockTaken: Boolean(r.stock_taken),
+    createdAt: r.created_at as string,
+    updatedAt: r.updated_at as string,
+  };
+}
+
+function toCoupon(r: Row): Coupon {
+  return {
+    code: r.code as string,
+    description: (r.description as string) ?? "",
+    percent: (r.percent as number | null) ?? null,
+    amountPaise: (r.amount_paise as number | null) ?? null,
+    minOrderPaise: (r.min_order_paise as number) ?? 0,
+    maxUses: (r.max_uses as number | null) ?? null,
+    startsAt: (r.starts_at as string | null) ?? null,
+    endsAt: (r.ends_at as string | null) ?? null,
+    source: (r.source as string) ?? "",
+    active: r.active as boolean,
+    createdAt: r.created_at as string,
+  };
+}
+
+function toCustom(r: Row): CustomRequest {
+  return {
+    id: r.id as string,
+    number: r.number as string,
+    status: r.status as CustomRequest["status"],
+    customerName: r.customer_name as string,
+    customerPhone: r.customer_phone as string,
+    instagram: (r.instagram as string) ?? "",
+    kind: r.kind as CustomRequest["kind"],
+    size: (r.size as string) ?? "",
+    qty: r.qty as number,
+    note: (r.note as string) ?? "",
+    files: (r.files as string[]) ?? [],
+    source: (r.source as string) ?? "",
+    adminNote: (r.admin_note as string) ?? "",
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
   };
@@ -237,6 +282,9 @@ export class SupabaseStore implements Store {
       discount_paise: o.discountPaise,
       total_paise: o.totalPaise,
       offers: o.offers,
+      coupon_code: o.couponCode,
+      source: o.source,
+      instagram: o.instagram,
     };
     const res = await this.db.from("orders").insert(row).select("*").single();
     if (res.error?.code === "23505") throw new Error("duplicate order number");
@@ -270,6 +318,95 @@ export class SupabaseStore implements Store {
     return toOrder(check(await this.db.from("orders").update(row).eq("number", number).select("*").single()) as Row);
   }
 
+  async moveStock(number: string, sign: -1 | 1) {
+    // Flip the flag first, only if it's in the other state, so two clicks
+    // (or two admins) can never take the same order's stock twice.
+    const taken = sign === -1;
+    const rows = check(
+      await this.db.from("orders").update({ stock_taken: taken }).eq("number", number).eq("stock_taken", !taken).select("lines"),
+    ) as Row[];
+    if (!rows.length) return;
+    check(await this.db.rpc("adjust_stock", { p_lines: rows[0].lines, p_sign: sign }));
+  }
+
+  // Coupons -------------------------------------------------------------
+
+  async listCoupons() {
+    return (check(await this.db.from("coupons").select("*").order("created_at", { ascending: false })) as Row[]).map(toCoupon);
+  }
+
+  async getCoupon(code: string) {
+    const data = check(await this.db.from("coupons").select("*").eq("code", code).maybeSingle());
+    return data ? toCoupon(data as Row) : null;
+  }
+
+  async saveCoupon(c: CouponInput, isNew: boolean) {
+    const row = {
+      code: c.code,
+      description: c.description,
+      percent: c.percent,
+      amount_paise: c.amountPaise,
+      min_order_paise: c.minOrderPaise,
+      max_uses: c.maxUses,
+      starts_at: c.startsAt,
+      ends_at: c.endsAt,
+      source: c.source,
+      active: c.active,
+    };
+    const res = isNew ? await this.db.from("coupons").insert(row).select("*").single() : await this.db.from("coupons").update(row).eq("code", c.code).select("*").single();
+    if (res.error?.code === "23505") throw new Error(`The code ${c.code} already exists.`);
+    return toCoupon(check(res) as Row);
+  }
+
+  async deleteCoupon(code: string) {
+    check(await this.db.from("coupons").delete().eq("code", code));
+  }
+
+  async couponUses(code: string) {
+    const res = await this.db.from("orders").select("id", { count: "exact", head: true }).eq("coupon_code", code).neq("status", "cancelled");
+    if (res.error) throw new Error(res.error.message);
+    return res.count ?? 0;
+  }
+
+  // Custom requests -----------------------------------------------------
+
+  async createCustomRequest(c: NewCustomRequest) {
+    const res = await this.db
+      .from("custom_requests")
+      .insert({
+        number: c.number,
+        customer_name: c.customerName,
+        customer_phone: c.customerPhone,
+        instagram: c.instagram,
+        kind: c.kind,
+        size: c.size,
+        qty: c.qty,
+        note: c.note,
+        files: c.files,
+        source: c.source,
+      })
+      .select("*")
+      .single();
+    if (res.error?.code === "23505") throw new Error("duplicate request number");
+    return toCustom(check(res) as Row);
+  }
+
+  async getCustomRequest(number: string) {
+    const data = check(await this.db.from("custom_requests").select("*").eq("number", number).maybeSingle());
+    return data ? toCustom(data as Row) : null;
+  }
+
+  async listCustomRequests(limit = 200) {
+    return (check(await this.db.from("custom_requests").select("*").order("created_at", { ascending: false }).limit(limit)) as Row[]).map(toCustom);
+  }
+
+  async updateCustomRequest(number: string, patch: CustomRequestPatch) {
+    const row: Row = { updated_at: new Date().toISOString() };
+    if (patch.status !== undefined) row.status = patch.status;
+    if (patch.adminNote !== undefined) row.admin_note = patch.adminNote;
+    return toCustom(check(await this.db.from("custom_requests").update(row).eq("number", number).select("*").single()) as Row);
+  }
+
   // Uploads, analytics, settings ---------------------------------------
 
   async saveUpload(id: string, file: File) {
@@ -288,11 +425,12 @@ export class SupabaseStore implements Store {
 
   async track(events: TrackEvent[]) {
     if (!events.length) return;
-    check(await this.db.from("events").insert(events.map((e) => ({ type: e.type, product_id: e.productId, path: e.path }))));
+    check(await this.db.from("events").insert(events.map((e) => ({ type: e.type, product_id: e.productId, path: e.path, source: e.source ?? "" }))));
   }
 
   async stats(sinceIso: string): Promise<Stats> {
-    return check(await this.db.rpc("shop_stats", { p_since: sinceIso })) as Stats;
+    // Before the v5 migration the function returns fewer fields; fill the rest.
+    return { ...EMPTY_STATS, ...(check(await this.db.rpc("shop_stats", { p_since: sinceIso })) as Partial<Stats>) };
   }
 
   async getSettings(): Promise<Settings> {

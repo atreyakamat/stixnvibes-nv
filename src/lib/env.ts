@@ -43,3 +43,18 @@ export function syncToken(): string | null {
   const t = process.env.INWOICE_SYNC_TOKEN ?? "";
   return t.length >= 32 ? t : null;
 }
+
+/**
+ * Owner emails via Resend. Off unless RESEND_API_KEY and NOTIFY_EMAIL are set.
+ * MAIL_FROM needs a domain verified in Resend; without one Resend's test
+ * sender works, but only to the email the Resend account was made with.
+ */
+export function mailConfig() {
+  const apiKey = process.env.RESEND_API_KEY ?? "";
+  const to = (process.env.NOTIFY_EMAIL ?? "")
+    .split(",")
+    .map((e) => e.trim())
+    .filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+  if (!apiKey || !to.length || storeMode() === "demo") return null;
+  return { apiKey, to, from: process.env.MAIL_FROM || "Stix N Vibes shop <onboarding@resend.dev>" };
+}

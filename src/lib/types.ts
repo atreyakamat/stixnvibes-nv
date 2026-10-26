@@ -68,6 +68,10 @@ export type Product = {
   minQty: number;
   options: OptionGroup[];
   customFields: CustomField[];
+  /** Units in hand. null = not counted (made to order); 0 = sold out. */
+  stock: number | null;
+  /** Admin warning when stock drops to this or below. */
+  lowStockAt: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -162,11 +166,61 @@ export type Order = {
   totalPaise: number;
   offers: AppliedOffer[];
   adminNote: string;
+  /** Uppercase coupon code used, or "". Its discount is in `offers`. */
+  couponCode: string;
+  /** Where the customer came from, e.g. "stall-wordsup". "" = direct. */
+  source: string;
+  /** Customer's Instagram username without the @, or "". */
+  instagram: string;
+  /** True once this order's items were taken off stock. */
+  stockTaken: boolean;
   createdAt: string;
   updatedAt: string;
 };
 
-export const EVENT_TYPES = ["view", "add_to_cart", "order_click", "ask_click"] as const;
+/** A code customers type at checkout: % off or a flat amount off. */
+export type Coupon = {
+  code: string;
+  description: string;
+  percent: number | null;
+  amountPaise: number | null;
+  minOrderPaise: number;
+  /** null = unlimited; counts orders that weren't cancelled. */
+  maxUses: number | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  /** Where it's handed out, e.g. "WordsUp stall". */
+  source: string;
+  active: boolean;
+  createdAt: string;
+};
+
+export const CUSTOM_STATUSES = ["new", "quoted", "won", "lost"] as const;
+export type CustomStatus = (typeof CUSTOM_STATUSES)[number];
+export const CUSTOM_KINDS = ["sticker", "sheet", "poster", "music-card", "wall-card", "other"] as const;
+export type CustomKind = (typeof CUSTOM_KINDS)[number];
+
+/** A customer's own design sent from /custom for a quote. */
+export type CustomRequest = {
+  id: string;
+  number: string;
+  status: CustomStatus;
+  customerName: string;
+  customerPhone: string;
+  instagram: string;
+  kind: CustomKind;
+  size: string;
+  qty: number;
+  note: string;
+  /** Upload ids of the design files. */
+  files: string[];
+  source: string;
+  adminNote: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const EVENT_TYPES = ["view", "add_to_cart", "order_click", "ask_click", "visit", "checkout"] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
 export type Upload = { id: string; path: string; contentType: string };
@@ -192,13 +246,25 @@ export type Settings = {
 };
 
 export type Stats = {
+  /** Browser sessions that opened the shop. */
+  visits: number;
   views: number;
   addToCart: number;
+  /** Times the checkout page was opened. */
+  checkouts: number;
   orderClicks: number;
   askClicks: number;
+  /** Orders placed, excluding cancelled. */
   orders: number;
   orderValuePaise: number;
+  /** Orders confirmed or further along: real sales. */
+  sales: number;
+  salesPaise: number;
+  paid: number;
   topViewed: { productId: string; count: number }[];
   topOrdered: { productId: string; qty: number }[];
-  daily: { day: string; views: number; orders: number }[];
+  byType: { type: string; qty: number; paise: number }[];
+  bySource: { source: string; visits: number | null; orders: number | null; sales: number | null; salesPaise: number | null }[];
+  byCoupon: { code: string; orders: number; sales: number; salesPaise: number; discountPaise: number }[];
+  daily: { day: string; views: number; visits: number; orders: number; salesPaise: number }[];
 };

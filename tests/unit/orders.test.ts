@@ -16,6 +16,9 @@ const details = {
   fulfilment: "delivery" as const,
   address: { line: "12 Rua de Ourem, Fontainhas", city: "Panaji", state: "Goa", pincode: "403001" },
   customerNote: "",
+  couponCode: "",
+  source: "",
+  instagram: "",
 };
 
 const products = demoProducts();
@@ -172,6 +175,7 @@ describe("customers", () => {
     discountPaise: 0,
     totalPaise: 1000,
     offers: [],
+    stockTaken: false,
     createdAt: "2026-10-01T00:00:00Z",
     updatedAt: "2026-10-01T00:00:00Z",
     ...details,

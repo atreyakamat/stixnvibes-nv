@@ -108,6 +108,9 @@ export default async function ProductsPage({ searchParams }: PageProps<"/admin/p
                   <td className="px-4 py-3">
                     {STATUS[p.status]}
                     {p.soldOut && <span className="ml-1 text-[#ffb020]">· Sold out</span>}
+                    {p.stock !== null && (
+                      <span className={`ml-1 ${p.stock <= p.lowStockAt ? "text-[#ffb020]" : "text-mute"}`}>· {p.stock} in stock</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <form action={quickProductAction} className="flex flex-wrap gap-1">

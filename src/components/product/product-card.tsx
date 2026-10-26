@@ -1,11 +1,12 @@
 import Link from "next/link";
+import { isSoldOut } from "@/lib/pricing";
 import type { Product } from "@/lib/types";
 import { CardPrice } from "./card-price";
 
 
 export function ProductCard({ product, priority = false }: { product: Product; priority?: boolean }) {
   const [first, ...rest] = product.images;
-  const tag = product.status === "upcoming" ? "Coming soon" : product.soldOut ? "Sold out" : product.badge;
+  const tag = product.status === "upcoming" ? "Coming soon" : isSoldOut(product) ? "Sold out" : product.badge;
 
   return (
     <Link
@@ -27,7 +28,7 @@ export function ProductCard({ product, priority = false }: { product: Product; p
         )}
         {rest.length > 0 && <span className="label absolute bottom-3 right-3 rounded-full bg-ink/80 px-2 py-1 text-mute">+{rest.length}</span>}
         {tag && (
-          <span className={`label absolute left-3 top-3 rounded-full px-3 py-1.5 ${product.status === "live" && !product.soldOut ? "bg-lemon text-ink" : "bg-paper text-ink"}`}>
+          <span className={`label absolute left-3 top-3 rounded-full px-3 py-1.5 ${product.status === "live" && !isSoldOut(product) ? "bg-lemon text-ink" : "bg-paper text-ink"}`}>
             {tag}
           </span>
         )}

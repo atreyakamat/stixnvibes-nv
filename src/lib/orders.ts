@@ -2,9 +2,9 @@ import "server-only";
 import { randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { site } from "@/content/site";
 import { UPLOAD_ID_RE } from "@/lib/constants";
-import { canOrder, liveOffers, minQtyShortfalls, resolveOptions, totals } from "@/lib/pricing";
+import { canOrder, COUPON_CODE_RE, liveOffers, minQtyShortfalls, normalizeCode, resolveOptions, stockShortfalls, totals } from "@/lib/pricing";
 import { getStore } from "@/lib/store";
-import type { Offer, Order, OrderLine, Product } from "@/lib/types";
+import type { Coupon, Offer, Order, OrderLine, OrderStatus, Product } from "@/lib/types";
 import type { OrderInput } from "@/lib/validation";
 import { orderMessage } from "@/lib/instagram";
 
@@ -57,7 +57,7 @@ export function webLink(value: string): string | null {
  * Prices the cart from the live catalog. The browser only sends ids,
  * picked options and typed text; prices always come from here.
  */
-export function priceLines(input: OrderInput["lines"], products: Product[], offers: Offer[]) {
+export function priceLines(input: OrderInput["lines"], products: Product[], offers: Offer[], coupon?: Coupon | null, couponUses = 0) {
   const problems: { productId: string; reason: string }[] = [];
   const lines: OrderLine[] = [];
 
@@ -115,7 +115,10 @@ export function priceLines(input: OrderInput["lines"], products: Product[], offe
   for (const s of minQtyShortfalls(lines, products)) {
     problems.push({ productId: s.productId, reason: `${s.name}: the minimum is ${s.minQty} per order. Add ${s.need} more.` });
   }
-  const t = totals(lines, offers);
+  for (const s of stockShortfalls(lines, products)) {
+    problems.push({ productId: s.productId, reason: `${s.name}: only ${s.stock} left. Lower the quantity to ${s.stock}.` });
+  }
+  const t = totals(lines, offers, coupon, couponUses);
   return { lines, problems, ...t };
 }
 
@@ -125,8 +128,11 @@ export async function createOrder(input: OrderInput): Promise<{ order: Order }> 
   const [products, allOffers, settings] = await Promise.all([store.listProducts(), store.listOffers(), store.getSettings()]);
   if (!settings.storeOpen) throw new OrderError("Online orders are paused. Message us on Instagram.");
 
-  const priced = priceLines(input.lines, products, liveOffers(allOffers));
+  const coupon = await findCoupon(input.couponCode);
+  const uses = coupon ? await store.couponUses(coupon.code) : 0;
+  const priced = priceLines(input.lines, products, liveOffers(allOffers), coupon, uses);
   if (priced.problems.length) throw new OrderError(priced.problems[0].reason, priced.problems);
+  if (priced.couponProblem) throw new OrderError(`${priced.couponProblem} Remove it to order without it.`);
 
   let order: Order | null = null;
   for (let attempt = 0; attempt < 4 && !order; attempt++) {
@@ -144,6 +150,9 @@ export async function createOrder(input: OrderInput): Promise<{ order: Order }> 
         discountPaise: priced.discountPaise,
         totalPaise: priced.totalPaise,
         offers: priced.applied,
+        couponCode: priced.couponCode,
+        source: input.source,
+        instagram: input.instagram,
       });
     } catch (err) {
       if (!/duplicate/i.test((err as Error).message) || attempt === 3) throw err;
@@ -151,4 +160,30 @@ export async function createOrder(input: OrderInput): Promise<{ order: Order }> 
   }
 
   return { order: order! };
+}
+
+/** The coupon for a typed code. Throws a friendly error for an unknown one. */
+export async function findCoupon(code: string | undefined): Promise<Coupon | null> {
+  const c = normalizeCode(code ?? "");
+  if (!c) return null;
+  const coupon = COUPON_CODE_RE.test(c) ? await getStore().getCoupon(c) : null;
+  if (!coupon) throw new OrderError(`We don't know the code ${c}. Check it, or remove it to order without it.`);
+  return coupon;
+}
+
+/** Statuses that mean the order is real and its items are spoken for. */
+const HOLDS_STOCK: OrderStatus[] = ["confirmed", "paid", "shipped", "done"];
+
+/**
+ * Changes an order's status and keeps stock in step: items come off stock
+ * when an order is first confirmed (or later), and go back if it's
+ * cancelled or set back to new.
+ */
+export async function setOrderStatus(number: string, status: OrderStatus, adminNote?: string): Promise<Order> {
+  const store = getStore();
+  const order = await store.updateOrder(number, adminNote === undefined ? { status } : { status, adminNote });
+  const hold = HOLDS_STOCK.includes(status);
+  if (hold && !order.stockTaken) await store.moveStock(number, -1);
+  if (!hold && order.stockTaken) await store.moveStock(number, 1);
+  return order;
 }

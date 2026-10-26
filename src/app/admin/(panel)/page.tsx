@@ -39,9 +39,11 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
   ];
 
   const unpriced = products.filter((p) => p.status === "live" && p.pricePaise === null).length;
+  const lowStock = products.filter((p) => p.status !== "hidden" && p.stock !== null && p.stock <= p.lowStockAt).length;
   const warnings = [
     !settings.storeOpen && "Online orders are paused. Turn them on in Settings.",
     unpriced > 0 && `${unpriced} live product${unpriced === 1 ? " has" : "s have"} no price, so customers see "Ask on Instagram".`,
+    lowStock > 0 && `${lowStock} product${lowStock === 1 ? " is" : "s are"} low on stock or sold out. See Analytics.`,
   ].filter(Boolean) as string[];
 
   return (

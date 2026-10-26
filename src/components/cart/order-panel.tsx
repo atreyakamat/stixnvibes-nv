@@ -5,16 +5,16 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { formatINR } from "@/lib/money";
 import { normalizePhone } from "@/lib/phone";
-import { track } from "@/lib/track";
+import { getSource, track } from "@/lib/track";
 import type { Address, Fulfilment } from "@/lib/types";
-import { orderMessage } from "@/lib/instagram";
+import { cleanHandle, INSTAGRAM_HANDLE_RE, orderMessage } from "@/lib/instagram";
 import { CopyAndDm } from "../copy-and-dm";
 import { useCart } from "./cart-context";
 
-type Details = { name: string; phone: string; fulfilment: Fulfilment; address: Address; note: string };
+type Details = { name: string; phone: string; instagram: string; fulfilment: Fulfilment; address: Address; note: string };
 
 const DETAILS_KEY = "snv-details-v1";
-const EMPTY: Details = { name: "", phone: "", fulfilment: "delivery", address: { line: "", city: "", state: "Goa", pincode: "" }, note: "" };
+const EMPTY: Details = { name: "", phone: "", instagram: "", fulfilment: "delivery", address: { line: "", city: "", state: "Goa", pincode: "" }, note: "" };
 
 function loadDetails(): Details {
   try {
@@ -30,6 +30,8 @@ function check(d: Details): Record<string, string> {
   const e: Record<string, string> = {};
   if (d.name.trim().length < 2) e.name = "Add your name.";
   if (!normalizePhone(d.phone)) e.phone = "Add a 10-digit mobile number.";
+  const ig = cleanHandle(d.instagram);
+  if (ig && !INSTAGRAM_HANDLE_RE.test(ig)) e.instagram = "That doesn't look like an Instagram username.";
   if (d.fulfilment === "delivery") {
     if (d.address.line.trim().length < 5) e.line = "Add your delivery address.";
     if (d.address.city.trim().length < 2) e.city = "Add your city.";
@@ -82,8 +84,8 @@ function Nudges() {
   return (
     <>
       {shortfalls.map((s) => (
-        <p key={s.productId} className="rounded-xl bg-[#ff7a59]/10 px-3 py-2 text-sm text-[#ffb59f]" role="alert">
-          {s.name}: minimum {s.minQty} per order. Add {s.need} more to check out.
+        <p key={`${s.productId}-${s.stock ?? "min"}`} className="rounded-xl bg-[#ff7a59]/10 px-3 py-2 text-sm text-[#ffb59f]" role="alert">
+          {s.stock !== undefined ? `${s.name}: only ${s.stock} left. Lower the quantity to check out.` : `${s.name}: minimum ${s.minQty} per order. Add ${s.need} more to check out.`}
         </p>
       ))}
       {hints.map((h) => (
@@ -95,12 +97,78 @@ function Nudges() {
   );
 }
 
+function CouponField() {
+  const { coupon, couponCode, couponProblem, applyCode, removeCode } = useCart();
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  if (coupon) {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2 text-sm">
+        <span>
+          Code <strong className="font-mono">{coupon.code}</strong>
+          {couponCode ? <span className="text-lemon"> applied</span> : couponProblem ? <span className="block text-[#ffb59f]">{couponProblem}</span> : null}
+        </span>
+        <button type="button" className="shrink-0 text-mute underline underline-offset-2 hover:text-paper" onClick={removeCode} aria-label={`Remove code ${coupon.code}`}>
+          Remove
+        </button>
+      </div>
+    );
+  }
+  if (!open)
+    return (
+      <button type="button" className="text-sm text-mute underline underline-offset-2 hover:text-paper" onClick={() => setOpen(true)}>
+        Have a code?
+      </button>
+    );
+
+  async function apply() {
+    setBusy(true);
+    setError((await applyCode(value)) ?? "");
+    setBusy(false);
+  }
+  return (
+    <div>
+      <div className="flex gap-2">
+        <label className="sr-only" htmlFor="f-code">
+          Code
+        </label>
+        <input
+          id="f-code"
+          value={value}
+          onChange={(e) => setValue(e.target.value.toUpperCase())}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void apply();
+            }
+          }}
+          maxLength={20}
+          placeholder="CODE"
+          className="field !py-2.5 font-mono uppercase"
+          autoComplete="off"
+        />
+        <button type="button" className="btn btn-ghost !py-2.5" disabled={busy || !value.trim()} onClick={() => void apply()}>
+          {busy ? "…" : "Apply"}
+        </button>
+      </div>
+      {error && (
+        <p className="mt-1 text-xs text-[#ff7a59]" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /**
  * Totals, offer nudges and checkout. The drawer (compact) only shows totals
  * and links to the cart page, where the details form lives.
  */
 export function OrderPanel({ compact = false }: { compact?: boolean }) {
-  const { items, subtotalPaise, discountPaise, totalPaise, applied, shortfalls, config, clear, setDrawerOpen } = useCart();
+  const { items, subtotalPaise, discountPaise, totalPaise, applied, shortfalls, config, clear, setDrawerOpen, coupon } = useCart();
   const router = useRouter();
   const [d, setD] = useState<Details>(EMPTY);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -114,6 +182,10 @@ export function OrderPanel({ compact = false }: { compact?: boolean }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setD(loadDetails());
   }, []);
+
+  useEffect(() => {
+    if (!compact) track("checkout");
+  }, [compact]);
 
   if (compact) {
     return (
@@ -180,6 +252,9 @@ export function OrderPanel({ compact = false }: { compact?: boolean }) {
           fulfilment: d.fulfilment,
           address: d.address,
           customerNote: d.note,
+          instagram: d.instagram,
+          couponCode: coupon?.code ?? "",
+          source: getSource(),
         }),
       });
       const data = (await res.json().catch(() => ({}))) as { orderPath?: string; error?: string };
@@ -222,6 +297,7 @@ export function OrderPanel({ compact = false }: { compact?: boolean }) {
     <form className="space-y-4" onSubmit={order} noValidate>
       <Nudges />
       <Totals />
+      <CouponField />
 
       <fieldset className="space-y-3 border-t border-line pt-4">
         <legend className="label mb-3 text-mute">Your details</legend>
@@ -245,6 +321,24 @@ export function OrderPanel({ compact = false }: { compact?: boolean }) {
           />
         </label>
         {fieldError("phone")}
+        <label className="block">
+          <span className="mb-1 block text-sm text-paper/70">
+            Instagram username <span className="text-mute">(optional, so we can DM you)</span>
+          </span>
+          <input
+            id="f-instagram"
+            value={d.instagram}
+            onChange={(e) => set({ instagram: e.target.value })}
+            maxLength={60}
+            placeholder="@yourname"
+            className="field !py-2.5"
+            autoComplete="off"
+            autoCapitalize="none"
+            {...invalid("instagram")}
+          />
+          <span className="mt-1 block text-xs text-mute">No Instagram? We&apos;ll reach you on WhatsApp at the number above.</span>
+        </label>
+        {fieldError("instagram")}
 
         <div role="radiogroup" aria-label="Delivery or pickup" className="grid grid-cols-2 gap-2">
           {(

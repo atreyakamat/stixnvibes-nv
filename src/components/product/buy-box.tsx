@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useCart } from "@/components/cart/cart-context";
 import { QtyStepper } from "@/components/cart/qty-stepper";
 import { formatINR } from "@/lib/money";
-import { canOrder, defaultSelections, mrpFor, resolveOptions } from "@/lib/pricing";
+import { canOrder, defaultSelections, isSoldOut, mrpFor, resolveOptions } from "@/lib/pricing";
 import { track } from "@/lib/track";
 import type { Product } from "@/lib/types";
 import { askMessage } from "@/lib/instagram";
@@ -77,6 +77,7 @@ export function BuyBox({ product, url }: { product: Product; url: string }) {
         image: product.images[0] ?? null,
         unitPricePaise: unit,
         minQty: product.minQty,
+        stock: product.stock,
         selections: resolved.selections,
         optionLabels: resolved.labels,
         custom: filled,
@@ -107,6 +108,11 @@ export function BuyBox({ product, url }: { product: Product; url: string }) {
         )}
       </div>
       {product.minQty > 1 && product.status === "live" && <p className="text-sm text-paper/70">Minimum {product.minQty} per order. Mix different designs or songs.</p>}
+      {orderable && product.stock !== null && product.stock <= product.lowStockAt && (
+        <p className="text-sm font-medium text-[#ffb59f]" data-testid="low-stock">
+          Only {product.stock} left.
+        </p>
+      )}
       {offers.length > 0 && (
         <ul className="flex flex-wrap gap-2">
           {offers.map((o) => (
@@ -208,7 +214,7 @@ export function BuyBox({ product, url }: { product: Product; url: string }) {
           <p className="text-paper/70">
             {product.status === "upcoming"
               ? "Dropping soon. Message us to get it first."
-              : product.soldOut
+              : isSoldOut(product)
                 ? "Sold out right now. Message us and we'll tell you when it's back."
                 : !config.storeOpen
                   ? "Online orders are paused. Message us and we'll sort it out."

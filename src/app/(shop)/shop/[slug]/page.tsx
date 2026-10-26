@@ -5,7 +5,7 @@ import { BuyBox } from "@/components/product/buy-box";
 import { Gallery } from "@/components/product/gallery";
 import { ProductCard } from "@/components/product/product-card";
 import { site } from "@/content/site";
-import { fromPrice } from "@/lib/pricing";
+import { fromPrice, isSoldOut } from "@/lib/pricing";
 import { getProductBySlug, getShopState } from "@/lib/shop";
 import { PRODUCT_TYPES } from "@/lib/types";
 
@@ -52,7 +52,7 @@ export default async function ProductPage({ params }: PageProps<"/shop/[slug]">)
           "@type": "Offer",
           priceCurrency: "INR",
           price: (price / 100).toFixed(2),
-          availability: product.soldOut ? "https://schema.org/OutOfStock" : "https://schema.org/InStock",
+          availability: isSoldOut(product) ? "https://schema.org/OutOfStock" : "https://schema.org/InStock",
           url,
         },
       }),

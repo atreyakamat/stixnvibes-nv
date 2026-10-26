@@ -8,7 +8,7 @@ import { isImage } from "@/lib/upload-check";
 // Customer photos for custom products. Returns an id the cart keeps; the
 // order message links to /u/<id>, which only the shop owner needs to open.
 export async function POST(req: Request) {
-  if (!(await rateLimit("upload", 15, 10 * 60_000))) return json({ error: "Too many uploads. Try again in a few minutes." }, 429);
+  if (!(await rateLimit("upload", 30, 10 * 60_000))) return json({ error: "Too many uploads. Try again in a few minutes." }, 429);
   let form: FormData;
   try {
     form = await req.formData();
