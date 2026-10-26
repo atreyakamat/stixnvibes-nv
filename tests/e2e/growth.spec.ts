@@ -115,8 +115,10 @@ test("a customer sends their own design and it lands in admin, ready for a Cricu
   await expect(page.getByAltText("Design 1")).toBeVisible();
   await page.getByRole("link", { name: "Make a Cricut sheet from these designs" }).click();
 
-  // One design, 30 wanted: 5 cm stickers fit 12 to a Print Then Cut sheet.
+  // One square design, 30 wanted: 5 cm stickers fit 12 or 13 to an A4 Print Then Cut sheet.
+  await page.getByLabel("Sticker size (cm, long side)").fill("5");
   await expect(page.getByTestId("sheet-summary")).toHaveText("30 stickers on 3 sheets");
+  await expect(page.getByText(/^Sheet 1: 1[23] stickers$/)).toBeVisible();
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download PNG" }).first().click();
   const file = await (await download).path();
@@ -124,5 +126,6 @@ test("a customer sends their own design and it lands in admin, ready for a Cricu
   const png = readFileSync(file);
   expect(png.subarray(1, 4).toString()).toBe("PNG");
   expect(png.includes(Buffer.from("pHYs"))).toBe(true);
-  expect(png.readUInt32BE(16)).toBe(2025); // 6.75 in at 300 DPI
+  expect(png.readUInt32BE(16)).toBe(2160); // 7.2 in at 300 DPI
+  expect(png.readUInt32BE(20)).toBe(3186); // 10.62 in
 });

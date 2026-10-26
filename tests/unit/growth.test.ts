@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { mailOwner } from "@/lib/mail";
 import { priceLines } from "@/lib/orders";
 import { couponDiscount, couponProblem, isSoldOut, normalizeCode, stockShortfalls, totals } from "@/lib/pricing";
-import { crc32, DEFAULT_SPEC, designBox, layoutSheets, perSheet, specProblem, withDpi } from "@/lib/sheet-layout";
+import { dilate, emptyMask, nest, setCell } from "@/lib/nest";
+import { A4_TEMPLATE, blankSheet, CELL_IN, crc32, DEFAULT_SPEC, designBox, gapCells, inPrintArea, SHEET_PX, specProblem, withDpi } from "@/lib/sheet-layout";
 import { computeStats, MemoryStore } from "@/lib/store/memory";
 import { demoProducts, seedOffers } from "@/lib/store/seed";
 import type { Coupon, Order } from "@/lib/types";
@@ -228,32 +229,80 @@ describe("owner email", () => {
 });
 
 describe("Cricut sheets", () => {
-  it("fits 5 cm stickers on a Print Then Cut sheet and spills onto more sheets", () => {
-    const spec = { ...DEFAULT_SPEC, sizeIn: 5 / 2.54, borderIn: 0.15 / 2.54, gapIn: 0.4 / 2.54 };
-    const n = perSheet(1, spec);
-    expect(n).toBe(12); // 3 across × 4 down on 6.75 × 9.25 in
-    const sheets = layoutSheets([{ key: "a", aspect: 1, qty: 30 }], spec);
-    expect(sheets.map((s) => s.placements.length)).toEqual([12, 12, 6]);
-    expect(sheets[0]).toMatchObject({ widthPx: 2025, heightPx: 2775 });
-    // Nothing overlaps or leaves the sheet, border included.
-    const b = Math.round(spec.borderIn * 300);
-    for (const s of sheets) {
-      for (const p of s.placements) {
-        expect(p.x - b).toBeGreaterThanOrEqual(0);
-        expect(p.y - b).toBeGreaterThanOrEqual(0);
-        expect(p.x + p.w + b).toBeLessThanOrEqual(s.widthPx);
-        expect(p.y + p.h + b).toBeLessThanOrEqual(s.heightPx);
+  const square = (sideIn: number) => {
+    const n = Math.ceil(sideIn / CELL_IN);
+    const m = emptyMask(n, n);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) setCell(m, x, y);
+    return m;
+  };
+  /** An L: a square with its top-right quarter missing, so turning it matters. */
+  const ell = (sideIn: number, quarterTurns: number) => {
+    const n = Math.ceil(sideIn / CELL_IN);
+    const m = emptyMask(n, n);
+    for (let y = 0; y < n; y++)
+      for (let x = 0; x < n; x++) {
+        // Rotate the "missing" quarter around the square.
+        const [u, v] = [[x, y], [y, n - 1 - x], [n - 1 - x, n - 1 - y], [n - 1 - y, x]][quarterTurns];
+        if (!(u >= n / 2 && v < n / 2)) setCell(m, x, y);
       }
-      for (const [i, p] of s.placements.entries())
-        for (const q of s.placements.slice(i + 1)) expect(p.x + p.w + b <= q.x - b || q.x + q.w + b <= p.x - b || p.y + p.h + b <= q.y - b || q.y + q.h + b <= p.y - b).toBe(true);
+    return m;
+  };
+
+  it("uses the A4 Print Then Cut template: 7.2 × 10.62 in with stepped corners", () => {
+    expect(SHEET_PX).toEqual({ w: 2160, h: 3186 });
+    expect(inPrintArea(3.6, 5.3)).toBe(true);
+    expect(inPrintArea(0.1, 0.1)).toBe(false); // corner mark
+    expect(inPrintArea(1, 0.2)).toBe(false); // inside the long step
+    expect(inPrintArea(0.2, 1)).toBe(false);
+    expect(inPrintArea(1.3, 0.1)).toBe(true); // past the long step
+    expect(inPrintArea(0.4, 0.4)).toBe(true); // inside the L
+    expect(inPrintArea(7.1, 10.5)).toBe(false);
+    const g = blankSheet();
+    expect(g.fits(square(0.3), 0, 0)).toBe(false);
+    expect(g.fits(square(0.3), Math.round(1.28 / CELL_IN), 0)).toBe(true);
+    expect(g.fits(square(0.3), Math.round(0.34 / CELL_IN), Math.round(0.34 / CELL_IN))).toBe(true);
+  });
+
+  it("packs 5 cm stickers with a 3 mm gap, never overlapping, and spills onto more sheets", () => {
+    const pad = gapCells(0.3 / 2.54);
+    const shape = square(5 / 2.54);
+    const r = nest([{ key: "a", qty: 30, variants: [{ angle: 0, shape, clearance: dilate(shape, pad), pad }] }], blankSheet);
+    // 3 across × 4 down, plus one more in a 5th row between the corner marks.
+    expect(r.sheets.map((s) => s.length)).toEqual([13, 13, 4]);
+    // Replay the placements on fresh sheets: every sticker lands on free, printable cells.
+    for (const s of r.sheets) {
+      const g = blankSheet();
+      for (const p of s) {
+        expect(g.fits(shape, p.x, p.y)).toBe(true);
+        g.place(shape, p.x, p.y);
+      }
+      // And keeps the gap from each other.
+      for (const [i, p] of s.entries())
+        for (const q of s.slice(i + 1)) {
+          const apart = Math.max(Math.abs(p.x - q.x), Math.abs(p.y - q.y)) - shape.w;
+          expect(apart).toBeGreaterThanOrEqual(pad);
+        }
     }
   });
 
+  it("turns shapes so they interlock and fit more", () => {
+    const pad = gapCells(0.1);
+    const variant = (q: number) => {
+      const shape = ell(1.5, q);
+      return { angle: q * 90, shape, clearance: dilate(shape, pad), pad };
+    };
+    const still = nest([{ key: "l", qty: 200, variants: [variant(0)] }], blankSheet).sheets[0].length;
+    const turned = nest([{ key: "l", qty: 200, variants: [0, 1, 2, 3].map(variant) }], blankSheet).sheets[0].length;
+    expect(turned).toBeGreaterThan(still);
+  });
+
   it("keeps each design's shape and refuses stickers bigger than the sheet", () => {
-    expect(designBox(2, DEFAULT_SPEC)).toEqual({ w: 600, h: 300 });
-    expect(designBox(0.5, DEFAULT_SPEC)).toEqual({ w: 300, h: 600 });
-    expect(specProblem({ ...DEFAULT_SPEC, sizeIn: 8 })).toMatch(/don't fit/);
+    expect(designBox(2, 2)).toEqual({ w: 600, h: 300 });
+    expect(designBox(0.5, 2)).toEqual({ w: 300, h: 600 });
+    expect(specProblem({ ...DEFAULT_SPEC, sizeIn: 12 })).toMatch(/don't fit/);
     expect(specProblem(DEFAULT_SPEC)).toBeNull();
+    const huge = square(A4_TEMPLATE.widthIn + 1);
+    expect(nest([{ key: "x", qty: 1, variants: [{ angle: 0, shape: huge, clearance: huge, pad: 0 }] }], blankSheet).tooBig).toEqual(["x"]);
   });
 
   it("stamps 300 DPI into the PNG", () => {
