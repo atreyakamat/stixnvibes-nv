@@ -241,6 +241,8 @@ export type Settings = {
   upiId: string;
   /** Name shown in the customer's UPI app. */
   upiName: string;
+  /** 10-digit WhatsApp number customers send payment screenshots to. Empty hides the button. */
+  whatsappNumber: string;
   /** MRP shown struck through = price + this %, rounded up to the rupee. null = off. */
   mrpMarkupPercent: number | null;
 };

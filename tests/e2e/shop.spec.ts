@@ -149,7 +149,9 @@ test("UPI QR on the order page for a stall pickup", async ({ page, context }) =>
   await expect(page.getByLabel("Address")).toHaveCount(0);
   await page.getByRole("button", { name: "Place order" }).click();
   await expect(page).toHaveURL(/\/order\/SNV-/);
-  await expect(page.getByRole("heading", { name: "Pay with UPI" })).toBeVisible();
+  // Online payment is on in the test server, so the QR sits behind a link.
+  await page.getByRole("button", { name: "Or pay with the UPI QR" }).click();
+  await expect(page.getByRole("heading", { name: "Pay with the UPI QR" })).toBeVisible();
   await expect(page.getByRole("img", { name: "UPI QR code" })).toBeVisible();
   await expect(page.getByText("Paying to stixnvibes@okicici.")).toBeVisible();
 });

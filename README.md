@@ -40,6 +40,7 @@ Without Supabase keys the app runs in **demo mode**: data lives in memory, produ
 - **Codes**: % or ₹ off after offers, with optional dates, minimum order and use limit. `?code=X` on any link applies it in the cart; each code has a printable QR card. The server checks the code again when the order is placed.
 - **Stock**: optional count per product, taken when an order is confirmed and given back if it's cancelled. Low stock shows on the dashboard; the shop says "Only N left" and stops at zero.
 - **Custom requests** (`/custom`): the customer uploads up to 6 designs, says what to make and how many, and gets a `CUS-XXXXXX` ref. With Resend set up, each order and request is emailed to the owner.
+- **Payments**: optional "Pay now" through YouPI PG on the home lab, falling back to the UPI QR and a WhatsApp button when it's off or down. A signed webhook marks the order paid. Customers can download the QR and a receipt. See [docs/PAYMENTS.md](docs/PAYMENTS.md).
 - **Cricut sheets** (`/admin/sheets`): packs designs onto Print Then Cut sheets (shelf packing, white cut border, 300 DPI PNG with its DPI set).
 - **Admin** (`/admin`): dashboard (orders sent, order value, views, conversion, most viewed / ordered, daily chart), orders (status, private notes, customer photos), products (filters, quick hide / sold out / feature, duplicate, full editor with options, custom fields and photos), bulk add (one product per uploaded design), collections, offers, settings (Instagram account, notes, banner, pause orders).
 

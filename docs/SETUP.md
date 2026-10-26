@@ -42,6 +42,10 @@ v4 takes orders through Instagram DMs instead of WhatsApp. In **Admin → Settin
 4. **Codes & QR**: make a code per stall (e.g. `WORDSUP10`, "Where you hand it out" = `stall-wordsup`) and print its QR card. **Analytics** then shows visits, orders and sales per stall and per code.
 5. Read **Privacy** and **Terms** on the shop and check the promises are ones you'll keep: delete unused custom requests within 12 months, reply to data requests within 7 days, and the email address shown.
 
+### Online payments (optional)
+
+See [PAYMENTS.md](PAYMENTS.md) for YouPI PG on the home lab. Without it, set the UPI ID and the WhatsApp number in **Admin → Settings → Payments**, and order pages show the QR and a WhatsApp button.
+
 ## 3. Open the shop
 
 1. Go to `https://shop.stixnvibes.com/admin` and log in.

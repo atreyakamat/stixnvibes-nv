@@ -58,3 +58,25 @@ export function mailConfig() {
   if (!apiKey || !to.length || storeMode() === "demo") return null;
   return { apiKey, to, from: process.env.MAIL_FROM || "Stix N Vibes shop <onboarding@resend.dev>" };
 }
+
+/**
+ * YouPI PG, the self-hosted UPI gateway on the home lab. Off unless all three
+ * are set. YOUPI_URL is its public checkout address (https; plain http only
+ * for localhost, used in tests). The webhook secret is the merchant's
+ * webhook secret from the YouPI admin.
+ */
+export function youpiConfig() {
+  const raw = process.env.YOUPI_URL ?? "";
+  const merchantId = process.env.YOUPI_MERCHANT_ID ?? "";
+  const webhookSecret = process.env.YOUPI_WEBHOOK_SECRET ?? "";
+  if (!raw || !merchantId || webhookSecret.length < 16) return null;
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return null;
+  }
+  const local = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  if (url.protocol !== "https:" && !(local && url.protocol === "http:")) return null;
+  return { origin: url.origin, merchantId, webhookSecret };
+}

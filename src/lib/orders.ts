@@ -39,6 +39,18 @@ export function viewKeyMatches(order: Pick<Order, "viewKey">, key: string | unde
 }
 
 /** The message the customer sends us for an order, with their details and page link. */
+/**
+ * Whether the order total is final, so it can be paid now. Pickups and
+ * orders above the free shipping line are; other deliveries wait for the
+ * delivery charge to be agreed.
+ */
+export function totalIsFinal(order: Pick<Order, "fulfilment" | "totalPaise">, freeShippingAbovePaise: number | null): boolean {
+  return order.fulfilment === "pickup" || (freeShippingAbovePaise !== null && order.totalPaise >= freeShippingAbovePaise);
+}
+
+/** Orders that can still be paid for. */
+export const awaitingPayment = (order: Pick<Order, "status">) => order.status === "new" || order.status === "confirmed";
+
 export function messageFor(order: Order, freeShippingAbovePaise: number | null) {
   return orderMessage({ ...order, freeShippingAbovePaise, link: orderUrl(order) });
 }

@@ -230,6 +230,7 @@ export const DEFAULT_SETTINGS: Settings = {
   freeShippingAbovePaise: 25000,
   upiId: "",
   upiName: "Stix N Vibes",
+  whatsappNumber: "",
   mrpMarkupPercent: 20,
 };
 

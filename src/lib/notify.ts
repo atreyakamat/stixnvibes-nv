@@ -52,6 +52,25 @@ export async function notifyNewOrder(order: Order) {
   return mailOwner({ subject: `New order ${order.number} · ${formatINR(order.totalPaise)} · ${order.customerName}`, text, html });
 }
 
+/** An online payment came in, or one needs a look (wrong amount, already paid). */
+export async function notifyPayment(order: Order, p: { utr: string; paymentId: string; amountPaise: number }, problem?: string) {
+  const { text, html } = build(
+    problem ? `Check payment for ${order.number}` : `Paid online: ${order.number}, ${formatINR(p.amountPaise)}`,
+    [
+      ["Problem", problem ?? ""],
+      ["Customer", order.customerName],
+      ["Phone", formatPhone(order.customerPhone)],
+      ["Order total", formatINR(order.totalPaise)],
+      ["Paid", formatINR(p.amountPaise)],
+      ["UTR", p.utr],
+      ["YouPI payment", p.paymentId],
+      ["Next", problem ? "Check your bank app before doing anything with this order." : "Check the UTR in your bank app, then pack it."],
+    ],
+    `${site.url}/admin/orders/${order.number}`,
+  );
+  return mailOwner({ subject: `${problem ? "Check payment" : "Paid"} ${order.number} · ${formatINR(p.amountPaise)}`, text, html });
+}
+
 /** The bytes of an upload, for email attachments. null when it can't be read. */
 async function uploadBytes(id: string): Promise<Buffer | null> {
   const u = await getStore().readUpload(id);
