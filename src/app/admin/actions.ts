@@ -170,6 +170,7 @@ const productSchema = z.object({
       return n;
     }),
   lowStockAt: z.coerce.number().int().min(0).max(9999),
+  cost: money,
 });
 
 function editable(p: Product): ProductInput {
@@ -194,6 +195,7 @@ function editable(p: Product): ProductInput {
     customFields: p.customFields,
     stock: p.stock,
     lowStockAt: p.lowStockAt,
+    costPaise: p.costPaise,
   };
 }
 
@@ -222,6 +224,7 @@ function toProductInput(p: z.infer<typeof productSchema>): ProductInput {
     customFields: p.customFields,
     stock: p.stock,
     lowStockAt: p.lowStockAt,
+    costPaise: p.cost,
   };
 }
 
@@ -348,6 +351,7 @@ export async function bulkCreateAction(_: FormState, form: FormData): Promise<Fo
       customFields: structuredClone(t.customFields),
       stock: null,
       lowStockAt: 5,
+      costPaise: null,
     });
     created++;
   }
@@ -577,7 +581,10 @@ export async function saveSettingsAction(_: FormState, form: FormData): Promise<
   const markup = markupText === "" ? null : Number(markupText);
   if (markup !== null && (!Number.isInteger(markup) || markup < 0 || markup > 100)) return { error: "MRP markup is a whole % from 0 to 100, or blank." };
 
+  const store = getStore();
   const settings: Settings = {
+    // Costs and the goal are saved from their own form; keep them as they are.
+    ...(await store.getSettings()),
     storeOpen: form.get("storeOpen") === "on",
     announcement: text("announcement", 200),
     instagramHandle,
@@ -590,7 +597,7 @@ export async function saveSettingsAction(_: FormState, form: FormData): Promise<
     whatsappNumber,
     mrpMarkupPercent: markup,
   };
-  await getStore().saveSettings(settings);
+  await store.saveSettings(settings);
   refreshShop();
   return { ok: true, message: "Settings saved." };
 }

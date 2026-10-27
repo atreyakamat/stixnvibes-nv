@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { GoalCard } from "@/components/admin/goal-card";
 import { OrdersTable } from "@/components/admin/orders-table";
 import { requireAdmin } from "@/lib/admin/session";
+import { goalReport, istDayStart } from "@/lib/costs";
 import { formatINR } from "@/lib/money";
 import { getStore } from "@/lib/store";
 
@@ -20,12 +22,16 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
   since.setDate(since.getDate() - (days - 1));
 
   const store = getStore();
-  const [stats, orders, products, settings] = await Promise.all([
+  const [stats, orders, products, settings, stalls] = await Promise.all([
     store.stats(since.toISOString()),
     store.listOrders({ limit: 8 }),
     store.listProducts({ includeHidden: true }),
     store.getSettings(),
+    store.listStalls(),
   ]);
+  const goalSince = istDayStart(settings.goalStart);
+  const [goalOrders, goalSales] = await Promise.all([store.listOrders({ createdSince: goalSince, limit: 5000 }), store.listStallSales({ since: goalSince })]);
+  const goal = settings.goalPaise ? goalReport(settings, goalOrders, goalSales, stalls, products) : null;
   const name = (id: string) => products.find((p) => p.id === id)?.name ?? "Deleted product";
   const conversion = stats.views ? ((stats.orders / stats.views) * 100).toFixed(1) : "0";
   const newOrders = orders.filter((o) => o.status === "new").length;
@@ -73,6 +79,8 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
           ))}
         </ul>
       )}
+
+      {goal && <GoalCard r={goal} start={settings.goalStart} by={settings.goalBy} />}
 
       <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((c) => (

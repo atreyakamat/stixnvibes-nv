@@ -1,4 +1,5 @@
 import "server-only";
+import { timingSafeEqual } from "node:crypto";
 import { OrderError } from "@/lib/orders";
 import { StoreUnavailableError } from "@/lib/store";
 
@@ -20,4 +21,11 @@ export async function readJson(req: Request): Promise<unknown> {
   } catch {
     return null;
   }
+}
+
+/** True when the request carries `Authorization: Bearer <token>`. Constant time. */
+export function bearerMatches(req: Request, token: string) {
+  const got = Buffer.from(req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "");
+  const want = Buffer.from(token);
+  return got.length === want.length && timingSafeEqual(got, want);
 }

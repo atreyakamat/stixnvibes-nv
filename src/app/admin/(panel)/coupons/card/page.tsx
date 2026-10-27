@@ -21,7 +21,8 @@ export default async function QrCard({ searchParams }: PageProps<"/admin/coupons
   const coupon = code && COUPON_CODE_RE.test(code) ? await getStore().getCoupon(code) : null;
   if (code && !coupon) notFound();
   const source = coupon?.source || cleanSource(typeof sp.src === "string" ? sp.src : "") || `qr-${code.toLowerCase()}` || "qr";
-  const link = qrLink(source, coupon?.code);
+  const path = typeof sp.path === "string" ? sp.path : "/";
+  const link = qrLink(source, coupon?.code, path);
   const svg = await QRCode.toString(link, { type: "svg", margin: 1, errorCorrectionLevel: "M", color: { dark: "#0b0b0a", light: "#ffffff" } });
   const deal = coupon ? (coupon.percent !== null ? `${coupon.percent}% off` : `${formatINR(coupon.amountPaise!)} off`) : null;
 

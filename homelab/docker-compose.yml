@@ -1,0 +1,24 @@
+# Home lab add-ons for the shop: uptime checks for every service, and a daily
+# backup of the shop's data. Separate from the shop's own docker-compose.yml.
+#   1. cp .env.example .env and fill it in
+#   2. docker compose up -d
+#   3. open http://<server>:3001 and add the monitors in README.md
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:1.23.16
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./data/uptime-kuma:/app/data
+    mem_limit: 256m
+
+  backup:
+    build: ./backup
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: Asia/Kolkata
+    volumes:
+      - ./data/backups:/backups
+    mem_limit: 128m

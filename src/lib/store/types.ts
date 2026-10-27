@@ -1,10 +1,10 @@
-import type { Collection, Coupon, CustomRequest, CustomStatus, EventType, Offer, Order, OrderStatus, Product, Settings, Stats, Upload } from "@/lib/types";
+import type { BlogPost, College, Collection, Coupon, CustomRequest, CustomStatus, EventType, GalleryItem, Offer, Order, OrderStatus, Product, Settings, Stall, StallSale, Stats, Upload } from "@/lib/types";
 
 export type ProductInput = Omit<Product, "id" | "createdAt" | "updatedAt">;
 export type CollectionInput = Omit<Collection, "id" | "createdAt">;
 export type OfferInput = Omit<Offer, "id">;
-export type NewOrder = Omit<Order, "id" | "createdAt" | "updatedAt" | "status" | "adminNote" | "stockTaken">;
-export type OrderPatch = Partial<Pick<Order, "status" | "adminNote">>;
+export type NewOrder = Omit<Order, "id" | "createdAt" | "updatedAt" | "status" | "adminNote" | "stockTaken" | "trackingNumber">;
+export type OrderPatch = Partial<Pick<Order, "status" | "adminNote" | "trackingNumber">>;
 export type OrderFilter = {
   status?: OrderStatus;
   /** Matches order number, customer name or phone. */
@@ -12,11 +12,19 @@ export type OrderFilter = {
   limit?: number;
   /** Only orders changed after this ISO time (for the InWoice sync). */
   updatedSince?: string;
+  /** Only orders placed at or after this ISO time (for profit reports). */
+  createdSince?: string;
 };
 export type TrackEvent = { type: EventType; productId: string | null; path: string; source?: string };
 export type CouponInput = Omit<Coupon, "createdAt">;
 export type NewCustomRequest = Omit<CustomRequest, "id" | "createdAt" | "updatedAt" | "status" | "adminNote">;
 export type CustomRequestPatch = Partial<{ status: CustomStatus; adminNote: string }>;
+export type StallInput = Omit<Stall, "id" | "createdAt">;
+export type NewStallSale = Omit<StallSale, "createdAt">;
+export type StallSaleFilter = { stallId?: string; since?: string; limit?: number };
+export type PostInput = Omit<BlogPost, "id" | "createdAt" | "updatedAt">;
+export type GalleryInput = Omit<GalleryItem, "id" | "createdAt">;
+export type CollegeInput = Omit<College, "id" | "createdAt">;
 
 /**
  * Everything the app needs from persistence. Two implementations: Supabase
@@ -76,4 +84,35 @@ export interface Store {
 
   getSettings(): Promise<Settings>;
   saveSettings(settings: Settings): Promise<void>;
+
+  listStalls(): Promise<Stall[]>;
+  getStall(id: string): Promise<Stall | null>;
+  saveStall(id: string | null, input: StallInput): Promise<Stall>;
+  deleteStall(id: string): Promise<void>;
+
+  /**
+   * Stores a sale from stall mode and takes its items off stock. The same
+   * id sent twice is stored once: created is false the second time.
+   */
+  recordStallSale(sale: NewStallSale): Promise<{ sale: StallSale; created: boolean }>;
+  listStallSales(filter?: StallSaleFilter): Promise<StallSale[]>;
+  /** Deletes a sale (rung up by mistake) and puts its items back in stock. */
+  voidStallSale(id: string): Promise<void>;
+
+  listPosts(opts?: { includeDrafts?: boolean }): Promise<BlogPost[]>;
+  getPost(id: string): Promise<BlogPost | null>;
+  savePost(id: string | null, input: PostInput): Promise<BlogPost>;
+  deletePost(id: string): Promise<void>;
+
+  listGallery(opts?: { includeHidden?: boolean }): Promise<GalleryItem[]>;
+  saveGalleryItem(id: string | null, input: GalleryInput): Promise<GalleryItem>;
+  deleteGalleryItem(id: string): Promise<void>;
+
+  listColleges(opts?: { includeHidden?: boolean }): Promise<College[]>;
+  getCollege(id: string): Promise<College | null>;
+  saveCollege(id: string | null, input: CollegeInput): Promise<College>;
+  deleteCollege(id: string): Promise<void>;
+
+  /** Every table except analytics events, for the home lab backup. */
+  exportAll(): Promise<Record<string, unknown>>;
 }

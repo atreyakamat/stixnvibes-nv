@@ -52,6 +52,7 @@ export function ProductForm({ product, collections, initialType }: { product?: P
   const [minQty, setMinQty] = useState(String(product?.minQty ?? 1));
   const [stock, setStock] = useState(product?.stock == null ? "" : String(product.stock));
   const [lowStockAt, setLowStockAt] = useState(String(product?.lowStockAt ?? 5));
+  const [cost, setCost] = useState(paiseToRupees(product?.costPaise ?? null));
   const [groups, setGroups] = useState<GroupRow[]>(groupsFrom(product ?? tpl));
   const [fields, setFields] = useState<FieldRow[]>(product?.customFields ?? tpl.customFields);
 
@@ -74,6 +75,7 @@ export function ProductForm({ product, collections, initialType }: { product?: P
     minQty,
     stock,
     lowStockAt,
+    cost,
     options: groups.map((g) => ({ id: g.id, name: g.name, values: g.values.map((v) => ({ id: v.id, label: v.label, delta: v.delta })) })),
     customFields: fields,
   });
@@ -179,7 +181,7 @@ export function ProductForm({ product, collections, initialType }: { product?: P
         <section className={section}>
           <h2 className="font-medium">Price</h2>
           <p className="text-xs text-mute">Bulk prices (e.g. 6+ at ₹25) and buy-X-get-Y deals are set per product type under Offers.</p>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <label className="block">
               <span className={lbl}>Price ₹ (blank = ask on Instagram)</span>
               <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" className="field tabular-nums" placeholder="10" />
@@ -192,7 +194,12 @@ export function ProductForm({ product, collections, initialType }: { product?: P
               <span className={lbl}>Minimum per order</span>
               <input value={minQty} onChange={(e) => setMinQty(e.target.value)} inputMode="numeric" className="field tabular-nums" />
             </label>
+            <label className="block">
+              <span className={lbl}>Your cost ₹ per unit (blank = default)</span>
+              <input value={cost} onChange={(e) => setCost(e.target.value)} inputMode="decimal" className="field tabular-nums" placeholder="From Settings" />
+            </label>
           </div>
+          <p className="text-xs text-mute">Your cost is private. It only feeds profit on the dashboard and stall pages. Defaults per type and size are in Settings.</p>
         </section>
 
         <section className={section}>

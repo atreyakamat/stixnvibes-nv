@@ -44,3 +44,7 @@ next-env.d.ts
 # test output
 /test-results/
 /playwright-report/
+
+# home lab
+/homelab/data/
+/homelab/.env

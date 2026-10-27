@@ -13,6 +13,8 @@ test("a stall QR brings its code and source into the order, analytics and stock"
   const src = `stall-e2e-${info.project.name}`;
   // Scanning the stall QR: the code applies itself in the cart.
   await page.goto(`/?src=${src}&code=stall10`);
+  // The page saves the code once it's running; wait for that before moving on.
+  await expect.poll(() => page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))).toContain("STALL10");
   await page.goto("/shop/lofi-07");
   await page.getByRole("button", { name: "Increase quantity" }).click();
   await page.getByRole("button", { name: "Add to cart" }).click();
@@ -49,7 +51,7 @@ test("a stall QR brings its code and source into the order, analytics and stock"
   const before = await stockOf();
   await page.goto(`/admin/orders/${ref}`);
   await page.getByLabel("Status").selectOption("confirmed");
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("Saved.")).toBeVisible();
   expect(await stockOf()).toBe(before - 2);
 

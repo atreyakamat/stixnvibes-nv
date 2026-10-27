@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const YOUPI_SECRET = "e2e-only-webhook-secret-not-real";
+const BACKUP_TOKEN = "e2e-only-backup-token-not-real-0123456789";
 
 // Runs against a production build in demo mode (in-memory data, demo admin).
 export default defineConfig({
@@ -26,7 +27,7 @@ export default defineConfig({
       url: "http://localhost:3100",
       timeout: 240_000,
       reuseExistingServer: true,
-      env: { SHOP_DEMO_MODE: "true", YOUPI_URL: "http://localhost:3199", YOUPI_MERCHANT_ID: "e2e-merchant", YOUPI_WEBHOOK_SECRET: YOUPI_SECRET },
+      env: { SHOP_DEMO_MODE: "true", YOUPI_URL: "http://localhost:3199", YOUPI_MERCHANT_ID: "e2e-merchant", YOUPI_WEBHOOK_SECRET: YOUPI_SECRET, BACKUP_TOKEN },
     },
   ],
 });

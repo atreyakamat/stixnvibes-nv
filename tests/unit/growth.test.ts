@@ -130,6 +130,7 @@ describe("analytics", () => {
     source: "",
     instagram: "",
     stockTaken: false,
+    trackingNumber: "",
     createdAt: "2026-10-20T10:00:00Z",
     updatedAt: "2026-10-20T10:00:00Z",
     ...o,

@@ -8,6 +8,8 @@ const links = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/analytics", label: "Analytics" },
   { href: "/admin/orders", label: "Orders" },
+  { href: "/admin/packing", label: "Packing" },
+  { href: "/admin/stalls", label: "Stalls" },
   { href: "/admin/custom", label: "Custom requests" },
   { href: "/admin/customers", label: "Customers" },
   { href: "/admin/products", label: "Products" },
@@ -15,6 +17,9 @@ const links = [
   { href: "/admin/offers", label: "Offers" },
   { href: "/admin/coupons", label: "Codes & QR" },
   { href: "/admin/sheets", label: "Cricut sheets" },
+  { href: "/admin/blog", label: "Blog" },
+  { href: "/admin/gallery", label: "Library" },
+  { href: "/admin/colleges", label: "Colleges" },
   { href: "/admin/settings", label: "Settings" },
 ];
 

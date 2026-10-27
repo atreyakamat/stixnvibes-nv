@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { nav, site } from "@/content/site";
+import { moreNav, nav, site } from "@/content/site";
 import { Wordmark } from "./wordmark";
 
 const policies = [
@@ -13,12 +13,12 @@ export function SiteFooter() {
   const year = new Date().getFullYear();
   return (
     <footer className="relative mt-24 border-t border-line bg-ink">
-      <div className="container-x grid gap-12 pb-10 pt-16 md:grid-cols-12">
-        <div className="md:col-span-5">
+      <div className="container-x grid gap-12 pb-10 pt-16 sm:grid-cols-2 lg:grid-cols-12">
+        <div className="sm:col-span-2 lg:col-span-4">
           <Wordmark className="text-3xl" />
           <p className="mt-4 max-w-sm text-mute">{site.description}</p>
         </div>
-        <nav aria-label="Shop" className="md:col-span-2">
+        <nav aria-label="Shop" className="lg:col-span-2">
           <p className="label text-mute">Shop</p>
           <ul className="mt-4 space-y-2">
             {nav.map((item) => (
@@ -30,7 +30,19 @@ export function SiteFooter() {
             ))}
           </ul>
         </nav>
-        <nav aria-label="Policies" className="md:col-span-2">
+        <nav aria-label="More" className="lg:col-span-2">
+          <p className="label text-mute">More</p>
+          <ul className="mt-4 space-y-2">
+            {moreNav.map((item) => (
+              <li key={item.href}>
+                <Link href={item.href} className="hover:text-lemon">
+                  {item.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+        <nav aria-label="Policies" className="lg:col-span-2">
           <p className="label text-mute">Policies</p>
           <ul className="mt-4 space-y-2">
             {policies.map((item) => (
@@ -42,7 +54,7 @@ export function SiteFooter() {
             ))}
           </ul>
         </nav>
-        <div className="md:col-span-3">
+        <div className="lg:col-span-2">
           <p className="label text-mute">Talk to us</p>
           <ul className="mt-4 space-y-2">
             <li>

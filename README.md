@@ -41,6 +41,10 @@ Without Supabase keys the app runs in **demo mode**: data lives in memory, produ
 - **Stock**: optional count per product, taken when an order is confirmed and given back if it's cancelled. Low stock shows on the dashboard; the shop says "Only N left" and stops at zero.
 - **Custom requests** (`/custom`): the customer uploads up to 6 designs, says what to make and how many, and gets a `CUS-XXXXXX` ref. With Resend set up, each order and request is emailed to the owner.
 - **Payments**: optional "Pay now" through YouPI PG on the home lab, falling back to the UPI QR and a WhatsApp button when it's off or down. A signed webhook marks the order paid. Customers can download the QR and a receipt. See [docs/PAYMENTS.md](docs/PAYMENTS.md).
+- **Stalls and profit**: each pop-up's fee and costs, and a phone screen for stall sales (`/admin/stall`) that works with no signal and syncs later (cash or UPI, QR with the amount). Unit costs per type and size give profit per stall and against the goal on the dashboard.
+- **Shipping**: India Post only. A packing list of paid delivery orders, a tracking number per order, and a tracking block on the customer's order page.
+- **Content**: a blog (`/blog`, Markdown, rendered with no raw HTML), a photo library of stalls and events (`/gallery`), college pages (`/c/<name>`) with their code, stalls and best sellers, and a sticker pack builder (`/bundle`).
+- **Feeds and health**: an Instagram/Meta catalogue CSV (`/api/feeds/catalog`), `/api/health` for uptime checks, and a token-protected full export (`/api/integrations/backup`) for the nightly home lab backup in [homelab/](homelab/README.md).
 - **Cricut sheets** (`/admin/sheets`): packs designs onto Print Then Cut sheets (shelf packing, white cut border, 300 DPI PNG with its DPI set).
 - **Admin** (`/admin`): dashboard (orders sent, order value, views, conversion, most viewed / ordered, daily chart), orders (status, private notes, customer photos), products (filters, quick hide / sold out / feature, duplicate, full editor with options, custom fields and photos), bulk add (one product per uploaded design), collections, offers, settings (Instagram account, notes, banner, pause orders).
 
@@ -58,6 +62,10 @@ src/lib/pricing.ts   options and offers (shared by browser and server)
 src/lib/orders.ts    server-side pricing and order recording
 src/lib/instagram.ts Instagram DM links and the order message
 src/lib/store/       data layer: Supabase + in-memory demo store, seed catalog
-supabase/            SQL migration and starter catalog
+src/lib/costs.ts     unit costs, stall profit and the goal
+src/lib/stall.ts     stall mode pricing and sync checks
+public/stall-sw.js   keeps stall mode working offline
+supabase/            SQL migrations and starter catalog
+homelab/             Uptime Kuma and nightly backups for the home server
 tests/               unit (Vitest) and browser (Playwright) tests
 ```
