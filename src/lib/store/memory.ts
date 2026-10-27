@@ -1,6 +1,24 @@
-import type { Collection, Coupon, CustomRequest, Offer, Order, Product, Settings, Stats, Upload } from "@/lib/types";
-import { DEMO_SETTINGS, demoCoupons, demoProducts, seedCollections, seedOffers } from "./seed";
-import type { CollectionInput, CouponInput, CustomRequestPatch, NewCustomRequest, NewOrder, OfferInput, OrderFilter, OrderPatch, ProductInput, Store, TrackEvent } from "./types";
+import type { BlogPost, College, Collection, Coupon, CustomRequest, GalleryItem, Offer, Order, Product, Settings, Stall, StallSale, Stats, Upload } from "@/lib/types";
+import { DEMO_SETTINGS, demoColleges, demoCoupons, demoGallery, demoPosts, demoProducts, demoStallSales, demoStalls, seedCollections, seedOffers } from "./seed";
+import type {
+  CollectionInput,
+  CollegeInput,
+  CouponInput,
+  CustomRequestPatch,
+  GalleryInput,
+  NewCustomRequest,
+  NewOrder,
+  NewStallSale,
+  OfferInput,
+  OrderFilter,
+  OrderPatch,
+  PostInput,
+  ProductInput,
+  StallInput,
+  StallSaleFilter,
+  Store,
+  TrackEvent,
+} from "./types";
 
 type StoredEvent = TrackEvent & { at: string };
 
@@ -14,6 +32,11 @@ type State = {
   uploads: Map<string, Upload & { body: Buffer }>;
   events: StoredEvent[];
   settings: Settings;
+  stalls: Stall[];
+  stallSales: StallSale[];
+  posts: BlogPost[];
+  gallery: GalleryItem[];
+  colleges: College[];
 };
 
 const MAX_DEMO_FILE = 1.5 * 1024 * 1024;
@@ -155,6 +178,11 @@ export class MemoryStore implements Store {
       uploads: initial?.uploads ?? new Map(),
       events: initial?.events ?? [],
       settings: initial?.settings ?? { ...DEMO_SETTINGS },
+      stalls: initial?.stalls ?? demoStalls(),
+      stallSales: initial?.stallSales ?? demoStallSales(),
+      posts: initial?.posts ?? demoPosts(),
+      gallery: initial?.gallery ?? demoGallery(),
+      colleges: initial?.colleges ?? demoColleges(),
     };
   }
 
@@ -257,7 +285,7 @@ export class MemoryStore implements Store {
 
   async createOrder(input: NewOrder) {
     if (this.s.orders.some((o) => o.number === input.number)) throw new Error("duplicate order number");
-    const order: Order = { ...clone(input), id: uid("o"), status: "new", adminNote: "", stockTaken: false, createdAt: now(), updatedAt: now() };
+    const order: Order = { ...clone(input), id: uid("o"), status: "new", adminNote: "", stockTaken: false, trackingNumber: "", createdAt: now(), updatedAt: now() };
     this.s.orders.unshift(order);
     return clone(order);
   }
@@ -274,6 +302,7 @@ export class MemoryStore implements Store {
         .filter((o) => !filter?.status || o.status === filter.status)
         .filter((o) => !q || o.number.toLowerCase().includes(q) || o.customerName.toLowerCase().includes(q) || o.customerPhone.includes(q))
         .filter((o) => !filter?.updatedSince || o.updatedAt > filter.updatedSince)
+        .filter((o) => !filter?.createdSince || o.createdAt >= filter.createdSince)
         .sort((a, b) => (filter?.updatedSince ? a.updatedAt.localeCompare(b.updatedAt) : 0))
         .slice(0, filter?.limit ?? 200),
     );
@@ -290,7 +319,11 @@ export class MemoryStore implements Store {
     const o = this.s.orders.find((x) => x.number === number);
     if (!o || o.stockTaken === (sign === -1)) return;
     o.stockTaken = sign === -1;
-    for (const l of o.lines) {
+    this.adjustStock(o.lines, sign);
+  }
+
+  private adjustStock(lines: { productId: string; qty: number }[], sign: -1 | 1) {
+    for (const l of lines) {
       const p = this.s.products.find((x) => x.id === l.productId);
       if (p && p.stock !== null) p.stock = Math.max(0, p.stock + sign * l.qty);
     }
@@ -381,5 +414,147 @@ export class MemoryStore implements Store {
 
   async saveSettings(settings: Settings) {
     this.s.settings = clone(settings);
+  }
+
+  // Stalls ----------------------------------------------------------------
+
+  async listStalls() {
+    return clone([...this.s.stalls].sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name)));
+  }
+
+  async getStall(id: string) {
+    const st = this.s.stalls.find((x) => x.id === id);
+    return st ? clone(st) : null;
+  }
+
+  async saveStall(id: string | null, input: StallInput) {
+    if (id) {
+      const i = this.s.stalls.findIndex((x) => x.id === id);
+      if (i < 0) throw new Error("Stall not found");
+      this.s.stalls[i] = { ...this.s.stalls[i], ...clone(input) };
+      return clone(this.s.stalls[i]);
+    }
+    const st: Stall = { ...clone(input), id: uid("st"), createdAt: now() };
+    this.s.stalls.push(st);
+    return clone(st);
+  }
+
+  async deleteStall(id: string) {
+    this.s.stalls = this.s.stalls.filter((x) => x.id !== id);
+    for (const x of this.s.stallSales) if (x.stallId === id) x.stallId = null;
+    for (const g of this.s.gallery) if (g.stallId === id) g.stallId = null;
+  }
+
+  async recordStallSale(input: NewStallSale) {
+    const existing = this.s.stallSales.find((x) => x.id === input.id);
+    if (existing) return { sale: clone(existing), created: false };
+    const sale: StallSale = { ...clone(input), createdAt: now() };
+    this.s.stallSales.unshift(sale);
+    this.adjustStock(sale.lines, -1);
+    return { sale: clone(sale), created: true };
+  }
+
+  async listStallSales(filter?: StallSaleFilter) {
+    return clone(
+      this.s.stallSales
+        .filter((x) => !filter?.stallId || x.stallId === filter.stallId)
+        .filter((x) => !filter?.since || x.soldAt >= filter.since)
+        .sort((a, b) => b.soldAt.localeCompare(a.soldAt))
+        .slice(0, filter?.limit ?? 5000),
+    );
+  }
+
+  async voidStallSale(id: string) {
+    const sale = this.s.stallSales.find((x) => x.id === id);
+    if (!sale) return;
+    this.s.stallSales = this.s.stallSales.filter((x) => x.id !== id);
+    this.adjustStock(sale.lines, 1);
+  }
+
+  // Blog, gallery, colleges -------------------------------------------------
+
+  async listPosts(opts?: { includeDrafts?: boolean }) {
+    return clone(
+      this.s.posts
+        .filter((p) => opts?.includeDrafts || p.status === "published")
+        .sort((a, b) => (b.publishedAt ?? b.createdAt).localeCompare(a.publishedAt ?? a.createdAt)),
+    );
+  }
+
+  async getPost(id: string) {
+    const p = this.s.posts.find((x) => x.id === id);
+    return p ? clone(p) : null;
+  }
+
+  async savePost(id: string | null, input: PostInput) {
+    this.assertSlugFree(this.s.posts, input.slug, id ?? undefined);
+    if (id) {
+      const i = this.s.posts.findIndex((x) => x.id === id);
+      if (i < 0) throw new Error("Post not found");
+      this.s.posts[i] = { ...this.s.posts[i], ...clone(input), updatedAt: now() };
+      return clone(this.s.posts[i]);
+    }
+    const p: BlogPost = { ...clone(input), id: uid("post"), createdAt: now(), updatedAt: now() };
+    this.s.posts.push(p);
+    return clone(p);
+  }
+
+  async deletePost(id: string) {
+    this.s.posts = this.s.posts.filter((x) => x.id !== id);
+  }
+
+  async listGallery(opts?: { includeHidden?: boolean }) {
+    return clone(
+      this.s.gallery.filter((g) => opts?.includeHidden || g.visible).sort((a, b) => a.sortOrder - b.sortOrder || b.createdAt.localeCompare(a.createdAt)),
+    );
+  }
+
+  async saveGalleryItem(id: string | null, input: GalleryInput) {
+    if (id) {
+      const i = this.s.gallery.findIndex((x) => x.id === id);
+      if (i < 0) throw new Error("Photo not found");
+      this.s.gallery[i] = { ...this.s.gallery[i], ...clone(input) };
+      return clone(this.s.gallery[i]);
+    }
+    const g: GalleryItem = { ...clone(input), id: uid("g"), createdAt: now() };
+    this.s.gallery.push(g);
+    return clone(g);
+  }
+
+  async deleteGalleryItem(id: string) {
+    this.s.gallery = this.s.gallery.filter((x) => x.id !== id);
+  }
+
+  async listColleges(opts?: { includeHidden?: boolean }) {
+    return clone(this.s.colleges.filter((c) => opts?.includeHidden || c.active).sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)));
+  }
+
+  async getCollege(id: string) {
+    const c = this.s.colleges.find((x) => x.id === id);
+    return c ? clone(c) : null;
+  }
+
+  async saveCollege(id: string | null, input: CollegeInput) {
+    this.assertSlugFree(this.s.colleges, input.slug, id ?? undefined);
+    if (id) {
+      const i = this.s.colleges.findIndex((x) => x.id === id);
+      if (i < 0) throw new Error("College not found");
+      this.s.colleges[i] = { ...this.s.colleges[i], ...clone(input) };
+      return clone(this.s.colleges[i]);
+    }
+    const c: College = { ...clone(input), id: uid("col"), createdAt: now() };
+    this.s.colleges.push(c);
+    return clone(c);
+  }
+
+  async deleteCollege(id: string) {
+    this.s.colleges = this.s.colleges.filter((x) => x.id !== id);
+    for (const st of this.s.stalls) if (st.collegeId === id) st.collegeId = null;
+    for (const g of this.s.gallery) if (g.collegeId === id) g.collegeId = null;
+  }
+
+  async exportAll() {
+    // Uploaded files and analytics stay out, as in the Supabase export.
+    return clone(Object.fromEntries(Object.entries(this.s).filter(([k]) => k !== "uploads" && k !== "events")));
   }
 }

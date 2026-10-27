@@ -122,7 +122,7 @@ test("build a cart with offers and a music card, order and send it on Instagram,
   await expect(page.getByAltText("Your photo")).toBeVisible();
   await expect(page.getByText("12 Rua de Ourem, Fontainhas, Panaji, Goa 403001")).toBeVisible();
   await page.getByLabel("Status").selectOption("paid");
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("Saved.")).toBeVisible();
 
   // The customer shows up in Customers, built from their orders.
@@ -137,7 +137,7 @@ test("UPI QR on the order page for a stall pickup", async ({ page, context }) =>
   await adminLogin(page);
   await page.goto("/admin/settings");
   await page.getByLabel(/UPI ID for online payments/).fill("stixnvibes@okicici");
-  await page.getByRole("button", { name: /Save/ }).click();
+  await page.getByRole("button", { name: "Save settings" }).click();
   await expect(page.getByText("Settings saved.")).toBeVisible();
 
   await page.goto("/shop/lofi-05");
@@ -175,7 +175,7 @@ test("a festival campaign from a template runs with its banner, then switches of
   await page.goto("/admin/offers");
   const card = page.locator("li", { has: page.locator('input[value="Valentine\'s: 20% off music cards"]') }).last();
   await card.getByLabel("Active").uncheck();
-  await card.getByRole("button", { name: "Save" }).click();
+  await card.getByRole("button", { name: "Save", exact: true }).click();
   await expect(card.getByText("Saved.")).toBeVisible();
 });
 

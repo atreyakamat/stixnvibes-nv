@@ -1,5 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
-import { json } from "@/lib/api";
+import { bearerMatches, json } from "@/lib/api";
 import { syncToken } from "@/lib/env";
 import { orderUrl } from "@/lib/orders";
 import { getStoreOrNull } from "@/lib/store";
@@ -16,17 +15,11 @@ import { getStoreOrNull } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
-function authorised(req: Request, token: string) {
-  const got = Buffer.from(req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "");
-  const want = Buffer.from(token);
-  return got.length === want.length && timingSafeEqual(got, want);
-}
-
 export async function GET(req: Request) {
   const token = syncToken();
   // No token configured = the feed doesn't exist.
   if (!token) return json({ error: "Not found" }, 404);
-  if (!authorised(req, token)) return json({ error: "Unauthorised" }, 401);
+  if (!bearerMatches(req, token)) return json({ error: "Unauthorised" }, 401);
   const store = getStoreOrNull();
   if (!store) return json({ error: "Store not configured" }, 503);
 

@@ -44,6 +44,12 @@ export function syncToken(): string | null {
   return t.length >= 32 ? t : null;
 }
 
+/** Shared secret the home lab backup job uses. Empty = backups are off. */
+export function backupToken(): string | null {
+  const t = process.env.BACKUP_TOKEN ?? "";
+  return t.length >= 32 ? t : null;
+}
+
 /**
  * Owner emails via Resend. Off unless RESEND_API_KEY and NOTIFY_EMAIL are set.
  * MAIL_FROM needs a domain verified in Resend; without one Resend's test

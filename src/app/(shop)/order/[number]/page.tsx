@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { INDIA_POST_TRACKING_URL } from "@/lib/shipping";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import QRCode from "qrcode";
@@ -95,6 +96,15 @@ export default async function OrderPage({ params, searchParams }: PageProps<"/or
       <div className="mt-8 space-y-4 rounded-[1.5rem] border border-line p-5 md:p-6">
         <Steps order={order} />
         <p className="text-paper/80">{NEXT[order.status]}</p>
+        {order.trackingNumber && order.fulfilment === "delivery" && (
+          <p className="rounded-xl bg-paper/5 px-4 py-3 text-sm" data-testid="tracking">
+            Sent by India Post. Tracking number <span className="select-all font-mono text-lemon">{order.trackingNumber}</span>.{" "}
+            <a href={INDIA_POST_TRACKING_URL} target="_blank" rel="noopener" className="underline underline-offset-2">
+              Track it on India Post
+            </a>{" "}
+            (paste the number there).
+          </p>
+        )}
         {order.status === "new" && (
           <>
             {fresh && (

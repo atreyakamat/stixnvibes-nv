@@ -42,6 +42,17 @@ v4 takes orders through Instagram DMs instead of WhatsApp. In **Admin → Settin
 4. **Codes & QR**: make a code per stall (e.g. `WORDSUP10`, "Where you hand it out" = `stall-wordsup`) and print its QR card. **Analytics** then shows visits, orders and sales per stall and per code.
 5. Read **Privacy** and **Terms** on the shop and check the promises are ones you'll keep: delete unused custom requests within 12 months, reply to data requests within 7 days, and the email address shown.
 
+### Upgrading an existing shop to v7
+
+1. Run `supabase/migrations/0004_v7.sql` in **SQL Editor → New query** before the v7 code deploys. It adds a cost per product, India Post tracking numbers on orders, and tables for stalls, stall sales, blog posts, the photo library and college pages. It is safe to run twice. Until it's run, the new pages show empty and stall sales can't sync.
+2. **Settings → Unit costs and profit goal**: check what each thing costs you to make (sticker ₹5, poster ₹25, A3 poster ₹50, A4 framed ₹150, A3 framed ₹320, music card ₹4, wall card ₹10 are filled in) and the goal (₹3,00,000 by 31 Dec). A product's own cost, on its edit page, wins over these. The dashboard then shows profit against the goal.
+3. **Stalls**: add each pop-up with its date, venue, fee and other costs. After the day it shows takings, cash vs UPI, best sellers and profit.
+4. **Stall mode** (`/admin/stall`, on your phone): open it once with signal before the stall, and "Add to Home screen". It works with no signal: tap products, tap Cash or UPI, and the sale is saved on the phone. It sends the sales when signal comes back (tap the green/red button to send now). With your UPI ID in Settings, UPI shows a QR with the amount; otherwise use the printed QR. Admin logins last 12 hours, so log in again on the morning of the stall.
+5. **Packing**: paid delivery orders wait here. Paste the India Post number on the order (or in Packing), press **Save & mark shipped**, and copy the message for the customer. Their order page shows the number and a link to India Post tracking.
+6. **Blog**, **Library** and **Colleges** are in the admin menu. A college page lives at `/c/<name>` with its code, its upcoming public stalls, best sellers from its stalls and its photos. Print its QR card from the college page.
+7. **Instagram shop**: in Meta Commerce Manager, **Catalogue → Data sources → Data feed → Scheduled feed**, URL `https://shop.stixnvibes.com/api/feeds/catalog`, daily. Products with a price and a photo are listed; product links carry `?src=instagram-shop` so Analytics shows those sales.
+8. Optional, home lab uptime checks and nightly backups: set `BACKUP_TOKEN` in Netlify (32+ random characters) and follow [homelab/README.md](../homelab/README.md).
+
 ### Online payments (optional)
 
 See [PAYMENTS.md](PAYMENTS.md) for YouPI PG on the home lab. Without it, set the UPI ID and the WhatsApp number in **Admin → Settings → Payments**, and order pages show the QR and a WhatsApp button.
@@ -57,7 +68,7 @@ See [PAYMENTS.md](PAYMENTS.md) for YouPI PG on the home lab. Without it, set the
 ## Daily routine
 
 - A customer DMs the shop on Instagram with their order and its ref (`SNV-XXXXXX`). Open **Orders**, find the ref, check the items and any photos. Only confirm orders whose DM has come in: a confirmed order becomes an invoice in InWoice.
-- Move it along: Confirmed → Paid → Shipped → Done. Keep the phone number, address and courier in the private note.
+- Move it along: Confirmed → Paid → Shipped → Done. Paid delivery orders show under **Packing**; add the India Post number when it ships.
 - New designs: **Bulk add** or **Add product**. Upcoming designs: status "Coming soon".
 - Custom requests come in under **Custom requests** (and by email if set up). Quote on WhatsApp or Instagram, then set it to Quoted, Won or Lost.
 - Printing: **Cricut sheets** packs designs onto 6.75 × 9.25 in Print Then Cut sheets with no overlaps. Drop in files, or open it from an order or a custom request. Download each sheet as a PNG, upload it to Design Space as one image, and set its width to 6.75 in.

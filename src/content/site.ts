@@ -24,3 +24,11 @@ export const nav = [
   { href: "/collections", label: "Collections" },
   { href: "/custom", label: "Custom" },
 ] as const;
+
+/** Everything that isn't a product list: the footer and the mobile menu. */
+export const moreNav = [
+  { href: "/bundle", label: "Build a pack" },
+  { href: "/gallery", label: "Library" },
+  { href: "/blog", label: "Blog" },
+  { href: "/c", label: "Colleges" },
+] as const;

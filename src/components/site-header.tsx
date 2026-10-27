@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { nav, site } from "@/content/site";
+import { moreNav, nav, site } from "@/content/site";
 import { useCart } from "./cart/cart-context";
 import { Wordmark } from "./wordmark";
 
@@ -128,6 +128,15 @@ export function SiteHeader({ notice }: { notice?: string }) {
                 <li key={item.href}>
                   <Link href={item.href} className="display flex items-baseline gap-4 py-2 text-5xl hover:text-lemon">
                     <span className="label text-mute">0{i + 1}</span>
+                    {item.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <ul className="flex flex-wrap gap-x-6 gap-y-2 text-lg">
+              {moreNav.map((item) => (
+                <li key={item.href}>
+                  <Link href={item.href} className="hover:text-lemon">
                     {item.label}
                   </Link>
                 </li>

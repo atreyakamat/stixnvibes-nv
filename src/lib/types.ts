@@ -72,6 +72,8 @@ export type Product = {
   stock: number | null;
   /** Admin warning when stock drops to this or below. */
   lowStockAt: number;
+  /** What one unit costs to make. null = the default for its type in Settings. */
+  costPaise: number | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -174,6 +176,8 @@ export type Order = {
   instagram: string;
   /** True once this order's items were taken off stock. */
   stockTaken: boolean;
+  /** India Post consignment number, e.g. EE123456789IN. "" until shipped. */
+  trackingNumber: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -245,6 +249,111 @@ export type Settings = {
   whatsappNumber: string;
   /** MRP shown struck through = price + this %, rounded up to the rupee. null = off. */
   mrpMarkupPercent: number | null;
+  /**
+   * Unit cost in paise by product type ("poster") or type and option choice
+   * ("poster:a3"). A product's own cost beats both. See lib/costs.ts.
+   */
+  unitCosts: Record<string, number>;
+  /** Profit goal in paise, counted from goalStart (YYYY-MM-DD) to goalBy. */
+  goalPaise: number | null;
+  goalStart: string;
+  goalBy: string;
+};
+
+// Stalls ---------------------------------------------------------------------
+
+/** A pop-up stall: where, when and what it cost to be there. */
+export type Stall = {
+  id: string;
+  name: string;
+  /** YYYY-MM-DD, India time. */
+  date: string;
+  venue: string;
+  collegeId: string | null;
+  feePaise: number;
+  otherCostsPaise: number;
+  notes: string;
+  /** Listed on college pages as an upcoming stall. */
+  public: boolean;
+  createdAt: string;
+};
+
+export const PAYMENTS = ["cash", "upi"] as const;
+export type Payment = (typeof PAYMENTS)[number];
+
+/** A line of a stall sale. productId is "" for a one-off item typed in. */
+export type StallSaleLine = {
+  productId: string;
+  name: string;
+  type: ProductType | "other";
+  options: string[];
+  qty: number;
+  unitPricePaise: number;
+  lineTotalPaise: number;
+};
+
+/** A sale rung up in stall mode. The id is made on the phone. */
+export type StallSale = {
+  id: string;
+  stallId: string | null;
+  lines: StallSaleLine[];
+  subtotalPaise: number;
+  discountPaise: number;
+  totalPaise: number;
+  payment: Payment;
+  note: string;
+  soldAt: string;
+  createdAt: string;
+};
+
+// Content ----------------------------------------------------------------------
+
+export const POST_STATUSES = ["draft", "published"] as const;
+export type PostStatus = (typeof POST_STATUSES)[number];
+
+export type BlogPost = {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string;
+  /** Markdown, rendered by lib/markdown.ts. */
+  body: string;
+  cover: string;
+  tags: string[];
+  status: PostStatus;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** A photo in the library: stalls, events, work we've done. */
+export type GalleryItem = {
+  id: string;
+  image: string;
+  caption: string;
+  stallId: string | null;
+  collegeId: string | null;
+  tags: string[];
+  /** YYYY-MM-DD or null. */
+  takenOn: string | null;
+  visible: boolean;
+  sortOrder: number;
+  createdAt: string;
+};
+
+/** A college with its own page at /c/<slug>. */
+export type College = {
+  id: string;
+  slug: string;
+  name: string;
+  area: string;
+  description: string;
+  image: string;
+  couponCode: string;
+  productIds: string[];
+  active: boolean;
+  sortOrder: number;
+  createdAt: string;
 };
 
 export type Stats = {

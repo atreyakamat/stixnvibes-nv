@@ -1,0 +1,2 @@
+# 03:00 every night, Goa time (TZ is set in docker-compose.yml).
+0 3 * * * /usr/local/bin/backup.sh >> /proc/1/fd/1 2>&1

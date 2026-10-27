@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { OrderForm } from "@/components/admin/order-form";
+import { ShipForm } from "@/components/admin/ship-form";
 import { formatDate } from "@/components/admin/orders-table";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { requireAdmin } from "@/lib/admin/session";
@@ -148,6 +149,11 @@ export default async function OrderPage({ params }: PageProps<"/admin/orders/[nu
         </section>
         <div className="space-y-3">
           <OrderForm order={order} />
+          {order.fulfilment === "delivery" && (
+            <div className="rounded-2xl border border-line p-5">
+              <ShipForm number={order.number} tracking={order.trackingNumber} pageUrl={order.viewKey ? orderUrl(order) : null} shipped={order.status === "shipped" || order.status === "done"} />
+            </div>
+          )}
           <Link href={`/admin/sheets?order=${order.number}`} className="btn btn-ghost w-full justify-center !py-2.5">
             Make a Cricut sheet from this order
           </Link>

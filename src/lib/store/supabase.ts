@@ -1,9 +1,27 @@
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Collection, Coupon, CustomRequest, Offer, Order, Product, Settings, Stats } from "@/lib/types";
+import type { BlogPost, College, Collection, Coupon, CustomRequest, GalleryItem, Offer, Order, Product, Settings, Stall, StallSale, Stats } from "@/lib/types";
 import { EMPTY_STATS } from "./memory";
 import { DEFAULT_SETTINGS } from "./seed";
-import type { CollectionInput, CouponInput, CustomRequestPatch, NewCustomRequest, NewOrder, OfferInput, OrderFilter, OrderPatch, ProductInput, Store, TrackEvent } from "./types";
+import type {
+  CollectionInput,
+  CollegeInput,
+  CouponInput,
+  CustomRequestPatch,
+  GalleryInput,
+  NewCustomRequest,
+  NewOrder,
+  NewStallSale,
+  OfferInput,
+  OrderFilter,
+  OrderPatch,
+  PostInput,
+  ProductInput,
+  StallInput,
+  StallSaleFilter,
+  Store,
+  TrackEvent,
+} from "./types";
 
 type Row = Record<string, unknown>;
 
@@ -30,6 +48,7 @@ function toProduct(r: Row): Product {
     customFields: (r.custom_fields as Product["customFields"]) ?? [],
     stock: (r.stock as number | null) ?? null,
     lowStockAt: (r.low_stock_at as number) ?? 5,
+    costPaise: (r.cost_paise as number | null) ?? null,
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
   };
@@ -57,6 +76,7 @@ function productRow(p: ProductInput): Row {
     custom_fields: p.customFields,
     stock: p.stock,
     low_stock_at: p.lowStockAt,
+    cost_paise: p.costPaise,
     updated_at: new Date().toISOString(),
   };
 }
@@ -115,6 +135,7 @@ function toOrder(r: Row): Order {
     source: (r.source as string) ?? "",
     instagram: (r.instagram as string) ?? "",
     stockTaken: Boolean(r.stock_taken),
+    trackingNumber: (r.tracking_number as string) ?? "",
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
   };
@@ -153,6 +174,83 @@ function toCustom(r: Row): CustomRequest {
     adminNote: (r.admin_note as string) ?? "",
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
+  };
+}
+
+function toStall(r: Row): Stall {
+  return {
+    id: r.id as string,
+    name: r.name as string,
+    date: r.date as string,
+    venue: (r.venue as string) ?? "",
+    collegeId: (r.college_id as string | null) ?? null,
+    feePaise: (r.fee_paise as number) ?? 0,
+    otherCostsPaise: (r.other_costs_paise as number) ?? 0,
+    notes: (r.notes as string) ?? "",
+    public: r.public !== false,
+    createdAt: r.created_at as string,
+  };
+}
+
+function toSale(r: Row): StallSale {
+  return {
+    id: r.id as string,
+    stallId: (r.stall_id as string | null) ?? null,
+    lines: r.lines as StallSale["lines"],
+    subtotalPaise: r.subtotal_paise as number,
+    discountPaise: r.discount_paise as number,
+    totalPaise: r.total_paise as number,
+    payment: r.payment as StallSale["payment"],
+    note: (r.note as string) ?? "",
+    soldAt: r.sold_at as string,
+    createdAt: r.created_at as string,
+  };
+}
+
+function toPost(r: Row): BlogPost {
+  return {
+    id: r.id as string,
+    slug: r.slug as string,
+    title: r.title as string,
+    excerpt: (r.excerpt as string) ?? "",
+    body: (r.body as string) ?? "",
+    cover: (r.cover as string) ?? "",
+    tags: (r.tags as string[]) ?? [],
+    status: r.status as BlogPost["status"],
+    publishedAt: (r.published_at as string | null) ?? null,
+    createdAt: r.created_at as string,
+    updatedAt: r.updated_at as string,
+  };
+}
+
+function toGallery(r: Row): GalleryItem {
+  return {
+    id: r.id as string,
+    image: r.image as string,
+    caption: (r.caption as string) ?? "",
+    stallId: (r.stall_id as string | null) ?? null,
+    collegeId: (r.college_id as string | null) ?? null,
+    tags: (r.tags as string[]) ?? [],
+    takenOn: (r.taken_on as string | null) ?? null,
+    visible: r.visible !== false,
+    sortOrder: (r.sort_order as number) ?? 0,
+    createdAt: r.created_at as string,
+  };
+}
+
+function toCollege(r: Row): College {
+  return {
+    id: r.id as string,
+    slug: r.slug as string,
+    name: r.name as string,
+    area: (r.area as string) ?? "",
+    description: (r.description as string) ?? "",
+    image: (r.image as string) ?? "",
+    couponCode: (r.coupon_code as string) ?? "",
+    productIds: (r.product_ids as string[]) ?? [],
+    active: r.active !== false,
+    sortOrder: (r.sort_order as number) ?? 0,
+    createdAt: r.created_at as string,
   };
 }
 
@@ -308,6 +406,7 @@ export class SupabaseStore implements Store {
     const s = filter?.search?.trim().replace(/[%,()"]/g, "");
     if (s) q = q.or(`number.ilike.%${s}%,customer_name.ilike.%${s}%,customer_phone.ilike.%${s}%`);
     if (filter?.updatedSince) q = q.gt("updated_at", filter.updatedSince);
+    if (filter?.createdSince) q = q.gte("created_at", filter.createdSince);
     return (check(await q) as Row[]).map(toOrder);
   }
 
@@ -315,6 +414,7 @@ export class SupabaseStore implements Store {
     const row: Row = { updated_at: new Date().toISOString() };
     if (patch.status !== undefined) row.status = patch.status;
     if (patch.adminNote !== undefined) row.admin_note = patch.adminNote;
+    if (patch.trackingNumber !== undefined) row.tracking_number = patch.trackingNumber;
     return toOrder(check(await this.db.from("orders").update(row).eq("number", number).select("*").single()) as Row);
   }
 
@@ -440,5 +540,179 @@ export class SupabaseStore implements Store {
 
   async saveSettings(settings: Settings) {
     check(await this.db.from("settings").upsert({ id: 1, data: settings }));
+  }
+
+  // Stalls ----------------------------------------------------------------
+
+  async listStalls() {
+    return (check(await this.db.from("stalls").select("*").order("date", { ascending: false }).order("name")) as Row[]).map(toStall);
+  }
+
+  async getStall(id: string) {
+    const data = check(await this.db.from("stalls").select("*").eq("id", id).maybeSingle());
+    return data ? toStall(data as Row) : null;
+  }
+
+  async saveStall(id: string | null, st: StallInput) {
+    const row = {
+      name: st.name,
+      date: st.date,
+      venue: st.venue,
+      college_id: st.collegeId,
+      fee_paise: st.feePaise,
+      other_costs_paise: st.otherCostsPaise,
+      notes: st.notes,
+      public: st.public,
+    };
+    const res = id ? await this.db.from("stalls").update(row).eq("id", id).select("*").single() : await this.db.from("stalls").insert(row).select("*").single();
+    return toStall(check(res) as Row);
+  }
+
+  async deleteStall(id: string) {
+    check(await this.db.from("stalls").delete().eq("id", id));
+  }
+
+  async recordStallSale(x: NewStallSale) {
+    const row = {
+      id: x.id,
+      stall_id: x.stallId,
+      lines: x.lines,
+      subtotal_paise: x.subtotalPaise,
+      discount_paise: x.discountPaise,
+      total_paise: x.totalPaise,
+      payment: x.payment,
+      note: x.note,
+      sold_at: x.soldAt,
+    };
+    // ignoreDuplicates: a sale synced twice returns no row the second time,
+    // so stock is only taken once.
+    const inserted = check(await this.db.from("stall_sales").upsert(row, { onConflict: "id", ignoreDuplicates: true }).select("*")) as Row[];
+    if (inserted.length) {
+      check(await this.db.rpc("adjust_stock", { p_lines: x.lines, p_sign: -1 }));
+      return { sale: toSale(inserted[0]), created: true };
+    }
+    const existing = check(await this.db.from("stall_sales").select("*").eq("id", x.id).single()) as Row;
+    return { sale: toSale(existing), created: false };
+  }
+
+  async listStallSales(filter?: StallSaleFilter) {
+    let q = this.db
+      .from("stall_sales")
+      .select("*")
+      .order("sold_at", { ascending: false })
+      .limit(filter?.limit ?? 5000);
+    if (filter?.stallId) q = q.eq("stall_id", filter.stallId);
+    if (filter?.since) q = q.gte("sold_at", filter.since);
+    return (check(await q) as Row[]).map(toSale);
+  }
+
+  async voidStallSale(id: string) {
+    const rows = check(await this.db.from("stall_sales").delete().eq("id", id).select("lines")) as Row[];
+    if (rows.length) check(await this.db.rpc("adjust_stock", { p_lines: rows[0].lines, p_sign: 1 }));
+  }
+
+  // Blog, gallery, colleges -------------------------------------------------
+
+  async listPosts(opts?: { includeDrafts?: boolean }) {
+    let q = this.db.from("blog_posts").select("*").order("published_at", { ascending: false, nullsFirst: true }).order("created_at", { ascending: false });
+    if (!opts?.includeDrafts) q = q.eq("status", "published");
+    return (check(await q) as Row[]).map(toPost);
+  }
+
+  async getPost(id: string) {
+    const data = check(await this.db.from("blog_posts").select("*").eq("id", id).maybeSingle());
+    return data ? toPost(data as Row) : null;
+  }
+
+  async savePost(id: string | null, p: PostInput) {
+    const row = {
+      slug: p.slug,
+      title: p.title,
+      excerpt: p.excerpt,
+      body: p.body,
+      cover: p.cover,
+      tags: p.tags,
+      status: p.status,
+      published_at: p.publishedAt,
+      updated_at: new Date().toISOString(),
+    };
+    const res = id ? await this.db.from("blog_posts").update(row).eq("id", id).select("*").single() : await this.db.from("blog_posts").insert(row).select("*").single();
+    return toPost(check(res) as Row);
+  }
+
+  async deletePost(id: string) {
+    check(await this.db.from("blog_posts").delete().eq("id", id));
+  }
+
+  async listGallery(opts?: { includeHidden?: boolean }) {
+    let q = this.db.from("gallery_items").select("*").order("sort_order").order("created_at", { ascending: false });
+    if (!opts?.includeHidden) q = q.eq("visible", true);
+    return (check(await q) as Row[]).map(toGallery);
+  }
+
+  async saveGalleryItem(id: string | null, g: GalleryInput) {
+    const row = {
+      image: g.image,
+      caption: g.caption,
+      stall_id: g.stallId,
+      college_id: g.collegeId,
+      tags: g.tags,
+      taken_on: g.takenOn,
+      visible: g.visible,
+      sort_order: g.sortOrder,
+    };
+    const res = id ? await this.db.from("gallery_items").update(row).eq("id", id).select("*").single() : await this.db.from("gallery_items").insert(row).select("*").single();
+    return toGallery(check(res) as Row);
+  }
+
+  async deleteGalleryItem(id: string) {
+    check(await this.db.from("gallery_items").delete().eq("id", id));
+  }
+
+  async listColleges(opts?: { includeHidden?: boolean }) {
+    let q = this.db.from("colleges").select("*").order("sort_order").order("name");
+    if (!opts?.includeHidden) q = q.eq("active", true);
+    return (check(await q) as Row[]).map(toCollege);
+  }
+
+  async getCollege(id: string) {
+    const data = check(await this.db.from("colleges").select("*").eq("id", id).maybeSingle());
+    return data ? toCollege(data as Row) : null;
+  }
+
+  async saveCollege(id: string | null, c: CollegeInput) {
+    const row = {
+      slug: c.slug,
+      name: c.name,
+      area: c.area,
+      description: c.description,
+      image: c.image,
+      coupon_code: c.couponCode,
+      product_ids: c.productIds,
+      active: c.active,
+      sort_order: c.sortOrder,
+    };
+    const res = id ? await this.db.from("colleges").update(row).eq("id", id).select("*").single() : await this.db.from("colleges").insert(row).select("*").single();
+    return toCollege(check(res) as Row);
+  }
+
+  async deleteCollege(id: string) {
+    check(await this.db.from("colleges").delete().eq("id", id));
+  }
+
+  async exportAll() {
+    // Paged so a table bigger than one response still comes back whole.
+    const all = async (table: string) => {
+      const out: Row[] = [];
+      for (let from = 0; ; from += 1000) {
+        const page = check(await this.db.from(table).select("*").range(from, from + 999)) as Row[];
+        out.push(...page);
+        if (page.length < 1000) return out;
+      }
+    };
+    const tables = ["products", "collections", "offers", "orders", "coupons", "custom_requests", "uploads", "settings", "stalls", "stall_sales", "blog_posts", "gallery_items", "colleges"];
+    const out: Record<string, unknown> = {};
+    for (const t of tables) out[t] = await all(t);
+    return out;
   }
 }

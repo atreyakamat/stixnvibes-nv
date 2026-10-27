@@ -16,7 +16,7 @@ async function paymentSettings(page: Page) {
   await page.goto("/admin/settings");
   await page.getByLabel(/UPI ID for online payments/).fill("stixnvibes@okicici");
   await page.getByLabel(/WhatsApp number for payment screenshots/).fill("+91 98765 01234");
-  await page.getByRole("button", { name: /Save/ }).click();
+  await page.getByRole("button", { name: "Save settings" }).click();
   await expect(page.getByText("Settings saved.")).toBeVisible();
 }
 

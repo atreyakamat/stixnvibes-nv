@@ -1,4 +1,4 @@
-import type { Collection, Coupon, CustomField, Offer, OptionGroup, Product, Settings } from "@/lib/types";
+import type { BlogPost, College, Collection, Coupon, CustomField, GalleryItem, Offer, OptionGroup, Product, Settings, Stall, StallSale } from "@/lib/types";
 import { DEFAULT_INSTAGRAM } from "../instagram";
 
 // Starter catalog, option templates and offers. Prices and offers come from
@@ -112,6 +112,7 @@ function sticker(n: number): Product {
     // Demo stickers are counted, so stock shows up in the preview.
     stock: 40,
     lowStockAt: 5,
+    costPaise: null,
     createdAt: NOW,
     updatedAt: NOW,
   };
@@ -141,6 +142,7 @@ function base(id: string, type: Product["type"], name: string, description: stri
     customFields: structuredClone(t.customFields),
     stock: null,
     lowStockAt: 5,
+    costPaise: null,
     createdAt: NOW,
     updatedAt: NOW,
     ...extra,
@@ -232,6 +234,13 @@ export const DEFAULT_SETTINGS: Settings = {
   upiName: "Stix N Vibes",
   whatsappNumber: "",
   mrpMarkupPercent: 20,
+  // Atreya, 27 Oct 2026: sticker ₹5; poster A4 ₹25, A3 ₹50, A4 framed ₹150,
+  // A3 framed ₹320; music card (the album polaroid) ₹4; wall card ₹10.
+  // Super sheets aren't known yet.
+  unitCosts: { sticker: 500, poster: 2500, "poster:a3": 5000, "poster:a4-framed": 15000, "poster:a3-framed": 32000, "music-card": 400, "wall-card": 1000 },
+  goalPaise: 300_000_00,
+  goalStart: "2026-10-01",
+  goalBy: "2026-12-31",
 };
 
 export const DEMO_SETTINGS: Settings = {
@@ -242,4 +251,76 @@ export const DEMO_SETTINGS: Settings = {
 /** Demo catalog: the seed, which is fully priced. */
 export function demoProducts(): Product[] {
   return seedProducts();
+}
+
+// Demo stalls, sales and content, so previews show every page filled in.
+
+export function demoColleges(): College[] {
+  return [
+    {
+      id: "col-xaviers",
+      slug: "xaviers",
+      name: "St. Xavier's College",
+      area: "Mapusa",
+      description: "Home of WordsUp, our favourite fest. These are the designs Xavier's picks up first.",
+      image: "/lofi/lofi-11.webp",
+      couponCode: "STALL10",
+      productIds: ["p-lofi-07", "p-lofi-12"],
+      active: true,
+      sortOrder: 0,
+      createdAt: NOW,
+    },
+  ];
+}
+
+/** Dates relative to today so "past" and "upcoming" always both show. */
+const dayFromToday = (n: number) => new Date(Date.now() + n * 86_400_000 + 5.5 * 3_600_000).toISOString().slice(0, 10);
+
+export function demoStalls(): Stall[] {
+  return [
+    { id: "st-wordsup", name: "WordsUp fest", date: dayFromToday(-6), venue: "St. Xavier's, Mapusa", collegeId: "col-xaviers", feePaise: 150000, otherCostsPaise: 20000, notes: "", public: true, createdAt: NOW },
+    { id: "st-sunday", name: "Sunday flea", date: dayFromToday(5), venue: "Panjim", collegeId: null, feePaise: 100000, otherCostsPaise: 0, notes: "", public: true, createdAt: NOW },
+  ];
+}
+
+export function demoStallSales(): StallSale[] {
+  const at = `${dayFromToday(-6)}T11:30:00.000Z`;
+  const line = (n: number, qty: number) => ({ productId: `p-lofi-${pad(n)}`, name: `Lo-fi ${pad(n)}`, type: "sticker" as const, options: ["Material: Paper vinyl"], qty, unitPricePaise: 1000, lineTotalPaise: qty * 1000 });
+  return [
+    { id: "demo-sale-0001", stallId: "st-wordsup", lines: [line(7, 4), line(12, 1)], subtotalPaise: 5000, discountPaise: 1000, totalPaise: 4000, payment: "upi", note: "", soldAt: at, createdAt: at },
+    { id: "demo-sale-0002", stallId: "st-wordsup", lines: [line(7, 2), line(3, 3)], subtotalPaise: 5000, discountPaise: 1000, totalPaise: 4000, payment: "cash", note: "", soldAt: at, createdAt: at },
+  ];
+}
+
+export function demoPosts(): BlogPost[] {
+  return [
+    {
+      id: "post-waterproof",
+      slug: "are-our-stickers-waterproof",
+      title: "Are our stickers waterproof?",
+      excerpt: "Paper vinyl or waterproof vinyl: which one goes on your bottle, and which one on your laptop.",
+      body: "We print on two materials.\n\n## Paper vinyl\n\nMatte, cheap and great on **laptops, notebooks and phone covers**.\n\n## Waterproof vinyl\n\nGlossy and tough. Put it on a *water bottle* and wash it.\n\n- Clean the surface first\n- Press from the middle out\n- Wait a day before washing\n\n[Shop stickers](/shop?type=sticker)",
+      cover: "/lofi/lofi-05.webp",
+      tags: ["care"],
+      status: "published",
+      publishedAt: NOW,
+      createdAt: NOW,
+      updatedAt: NOW,
+    },
+  ];
+}
+
+export function demoGallery(): GalleryItem[] {
+  return [3, 7, 11, 14].map((n, i) => ({
+    id: `g-${n}`,
+    image: `/lofi/lofi-${pad(n)}.webp`,
+    caption: i === 0 ? "Our table at WordsUp" : "",
+    stallId: i < 2 ? "st-wordsup" : null,
+    collegeId: i < 2 ? "col-xaviers" : null,
+    tags: [],
+    takenOn: null,
+    visible: true,
+    sortOrder: i,
+    createdAt: NOW,
+  }));
 }
