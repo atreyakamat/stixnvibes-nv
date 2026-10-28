@@ -13,6 +13,7 @@ import { orderUrl } from "@/lib/orders";
 import { normalizePhone } from "@/lib/phone";
 import { clearRateLimit, rateLimit } from "@/lib/rate-limit";
 import { syncSchema, tally } from "@/lib/stall";
+import { rankStalls, repeatBuyers, restockList } from "@/lib/insights";
 import { getStoreOrNull, type Store } from "@/lib/store";
 import { ORDER_STATUSES, type Product } from "@/lib/types";
 
@@ -131,6 +132,23 @@ on("GET", "analytics", async ({ store, url }) => {
       count: inPeriod.length,
       topProducts: topProducts(sales, 10),
     },
+  });
+});
+
+// Which stalls to go back to, what to restock, who comes back. All time for
+// stalls and buyers; the last 30 days of selling pace for restock.
+on("GET", "insights", async ({ store }) => {
+  const [products, stalls, sales, orders, settings] = await Promise.all([
+    store.listProducts({ includeHidden: true }),
+    store.listStalls(),
+    store.listStallSales({}),
+    store.listOrders({ limit: 5000 }),
+    store.getSettings(),
+  ]);
+  return json({
+    ...rankStalls(stalls, sales, products, settings.unitCosts, istToday()),
+    restock: restockList(products, orders, sales),
+    repeat: repeatBuyers(orders),
   });
 });
 

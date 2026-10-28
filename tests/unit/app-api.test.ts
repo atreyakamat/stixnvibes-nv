@@ -66,6 +66,12 @@ describe("admin app API reads", () => {
     expect(an.data.stats.daily).toBeInstanceOf(Array);
     expect(an.data.stalls).toHaveProperty("profitPaise");
     expect((await call("GET", "stalls")).data).toHaveProperty("totals");
+    const ins = await call("GET", "insights");
+    expect(ins.status).toBe(200);
+    expect(ins.data).toHaveProperty("stalls");
+    expect(ins.data).toHaveProperty("venues");
+    expect(ins.data.restock).toBeInstanceOf(Array);
+    expect(ins.data.repeat).toHaveProperty("rate");
     const sm = await call("GET", "stall-mode");
     expect(sm.data.products.length).toBeGreaterThan(0);
     expect(sm.data.products.every((p: { pricePaise: number }) => typeof p.pricePaise === "number")).toBe(true);
