@@ -72,6 +72,9 @@ describe("admin app API reads", () => {
     expect(ins.data).toHaveProperty("venues");
     expect(ins.data.restock).toBeInstanceOf(Array);
     expect(ins.data.repeat).toHaveProperty("rate");
+    const rev = await call("GET", "reviews");
+    expect(rev.data.status).toBe("pending");
+    expect(rev.data.counts).toHaveProperty("published");
     const sm = await call("GET", "stall-mode");
     expect(sm.data.products.length).toBeGreaterThan(0);
     expect(sm.data.products.every((p: { pricePaise: number }) => typeof p.pricePaise === "number")).toBe(true);
@@ -132,5 +135,22 @@ describe("route table", () => {
     const { readFileSync } = await import("node:fs");
     const doc = readFileSync("docs/ADMIN_APP_API.md", "utf8");
     for (const r of api.ROUTES) expect(doc, r).toContain(`\`${r}\``);
+  });
+});
+
+describe("admin app API reviews", () => {
+  it("publishes with a reply, rejects bad input and deletes", async () => {
+    const { getStore } = await import("@/lib/store");
+    const product = (await getStore().listProducts())[0];
+    const r = await getStore().createReview({ productId: product.id, orderNumber: null, name: "Asha", instagram: "", rating: 4, text: "Nice", photos: [] });
+    expect((await call("GET", "reviews")).data.reviews.some((x: { id: string }) => x.id === r.id)).toBe(true);
+    const bad = await call("PATCH", `reviews/${r.id}`, { status: "live" });
+    expect(bad.status).toBe(422);
+    const ok = await call("PATCH", `reviews/${r.id}`, { status: "published", reply: "Thank you!" });
+    expect(ok.data).toEqual({ ok: true, message: "Published." });
+    const live = await call("GET", "reviews?status=published");
+    expect(live.data.reviews.find((x: { id: string }) => x.id === r.id)).toMatchObject({ reply: "Thank you!", productName: product.name });
+    expect((await call("DELETE", `reviews/${r.id}`)).status).toBe(200);
+    expect((await call("PATCH", `reviews/${r.id}`, { status: "hidden" })).status).toBe(422);
   });
 });

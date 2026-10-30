@@ -72,6 +72,9 @@ Paths are relative to `/api/app/admin/`.
 | `GET custom` | Custom requests |
 | `GET custom/:n` | One request and links to its files |
 | `PATCH custom/:n` | `{ status, adminNote }` |
+| `GET reviews` | `?status=pending,published,hidden` (default pending). Reviews with product name, photo links and the buyer's phone when verified; counts and live average |
+| `PATCH reviews/:id` | `{ status?, reply? }`: publish, hide, reply |
+| `DELETE reviews/:id` | Delete |
 | `GET settings` | Settings, plus option choices for the unit costs editor |
 | `PUT settings` | The settings form's fields |
 | `PUT costs` | `{ costs: [{ key, value }], goal, goalStart, goalBy }` |

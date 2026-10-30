@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { site } from "@/content/site";
 import * as ops from "@/lib/admin/ops";
+import { moderateReview, removeReview } from "@/lib/admin/reviews";
 import { checkCredentials, getAppAdmin, issueAppToken } from "@/lib/admin/session";
 import { syncStallSales } from "@/lib/admin/stall-sync";
 import { json, readJson } from "@/lib/api";
@@ -15,7 +16,7 @@ import { clearRateLimit, rateLimit } from "@/lib/rate-limit";
 import { syncSchema, tally } from "@/lib/stall";
 import { rankStalls, repeatBuyers, restockList } from "@/lib/insights";
 import { getStoreOrNull, type Store } from "@/lib/store";
-import { ORDER_STATUSES, type Product } from "@/lib/types";
+import { ORDER_STATUSES, REVIEW_STATUSES, type Product } from "@/lib/types";
 
 // The Android admin app's API: /api/app/admin/<path>. JSON in and out, a
 // bearer token from POST login on everything else. Reads return the same
@@ -282,6 +283,38 @@ on("PATCH", "custom/:n", async ({ req, params: [n] }) => {
   const b = await body(req);
   return done(await ops.updateCustomRequest({ number: n, status: b.status, adminNote: text(b.adminNote) }));
 });
+
+// Reviews ---------------------------------------------------------------
+
+on("GET", "reviews", async ({ store, url }) => {
+  const status = REVIEW_STATUSES.find((s) => s === url.searchParams.get("status")) ?? "pending";
+  const [reviews, all, products] = await Promise.all([store.listReviews({ status, limit: 300 }), store.listReviews({ limit: 2000 }), store.listProducts({ includeHidden: true })]);
+  const byId = new Map(products.map((p) => [p.id, p]));
+  // A verified review's order gives a phone number to WhatsApp the buyer.
+  const phones = new Map<string, string>();
+  for (const n of new Set(reviews.map((r) => r.orderNumber).filter((n): n is string => !!n))) {
+    const o = await store.getOrder(n);
+    if (o?.customerPhone) phones.set(n, o.customerPhone);
+  }
+  const live = all.filter((r) => r.status === "published");
+  return json({
+    status,
+    counts: Object.fromEntries(REVIEW_STATUSES.map((s) => [s, all.filter((r) => r.status === s).length])),
+    average: live.length ? Math.round((live.reduce((n, r) => n + r.rating, 0) / live.length) * 10) / 10 : null,
+    reviews: reviews.map((r) => ({
+      ...r,
+      productName: byId.get(r.productId)?.name ?? "Deleted product",
+      productImage: byId.get(r.productId)?.images[0] ?? null,
+      photoUrls: r.photos.map((id) => `${site.url}/u/${id}`),
+      customerPhone: (r.orderNumber && phones.get(r.orderNumber)) || null,
+    })),
+  });
+});
+on("PATCH", "reviews/:id", async ({ req, params: [id] }) => {
+  const b = await body(req);
+  return done(await moderateReview(id, { ...(b.status !== undefined ? { status: b.status } : {}), ...(b.reply !== undefined ? { reply: b.reply } : {}) }));
+});
+on("DELETE", "reviews/:id", async ({ params: [id] }) => done(await removeReview(id)));
 
 // Settings, costs and goal ----------------------------------------------
 
