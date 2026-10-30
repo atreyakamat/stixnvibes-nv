@@ -1,5 +1,5 @@
-import type { BlogPost, College, Collection, Coupon, CustomRequest, GalleryItem, Offer, Order, Product, Settings, Stall, StallSale, Stats, Upload } from "@/lib/types";
-import { DEMO_SETTINGS, demoColleges, demoCoupons, demoGallery, demoPosts, demoProducts, demoStallSales, demoStalls, seedCollections, seedOffers } from "./seed";
+import type { BlogPost, College, Collection, Coupon, CustomRequest, GalleryItem, Offer, Order, Product, Review, Settings, Stall, StallSale, Stats, Upload } from "@/lib/types";
+import { DEMO_SETTINGS, demoColleges, demoCoupons, demoGallery, demoPosts, demoProducts, demoReviews, demoStallSales, demoStalls, seedCollections, seedOffers } from "./seed";
 import type {
   CollectionInput,
   CollegeInput,
@@ -8,12 +8,15 @@ import type {
   GalleryInput,
   NewCustomRequest,
   NewOrder,
+  NewReview,
   NewStallSale,
   OfferInput,
   OrderFilter,
   OrderPatch,
   PostInput,
   ProductInput,
+  ReviewFilter,
+  ReviewPatch,
   StallInput,
   StallSaleFilter,
   Store,
@@ -37,6 +40,7 @@ type State = {
   posts: BlogPost[];
   gallery: GalleryItem[];
   colleges: College[];
+  reviews: Review[];
 };
 
 const MAX_DEMO_FILE = 1.5 * 1024 * 1024;
@@ -183,6 +187,7 @@ export class MemoryStore implements Store {
       posts: initial?.posts ?? demoPosts(),
       gallery: initial?.gallery ?? demoGallery(),
       colleges: initial?.colleges ?? demoColleges(),
+      reviews: initial?.reviews ?? (initial?.products ? [] : demoReviews(demoProducts())),
     };
   }
 
@@ -218,6 +223,7 @@ export class MemoryStore implements Store {
 
   async deleteProduct(id: string) {
     this.s.products = this.s.products.filter((p) => p.id !== id);
+    this.s.reviews = this.s.reviews.filter((r) => r.productId !== id);
   }
 
   async uploadProductImage(file: File) {
@@ -551,6 +557,45 @@ export class MemoryStore implements Store {
     this.s.colleges = this.s.colleges.filter((x) => x.id !== id);
     for (const st of this.s.stalls) if (st.collegeId === id) st.collegeId = null;
     for (const g of this.s.gallery) if (g.collegeId === id) g.collegeId = null;
+  }
+
+  // Reviews -------------------------------------------------------------
+
+  async listReviews(filter?: ReviewFilter) {
+    const list = this.s.reviews
+      .filter((r) => (!filter?.status || r.status === filter.status) && (!filter?.productId || r.productId === filter.productId))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return clone(list.slice(0, filter?.limit ?? 500));
+  }
+
+  async getReview(id: string) {
+    const r = this.s.reviews.find((x) => x.id === id);
+    return r ? clone(r) : null;
+  }
+
+  async createReview(input: NewReview) {
+    if (input.orderNumber && this.s.reviews.some((r) => r.orderNumber === input.orderNumber && r.productId === input.productId)) {
+      throw new Error("This order already has a review for that product.");
+    }
+    const r: Review = { ...clone(input), id: uid("rev"), status: "pending", reply: "", repliedAt: null, createdAt: now(), updatedAt: now() };
+    this.s.reviews.push(r);
+    return clone(r);
+  }
+
+  async updateReview(id: string, patch: ReviewPatch) {
+    const r = this.s.reviews.find((x) => x.id === id);
+    if (!r) throw new Error("Review not found");
+    if (patch.status) r.status = patch.status;
+    if (patch.reply !== undefined && patch.reply !== r.reply) {
+      r.reply = patch.reply;
+      r.repliedAt = patch.reply ? now() : null;
+    }
+    r.updatedAt = now();
+    return clone(r);
+  }
+
+  async deleteReview(id: string) {
+    this.s.reviews = this.s.reviews.filter((x) => x.id !== id);
   }
 
   async exportAll() {
