@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { BlogPost, College, Collection, Coupon, CustomRequest, GalleryItem, Offer, Order, Product, Settings, Stall, StallSale, Stats } from "@/lib/types";
+import type { BlogPost, College, Collection, Coupon, CustomRequest, GalleryItem, Offer, Order, Product, Review, Settings, Stall, StallSale, Stats } from "@/lib/types";
 import { EMPTY_STATS } from "./memory";
 import { DEFAULT_SETTINGS } from "./seed";
 import type {
@@ -11,12 +11,15 @@ import type {
   GalleryInput,
   NewCustomRequest,
   NewOrder,
+  NewReview,
   NewStallSale,
   OfferInput,
   OrderFilter,
   OrderPatch,
   PostInput,
   ProductInput,
+  ReviewFilter,
+  ReviewPatch,
   StallInput,
   StallSaleFilter,
   Store,
@@ -251,6 +254,27 @@ function toCollege(r: Row): College {
     active: r.active !== false,
     sortOrder: (r.sort_order as number) ?? 0,
     createdAt: r.created_at as string,
+  };
+}
+
+/** Postgres and PostgREST codes for a table that doesn't exist yet. */
+const NO_TABLE = new Set(["42P01", "PGRST205"]);
+
+function toReview(r: Row): Review {
+  return {
+    id: r.id as string,
+    productId: r.product_id as string,
+    orderNumber: (r.order_number as string | null) ?? null,
+    name: r.name as string,
+    instagram: (r.instagram as string) ?? "",
+    rating: Number(r.rating),
+    text: (r.body as string) ?? "",
+    photos: (r.photos as string[]) ?? [],
+    status: r.status as Review["status"],
+    reply: (r.reply as string) ?? "",
+    repliedAt: (r.replied_at as string | null) ?? null,
+    createdAt: r.created_at as string,
+    updatedAt: r.updated_at as string,
   };
 }
 
@@ -700,6 +724,62 @@ export class SupabaseStore implements Store {
     check(await this.db.from("colleges").delete().eq("id", id));
   }
 
+  // Reviews -------------------------------------------------------------
+
+  async listReviews(filter?: ReviewFilter) {
+    let q = this.db
+      .from("reviews")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(filter?.limit ?? 500);
+    if (filter?.status) q = q.eq("status", filter.status);
+    if (filter?.productId) q = q.eq("product_id", filter.productId);
+    const res = await q;
+    // Before 0005_reviews.sql is run, show no reviews instead of breaking product pages.
+    if (res.error && NO_TABLE.has(res.error.code ?? "")) return [];
+    return (check(res) as Row[]).map(toReview);
+  }
+
+  async getReview(id: string) {
+    const data = check(await this.db.from("reviews").select("*").eq("id", id).maybeSingle());
+    return data ? toReview(data as Row) : null;
+  }
+
+  async createReview(r: NewReview) {
+    const res = await this.db
+      .from("reviews")
+      .insert({
+        product_id: r.productId,
+        order_number: r.orderNumber,
+        name: r.name,
+        instagram: r.instagram,
+        rating: r.rating,
+        body: r.text,
+        photos: r.photos,
+      })
+      .select("*")
+      .single();
+    if (res.error?.code === "23505") throw new Error("This order already has a review for that product.");
+    return toReview(check(res) as Row);
+  }
+
+  async updateReview(id: string, patch: ReviewPatch) {
+    const current = await this.getReview(id);
+    if (!current) throw new Error("Review not found");
+    const at = new Date().toISOString();
+    const row: Row = { updated_at: at };
+    if (patch.status) row.status = patch.status;
+    if (patch.reply !== undefined && patch.reply !== current.reply) {
+      row.reply = patch.reply;
+      row.replied_at = patch.reply ? at : null;
+    }
+    return toReview(check(await this.db.from("reviews").update(row).eq("id", id).select("*").single()) as Row);
+  }
+
+  async deleteReview(id: string) {
+    check(await this.db.from("reviews").delete().eq("id", id));
+  }
+
   async exportAll() {
     // Paged so a table bigger than one response still comes back whole.
     const all = async (table: string) => {
@@ -710,7 +790,7 @@ export class SupabaseStore implements Store {
         if (page.length < 1000) return out;
       }
     };
-    const tables = ["products", "collections", "offers", "orders", "coupons", "custom_requests", "uploads", "settings", "stalls", "stall_sales", "blog_posts", "gallery_items", "colleges"];
+    const tables = ["products", "collections", "offers", "orders", "coupons", "custom_requests", "uploads", "settings", "stalls", "stall_sales", "blog_posts", "gallery_items", "colleges", "reviews"];
     const out: Record<string, unknown> = {};
     for (const t of tables) out[t] = await all(t);
     return out;

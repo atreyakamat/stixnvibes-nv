@@ -42,6 +42,10 @@ v4 takes orders through Instagram DMs instead of WhatsApp. In **Admin → Settin
 4. **Codes & QR**: make a code per stall (e.g. `WORDSUP10`, "Where you hand it out" = `stall-wordsup`) and print its QR card. **Analytics** then shows visits, orders and sales per stall and per code.
 5. Read **Privacy** and **Terms** on the shop and check the promises are ones you'll keep: delete unused custom requests within 12 months, reply to data requests within 7 days, and the email address shown.
 
+### Adding reviews
+
+Run `supabase/migrations/0005_reviews.sql` in **SQL Editor → New query**. It adds the `reviews` table and is safe to run twice. Until it's run, the shop shows no reviews and **Admin → Reviews** is empty. New reviews wait in **Reviews → Waiting** until you publish them; your reply shows under the review on the shop.
+
 ### Upgrading an existing shop to v7
 
 1. Run `supabase/migrations/0004_v7.sql` in **SQL Editor → New query** before the v7 code deploys. It adds a cost per product, India Post tracking numbers on orders, and tables for stalls, stall sales, blog posts, the photo library and college pages. It is safe to run twice. Until it's run, the new pages show empty and stall sales can't sync.

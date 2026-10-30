@@ -1,4 +1,4 @@
-import type { BlogPost, College, Collection, Coupon, CustomField, GalleryItem, Offer, OptionGroup, Product, Settings, Stall, StallSale } from "@/lib/types";
+import type { BlogPost, College, Collection, Coupon, CustomField, GalleryItem, Offer, OptionGroup, Product, Review, Settings, Stall, StallSale } from "@/lib/types";
 import { DEFAULT_INSTAGRAM } from "../instagram";
 
 // Starter catalog, option templates and offers. Prices and offers come from
@@ -323,4 +323,43 @@ export function demoGallery(): GalleryItem[] {
     sortOrder: i,
     createdAt: NOW,
   }));
+}
+
+/** One published review with a reply and one waiting, on the first products. */
+export function demoReviews(products: Product[]): Review[] {
+  const [a, b] = products;
+  if (!a || !b) return [];
+  const day = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
+  return [
+    {
+      id: "rev-demo-1",
+      productId: a.id,
+      orderNumber: null,
+      name: "Riya",
+      instagram: "",
+      rating: 5,
+      text: "Stuck it on my laptop a month ago and it still looks new. Bought three more at WordsUp.",
+      photos: [],
+      status: "published",
+      reply: "Thank you Riya! See you at the next stall.",
+      repliedAt: day(9),
+      createdAt: day(10),
+      updatedAt: day(9),
+    },
+    {
+      id: "rev-demo-2",
+      productId: b.id,
+      orderNumber: null,
+      name: "Kunal",
+      instagram: "",
+      rating: 4,
+      text: "Print is sharp. Wish there was a bigger size.",
+      photos: [],
+      status: "pending",
+      reply: "",
+      repliedAt: null,
+      createdAt: day(1),
+      updatedAt: day(1),
+    },
+  ];
 }
