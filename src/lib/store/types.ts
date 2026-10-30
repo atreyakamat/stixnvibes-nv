@@ -1,4 +1,4 @@
-import type { BlogPost, College, Collection, Coupon, CustomRequest, CustomStatus, EventType, GalleryItem, Offer, Order, OrderStatus, Product, Settings, Stall, StallSale, Stats, Upload } from "@/lib/types";
+import type { BlogPost, College, Collection, Coupon, CustomRequest, CustomStatus, EventType, GalleryItem, Offer, Order, OrderStatus, Product, Review, ReviewStatus, Settings, Stall, StallSale, Stats, Upload } from "@/lib/types";
 
 export type ProductInput = Omit<Product, "id" | "createdAt" | "updatedAt">;
 export type CollectionInput = Omit<Collection, "id" | "createdAt">;
@@ -25,6 +25,9 @@ export type StallSaleFilter = { stallId?: string; since?: string; limit?: number
 export type PostInput = Omit<BlogPost, "id" | "createdAt" | "updatedAt">;
 export type GalleryInput = Omit<GalleryItem, "id" | "createdAt">;
 export type CollegeInput = Omit<College, "id" | "createdAt">;
+export type NewReview = Omit<Review, "id" | "status" | "reply" | "repliedAt" | "createdAt" | "updatedAt">;
+export type ReviewPatch = Partial<{ status: ReviewStatus; reply: string }>;
+export type ReviewFilter = { status?: ReviewStatus; productId?: string; limit?: number };
 
 /**
  * Everything the app needs from persistence. Two implementations: Supabase
@@ -112,6 +115,15 @@ export interface Store {
   getCollege(id: string): Promise<College | null>;
   saveCollege(id: string | null, input: CollegeInput): Promise<College>;
   deleteCollege(id: string): Promise<void>;
+
+  /** Newest first. */
+  listReviews(filter?: ReviewFilter): Promise<Review[]>;
+  getReview(id: string): Promise<Review | null>;
+  /** Always saved as pending, for the admin to publish. */
+  createReview(input: NewReview): Promise<Review>;
+  /** Sets repliedAt when the reply text changes ("" clears it). */
+  updateReview(id: string, patch: ReviewPatch): Promise<Review>;
+  deleteReview(id: string): Promise<void>;
 
   /** Every table except analytics events, for the home lab backup. */
   exportAll(): Promise<Record<string, unknown>>;
