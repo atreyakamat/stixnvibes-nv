@@ -43,6 +43,7 @@ Paths are relative to `/api/app/admin/`.
 | `GET dashboard` | `?days=1,7,30,90`. Stats, profit goal, warnings, latest orders, next stall |
 | `GET analytics` | `?days=7,30,90,365`. Funnel, daily, by type/source/code, low stock, stall takings |
 | `GET insights` | Stalls and places ranked by profit per selling hour, restock list (30-day pace), repeat buyers |
+| `GET alerts` | `?since=<ISO time>`. New orders, custom requests and waiting reviews since then, plus the server time to send next time |
 | `GET orders` | `?status=&q=`. Up to 200 orders |
 | `GET orders/:n` | One order, its customer page link, how many orders the customer has |
 | `PATCH orders/:n` | `{ status?, adminNote? }`. Moves stock like the web admin |

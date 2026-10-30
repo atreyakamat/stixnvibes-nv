@@ -153,6 +153,27 @@ on("GET", "insights", async ({ store }) => {
   });
 });
 
+// What's new since the phone last looked, for its order alerts. Checked in
+// the background every 15 minutes or so, so it stays small.
+on("GET", "alerts", async ({ store, url }) => {
+  const now = new Date().toISOString();
+  const raw = url.searchParams.get("since") ?? "";
+  const since = Number.isFinite(Date.parse(raw)) ? new Date(raw).toISOString() : now;
+  const [orders, custom, reviews, products] = await Promise.all([
+    store.listOrders({ createdSince: since, limit: 50 }),
+    store.listCustomRequests(50),
+    store.listReviews({ status: "pending", limit: 50 }),
+    store.listProducts({ includeHidden: true }),
+  ]);
+  const name = names(products);
+  return json({
+    now,
+    orders: orders.filter((o) => o.createdAt > since).map((o) => ({ number: o.number, customerName: o.customerName, totalPaise: o.totalPaise, createdAt: o.createdAt })),
+    custom: custom.filter((r) => r.createdAt > since).map((r) => ({ number: r.number, customerName: r.customerName, createdAt: r.createdAt })),
+    reviews: reviews.filter((r) => r.createdAt > since).map((r) => ({ id: r.id, name: r.name, rating: r.rating, productName: name[r.productId] ?? "a product", createdAt: r.createdAt })),
+  });
+});
+
 // Orders and packing ----------------------------------------------------
 
 on("GET", "orders", async ({ store, url }) => {

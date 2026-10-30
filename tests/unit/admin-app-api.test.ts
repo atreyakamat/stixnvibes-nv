@@ -154,3 +154,18 @@ describe("admin app API reviews", () => {
     expect((await call("PATCH", `reviews/${r.id}`, { status: "hidden" })).status).toBe(422);
   });
 });
+
+describe("admin app API alerts", () => {
+  it("lists only what came in after since, and the server time", async () => {
+    const { getStore } = await import("@/lib/store");
+    const before = new Date(Date.now() - 1000).toISOString();
+    const product = (await getStore().listProducts())[0];
+    await getStore().createReview({ productId: product.id, orderNumber: null, name: "Neel", instagram: "", rating: 5, text: "", photos: [] });
+    const { data } = await call("GET", `alerts?since=${encodeURIComponent(before)}`);
+    expect(Date.parse(data.now)).toBeGreaterThan(Date.parse(before));
+    expect(data.reviews.map((r: { name: string }) => r.name)).toContain("Neel");
+    const later = await call("GET", `alerts?since=${encodeURIComponent(data.now)}`);
+    expect(later.data.reviews).toEqual([]);
+    expect((await call("GET", "alerts?since=garbage")).data.orders).toEqual([]);
+  });
+});
