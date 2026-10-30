@@ -4,7 +4,11 @@ import { notFound } from "next/navigation";
 import { BuyBox } from "@/components/product/buy-box";
 import { Gallery } from "@/components/product/gallery";
 import { ProductCard } from "@/components/product/product-card";
+import { ReviewForm } from "@/components/reviews/review-form";
+import { averageRating, ReviewList, Stars } from "@/components/reviews/review-list";
 import { site } from "@/content/site";
+import { publicReview } from "@/lib/app-api";
+import { getPublishedReviews } from "@/lib/content";
 import { fromPrice, isSoldOut } from "@/lib/pricing";
 import { getProductBySlug, getShopState } from "@/lib/shop";
 import { PRODUCT_TYPES } from "@/lib/types";
@@ -31,6 +35,8 @@ export default async function ProductPage({ params }: PageProps<"/shop/[slug]">)
   const { slug } = await params;
   const [product, { products, collections, settings }] = await Promise.all([getProductBySlug(slug), getShopState()]);
   if (!product) notFound();
+  const reviews = (await getPublishedReviews(product.id)).map(publicReview);
+  const rating = averageRating(reviews);
 
   const type = PRODUCT_TYPES.find((t) => t.id === product.type);
   const inCollections = collections.filter((c) => product.collectionIds.includes(c.id));
@@ -46,6 +52,7 @@ export default async function ProductPage({ params }: PageProps<"/shop/[slug]">)
     description: product.description,
     image: product.images.filter((i) => !i.startsWith("data:")).map((i) => (i.startsWith("http") ? i : `${site.url}${i}`)),
     brand: { "@type": "Brand", name: site.name },
+    ...(reviews.length > 0 && { aggregateRating: { "@type": "AggregateRating", ratingValue: rating, reviewCount: reviews.length } }),
     ...(price !== null &&
       product.status === "live" && {
         offers: {
@@ -82,6 +89,11 @@ export default async function ProductPage({ params }: PageProps<"/shop/[slug]">)
           <div className="md:pt-6">
             {product.badge && <p className="label text-lemon">{product.badge}</p>}
             <h1 className="display mt-2 text-[clamp(2.8rem,7vw,5.5rem)]">{product.name}</h1>
+            {reviews.length > 0 && (
+              <a href="#reviews" className="mt-3 inline-flex items-center gap-2 text-sm text-paper/70 hover:text-lemon">
+                <Stars rating={rating} /> {rating.toFixed(1)} · {reviews.length} review{reviews.length === 1 ? "" : "s"}
+              </a>
+            )}
             {product.description && <p className="mt-5 max-w-lg whitespace-pre-line text-lg text-paper/75">{product.description}</p>}
 
             <div className="mt-8">
@@ -118,6 +130,16 @@ export default async function ProductPage({ params }: PageProps<"/shop/[slug]">)
             )}
           </div>
         </div>
+
+        <section className="pt-20" aria-labelledby="reviews-title" id="reviews">
+          <h2 id="reviews-title" className="display text-5xl">
+            Reviews
+          </h2>
+          <div className="mt-8 space-y-6">
+            <ReviewList reviews={reviews} />
+            <ReviewForm productId={product.id} />
+          </div>
+        </section>
 
         {related.length > 0 && (
           <section className="pt-24" aria-labelledby="related">

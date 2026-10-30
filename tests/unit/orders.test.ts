@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { customersFromOrders, customerTag } from "@/lib/customers";
-import { orderNumber, priceLines, viewKeyMatches } from "@/lib/orders";
+import { orderNumber, priceLines, reviewOrderNumber, viewKeyMatches } from "@/lib/orders";
 import { normalizePhone } from "@/lib/phone";
 import { MemoryStore } from "@/lib/store/memory";
 import { demoProducts, seedOffers } from "@/lib/store/seed";
@@ -195,5 +195,17 @@ describe("customers", () => {
     expect(riya).toMatchObject({ name: "Riya K", orders: 2, spentPaise: 3000, paidOrders: 1, pickups: 1, firstAt: "2026-10-01T00:00:00Z", lastAt: "2026-10-03T00:00:00Z" });
     expect(riya.address?.city).toBe("Panaji");
     expect(customerTag(riya)).toBe("Repeat");
+  });
+});
+
+describe("verified buyer reviews", () => {
+  const order = { number: "SNV-ABC123", viewKey: "secret-key-123", status: "shipped" as const, lines: [{ productId: "p1" }] as Order["lines"] };
+  it("only marks a review verified with the right key, product and a received order", () => {
+    expect(reviewOrderNumber(order, "secret-key-123", "p1")).toBe("SNV-ABC123");
+    expect(reviewOrderNumber(order, "wrong", "p1")).toBeNull();
+    expect(reviewOrderNumber(order, undefined, "p1")).toBeNull();
+    expect(reviewOrderNumber(order, "secret-key-123", "p2")).toBeNull();
+    expect(reviewOrderNumber({ ...order, status: "new" }, "secret-key-123", "p1")).toBeNull();
+    expect(reviewOrderNumber({ ...order, status: "cancelled" }, "secret-key-123", "p1")).toBeNull();
   });
 });

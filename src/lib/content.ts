@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { istToday } from "@/lib/costs";
 import { getStoreOrNull } from "@/lib/store";
-import type { BlogPost, College, GalleryItem, Stall, StallSale } from "@/lib/types";
+import type { BlogPost, College, GalleryItem, Review, Stall, StallSale } from "@/lib/types";
 
 // Blog posts, library photos, colleges and stalls for storefront pages.
 // Like the catalog, these return empty lists instead of throwing, so a page
@@ -24,6 +24,11 @@ export const getPosts = cache((): Promise<BlogPost[]> => safe("posts", () => get
 export const getPostBySlug = cache(async (slug: string) => (await getPosts()).find((p) => p.slug === slug) ?? null);
 
 export const getGallery = cache((): Promise<GalleryItem[]> => safe("gallery", () => getStoreOrNull()!.listGallery(), []));
+
+/** Published reviews, newest first (all of them, or one product's). */
+export const getPublishedReviews = cache(
+  (productId?: string): Promise<Review[]> => safe("reviews", () => getStoreOrNull()!.listReviews({ status: "published", productId, limit: 500 }), []),
+);
 
 export const getColleges = cache((): Promise<College[]> => safe("colleges", () => getStoreOrNull()!.listColleges(), []));
 

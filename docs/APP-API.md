@@ -6,8 +6,9 @@ the server.
 
 | Route | What |
 | --- | --- |
-| `GET /api/app/shop` | Live + upcoming products, active collections, running offers, public settings, colleges, upcoming public stalls, published posts, visible library photos. Cached 60 s. |
+| `GET /api/app/shop` | Live + upcoming products, active collections, running offers, public settings, colleges, upcoming public stalls, published posts, visible library photos, published reviews (no order number or Instagram; photos as `/u/<id>` links; `verified` flag). Cached 60 s. |
 | `GET /api/app/order/<SNV-…>?k=<key>` | One order with how to pay (`upi://` link, gateway on/off, WhatsApp). Same key as the order page link; a wrong key is a 404. |
+| `POST /api/reviews` | `{productId, rating 1-5, text, name, instagram, photos: uploadIds[], orderNumber?, key?}` → `{id}`. Saved as pending; shows once published in admin. With the order's number + key (order paid/shipped/done, product in it) it's marked as a verified buyer. 6 an hour per IP. Also used by the website. |
 | `POST /api/app/idea` | `{idea, kind: "sticker"\|"poster", seed?}` → a Pollinations image link for an AI sticker idea. Brands, characters and NSFW words are refused. 25 a day per IP. |
 | `POST /api/app/idea/keep` | `{idea, kind, seed}` → `{id}`: the server fetches that same picture and keeps it as an upload for `POST /api/custom`. 10 a day per IP. |
 

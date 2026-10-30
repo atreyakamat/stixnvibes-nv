@@ -1,5 +1,5 @@
 import { appCatalog } from "@/lib/app-api";
-import { getColleges, getGallery, getPosts, upcomingStalls } from "@/lib/content";
+import { getColleges, getGallery, getPosts, getPublishedReviews, upcomingStalls } from "@/lib/content";
 import { getShopState } from "@/lib/shop";
 
 // The whole storefront in one read for the Android app: products, offers,
@@ -9,14 +9,15 @@ import { getShopState } from "@/lib/shop";
 export const revalidate = 60;
 
 export async function GET() {
-  const [{ products, collections, offers, settings }, colleges, stalls, posts, gallery] = await Promise.all([
+  const [{ products, collections, offers, settings }, colleges, stalls, posts, gallery, reviews] = await Promise.all([
     getShopState(),
     getColleges(),
     upcomingStalls(),
     getPosts(),
     getGallery(),
+    getPublishedReviews(),
   ]);
-  return Response.json(appCatalog({ products, collections, offers, settings, colleges, stalls, posts, gallery }), {
+  return Response.json(appCatalog({ products, collections, offers, settings, colleges, stalls, posts, gallery, reviews }), {
     headers: { "Cache-Control": "public, max-age=60, stale-while-revalidate=600" },
   });
 }
