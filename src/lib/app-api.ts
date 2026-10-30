@@ -2,7 +2,7 @@ import "server-only";
 import { site } from "@/content/site";
 import { awaitingPayment, totalIsFinal } from "@/lib/orders";
 import { formatINR } from "@/lib/money";
-import type { BlogPost, College, Collection, GalleryItem, Offer, Order, Product, Settings, Stall } from "@/lib/types";
+import type { BlogPost, College, Collection, GalleryItem, Offer, Order, Product, Review, Settings, Stall } from "@/lib/types";
 import { upiLink } from "@/lib/upi";
 
 // What the Stix N Vibes Android app reads. Everything here is already public
@@ -51,7 +51,20 @@ export type AppCatalog = {
   stalls: Pick<Stall, "id" | "name" | "date" | "venue" | "collegeId">[];
   posts: ReturnType<typeof appPost>[];
   gallery: ReturnType<typeof appGalleryItem>[];
+  /** Published reviews of products the app shows, newest first. */
+  reviews: PublicReview[];
 };
+
+/**
+ * A review as anyone may see it: no order number, no Instagram username.
+ * Photos become full links; only published reviews ever reach this.
+ */
+export type PublicReview = Pick<Review, "id" | "productId" | "name" | "rating" | "text" | "reply" | "repliedAt" | "createdAt"> & { photos: string[]; verified: boolean };
+
+export function publicReview(r: Review): PublicReview {
+  const { id, productId, name, rating, text, reply, repliedAt, createdAt } = r;
+  return { id, productId, name, rating, text, reply, repliedAt, createdAt, photos: r.photos.map((p) => absolute(`/u/${p}`)), verified: r.orderNumber !== null };
+}
 
 export function appCatalog(input: {
   products: Product[];
@@ -62,6 +75,7 @@ export function appCatalog(input: {
   stalls: AppCatalog["stalls"];
   posts: BlogPost[];
   gallery: GalleryItem[];
+  reviews?: Review[];
   now?: Date;
 }): AppCatalog {
   return {
@@ -76,6 +90,9 @@ export function appCatalog(input: {
     stalls: input.stalls,
     posts: input.posts.filter((p) => p.status === "published").map(appPost),
     gallery: input.gallery.filter((g) => g.visible).map(appGalleryItem),
+    reviews: (input.reviews ?? [])
+      .filter((r) => r.status === "published" && input.products.some((p) => p.id === r.productId && p.status !== "hidden"))
+      .map(publicReview),
   };
 }
 
