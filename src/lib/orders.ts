@@ -199,3 +199,13 @@ export async function setOrderStatus(number: string, status: OrderStatus, adminN
   if (!hold && order.stockTaken) await store.moveStock(number, 1);
   return order;
 }
+
+/**
+ * The order number to put on a review, or null: only when the key is the
+ * order's own, the order includes the product and the customer has it
+ * (paid, shipped or done). That is what "verified buyer" means.
+ */
+export function reviewOrderNumber(order: Pick<Order, "number" | "viewKey" | "status" | "lines">, key: string | undefined, productId: string): string | null {
+  const hasIt = order.status === "paid" || order.status === "shipped" || order.status === "done";
+  return hasIt && viewKeyMatches(order, key) && order.lines.some((l) => l.productId === productId) ? order.number : null;
+}

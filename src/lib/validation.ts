@@ -2,7 +2,7 @@ import { z } from "zod";
 import { MAX_CUSTOM_FILES, MAX_LINES, MAX_QTY_PER_LINE, UPLOAD_ID_RE } from "@/lib/constants";
 import { cleanHandle, INSTAGRAM_HANDLE_RE } from "@/lib/instagram";
 import { normalizePhone } from "@/lib/phone";
-import { CUSTOM_KINDS, EVENT_TYPES, FULFILMENTS } from "@/lib/types";
+import { CUSTOM_KINDS, EVENT_TYPES, FULFILMENTS, REVIEW_PHOTOS_MAX, REVIEW_TEXT_MAX } from "@/lib/types";
 
 const trimmed = (max: number) => z.string().trim().max(max);
 
@@ -107,3 +107,18 @@ export const customRequestSchema = z.object({
   company: z.string().max(0).optional(),
 });
 export type CustomRequestInput = z.infer<typeof customRequestSchema>;
+
+/** A customer review from the website or the app. Saved as pending. */
+export const reviewSchema = z.object({
+  productId: z.string().min(1).max(80),
+  rating: z.coerce.number().int().min(1, "Tap the stars to rate it.").max(5),
+  text: trimmed(REVIEW_TEXT_MAX).default(""),
+  name: trimmed(60).min(2, "Add your name."),
+  instagram: instagramSchema,
+  photos: z.array(z.string().regex(UPLOAD_ID_RE, "Upload the photos again.")).max(REVIEW_PHOTOS_MAX, `Up to ${REVIEW_PHOTOS_MAX} photos.`).default([]),
+  /** With the order page key, marks the review as from a verified buyer. */
+  orderNumber: z.string().max(20).optional(),
+  key: z.string().max(100).optional(),
+  company: z.string().max(0).optional(),
+});
+export type ReviewInput = z.infer<typeof reviewSchema>;
