@@ -1,4 +1,5 @@
 import { handleError, json, readJson } from "@/lib/api";
+import { customerFromRequest, linkOrderToAccount } from "@/lib/account";
 import { notifyNewOrder } from "@/lib/notify";
 import { createOrder, orderPath } from "@/lib/orders";
 import { rateLimit } from "@/lib/rate-limit";
@@ -13,6 +14,8 @@ export async function POST(req: Request) {
   try {
     const { order } = await createOrder(parsed.data);
     await getStoreOrNull()?.track([{ type: "order_click", productId: null, path: "/cart", source: order.source }]).catch(() => {});
+    const store = getStoreOrNull();
+    if (store) await linkOrderToAccount(store, customerFromRequest(req), order);
     await notifyNewOrder(order);
     return json({ number: order.number, totalPaise: order.totalPaise, orderPath: orderPath(order) });
   } catch (err) {

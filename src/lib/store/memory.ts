@@ -1,4 +1,4 @@
-import type { BlogPost, College, Collection, Coupon, CustomRequest, GalleryItem, Offer, Order, Product, Review, Settings, Stall, StallSale, Stats, Upload } from "@/lib/types";
+import type { Account, AccountData, BlogPost, College, Collection, Coupon, CustomRequest, GalleryItem, Offer, Order, Product, Review, Settings, Stall, StallSale, Stats, Upload } from "@/lib/types";
 import { DEMO_SETTINGS, demoColleges, demoCoupons, demoGallery, demoPosts, demoProducts, demoReviews, demoStallSales, demoStalls, seedCollections, seedOffers } from "./seed";
 import type {
   CollectionInput,
@@ -41,8 +41,13 @@ type State = {
   gallery: GalleryItem[];
   colleges: College[];
   reviews: Review[];
+  accounts: Account[];
+  /** Not part of the backup: see exportAll. */
+  loginCodes: Map<string, { hash: string; expiresAt: string; sentAt: number; tries: number }>;
 };
 
+/** Wrong guesses allowed per sign-in code. */
+const LOGIN_TRIES = 5;
 const MAX_DEMO_FILE = 1.5 * 1024 * 1024;
 
 const clone = <T,>(v: T): T => structuredClone(v);
@@ -188,6 +193,8 @@ export class MemoryStore implements Store {
       gallery: initial?.gallery ?? demoGallery(),
       colleges: initial?.colleges ?? demoColleges(),
       reviews: initial?.reviews ?? (initial?.products ? [] : demoReviews(demoProducts())),
+      accounts: initial?.accounts ?? [],
+      loginCodes: initial?.loginCodes ?? new Map(),
     };
   }
 
@@ -598,8 +605,48 @@ export class MemoryStore implements Store {
     this.s.reviews = this.s.reviews.filter((x) => x.id !== id);
   }
 
+  // Accounts -------------------------------------------------------------
+
+  async getAccount(email: string) {
+    const a = this.s.accounts.find((x) => x.email === email);
+    return a ? clone(a) : null;
+  }
+
+  async saveAccount(email: string, name: string, data: AccountData) {
+    const at = now();
+    const existing = this.s.accounts.find((x) => x.email === email);
+    if (existing) Object.assign(existing, { name, data: clone(data), updatedAt: at });
+    else this.s.accounts.push({ email, name, data: clone(data), createdAt: at, updatedAt: at });
+    return clone(this.s.accounts.find((x) => x.email === email)!);
+  }
+
+  async deleteAccount(email: string) {
+    this.s.accounts = this.s.accounts.filter((x) => x.email !== email);
+    this.s.loginCodes.delete(email);
+  }
+
+  async saveLoginCode(email: string, codeHash: string, expiresAt: string, minGapMs: number) {
+    const prev = this.s.loginCodes.get(email);
+    if (prev && Date.now() - prev.sentAt < minGapMs) return false;
+    this.s.loginCodes.set(email, { hash: codeHash, expiresAt, sentAt: Date.now(), tries: 0 });
+    return true;
+  }
+
+  async checkLoginCode(email: string, codeHash: string) {
+    const c = this.s.loginCodes.get(email);
+    if (!c) return "expired" as const;
+    if (c.expiresAt <= now()) return "expired" as const;
+    if (c.tries >= LOGIN_TRIES) return "locked" as const;
+    if (c.hash !== codeHash) {
+      c.tries++;
+      return "wrong" as const;
+    }
+    this.s.loginCodes.delete(email);
+    return "ok" as const;
+  }
+
   async exportAll() {
-    // Uploaded files and analytics stay out, as in the Supabase export.
-    return clone(Object.fromEntries(Object.entries(this.s).filter(([k]) => k !== "uploads" && k !== "events")));
+    // Uploaded files, analytics and sign-in codes stay out, as in the Supabase export.
+    return clone(Object.fromEntries(Object.entries(this.s).filter(([k]) => k !== "uploads" && k !== "events" && k !== "loginCodes")));
   }
 }

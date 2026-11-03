@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { BlogPost, College, Collection, Coupon, CustomRequest, GalleryItem, Offer, Order, Product, Review, Settings, Stall, StallSale, Stats } from "@/lib/types";
+import type { Account, AccountData, BlogPost, College, Collection, Coupon, CustomRequest, GalleryItem, Offer, Order, Product, Review, Settings, Stall, StallSale, Stats } from "@/lib/types";
 import { EMPTY_STATS } from "./memory";
 import { DEFAULT_SETTINGS } from "./seed";
 import type {
@@ -277,6 +277,12 @@ function toReview(r: Row): Review {
     updatedAt: r.updated_at as string,
   };
 }
+
+function toAccount(r: Row): Account {
+  return { email: r.email as string, name: (r.name as string) ?? "", data: r.data as AccountData, createdAt: r.created_at as string, updatedAt: r.updated_at as string };
+}
+
+const LOGIN_TRIES = 5;
 
 function check<T>(res: { data: T; error: { message: string; code?: string } | null }): T {
   if (res.error) {
@@ -780,6 +786,42 @@ export class SupabaseStore implements Store {
     check(await this.db.from("reviews").delete().eq("id", id));
   }
 
+  // Accounts -------------------------------------------------------------
+
+  async getAccount(email: string) {
+    const data = check(await this.db.from("accounts").select("*").eq("email", email).maybeSingle());
+    return data ? toAccount(data as Row) : null;
+  }
+
+  async saveAccount(email: string, name: string, data: AccountData) {
+    const row = { email, name, data, updated_at: new Date().toISOString() };
+    return toAccount(check(await this.db.from("accounts").upsert(row, { onConflict: "email" }).select("*").single()) as Row);
+  }
+
+  async deleteAccount(email: string) {
+    check(await this.db.from("accounts").delete().eq("email", email));
+    check(await this.db.from("login_codes").delete().eq("email", email));
+  }
+
+  async saveLoginCode(email: string, codeHash: string, expiresAt: string, minGapMs: number) {
+    const prev = check(await this.db.from("login_codes").select("sent_at").eq("email", email).maybeSingle()) as Row | null;
+    if (prev && Date.now() - new Date(prev.sent_at as string).getTime() < minGapMs) return false;
+    check(await this.db.from("login_codes").upsert({ email, code_hash: codeHash, expires_at: expiresAt, sent_at: new Date().toISOString(), tries: 0 }, { onConflict: "email" }));
+    return true;
+  }
+
+  async checkLoginCode(email: string, codeHash: string) {
+    const c = check(await this.db.from("login_codes").select("*").eq("email", email).maybeSingle()) as Row | null;
+    if (!c || new Date(c.expires_at as string).getTime() <= Date.now()) return "expired" as const;
+    if (Number(c.tries) >= LOGIN_TRIES) return "locked" as const;
+    if (c.code_hash !== codeHash) {
+      check(await this.db.from("login_codes").update({ tries: Number(c.tries) + 1 }).eq("email", email));
+      return "wrong" as const;
+    }
+    check(await this.db.from("login_codes").delete().eq("email", email));
+    return "ok" as const;
+  }
+
   async exportAll() {
     // Paged so a table bigger than one response still comes back whole.
     const all = async (table: string) => {
@@ -790,7 +832,7 @@ export class SupabaseStore implements Store {
         if (page.length < 1000) return out;
       }
     };
-    const tables = ["products", "collections", "offers", "orders", "coupons", "custom_requests", "uploads", "settings", "stalls", "stall_sales", "blog_posts", "gallery_items", "colleges", "reviews"];
+    const tables = ["products", "collections", "offers", "orders", "coupons", "custom_requests", "uploads", "settings", "stalls", "stall_sales", "blog_posts", "gallery_items", "colleges", "reviews", "accounts"];
     const out: Record<string, unknown> = {};
     for (const t of tables) out[t] = await all(t);
     return out;

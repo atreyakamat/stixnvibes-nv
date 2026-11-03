@@ -66,6 +66,18 @@ export function mailConfig() {
 }
 
 /**
+ * Mail to customers (sign-in codes). Same Resend key and sender as the owner
+ * mail, but it needs no NOTIFY_EMAIL. Resend only delivers to other people
+ * once a sending domain is verified in the Resend account and MAIL_FROM uses
+ * it; the default sender reaches only the account owner.
+ */
+export function customerMailConfig() {
+  const apiKey = process.env.RESEND_API_KEY ?? "";
+  if (!apiKey || storeMode() === "demo") return null;
+  return { apiKey, from: process.env.MAIL_FROM || "Stix N Vibes shop <onboarding@resend.dev>" };
+}
+
+/**
  * YouPI PG, the self-hosted UPI gateway on the home lab. Off unless all three
  * are set. YOUPI_URL is its public checkout address (https; plain http only
  * for localhost, used in tests). The webhook secret is the merchant's

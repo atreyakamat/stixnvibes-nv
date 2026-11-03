@@ -1,5 +1,5 @@
 import "server-only";
-import { mailConfig } from "@/lib/env";
+import { customerMailConfig, mailConfig } from "@/lib/env";
 
 // Emails to the shop owner (new orders, custom design requests) through
 // Resend's HTTP API. No SDK, no SMTP: one fetch. When RESEND_API_KEY isn't
@@ -37,6 +37,29 @@ export async function mailOwner(m: Mail, fetchImpl: typeof fetch = fetch): Promi
         ...(m.replyTo ? { reply_to: m.replyTo } : {}),
         ...(attachments.length ? { attachments } : {}),
       }),
+      signal: AbortSignal.timeout(10_000),
+      redirect: "error",
+    });
+    if (!res.ok) {
+      console.error("[mail] resend said", res.status, (await res.text()).slice(0, 300));
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("[mail]", err);
+    return false;
+  }
+}
+
+/** Sends one email to a customer. Returns false (and logs) on any failure; never throws. */
+export async function mailCustomer(to: string, m: Pick<Mail, "subject" | "text" | "html">, fetchImpl: typeof fetch = fetch): Promise<boolean> {
+  const cfg = customerMailConfig();
+  if (!cfg) return false;
+  try {
+    const res = await fetchImpl("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${cfg.apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: cfg.from, to: [to], subject: m.subject.replace(/[\r\n]+/g, " ").slice(0, 200), text: m.text, html: m.html }),
       signal: AbortSignal.timeout(10_000),
       redirect: "error",
     });

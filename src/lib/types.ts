@@ -409,3 +409,27 @@ export type Stats = {
   byCoupon: { code: string; orders: number; sales: number; salesPaise: number; discountPaise: number }[];
   daily: { day: string; views: number; visits: number; orders: number; salesPaise: number }[];
 };
+
+// Customer accounts -----------------------------------------------------
+// Optional: sign in with an emailed code to keep details, wishlist and
+// orders across phones and the website. No passwords.
+
+export const ACCOUNT_ORDERS_MAX = 200;
+export const ACCOUNT_LIST_MAX = 100;
+
+/** An order this account placed or claimed; the key is the order page's private key. */
+export type AccountOrderRef = { number: string; key: string };
+
+export type AccountData = {
+  details: { name: string; phone: string; instagram: string; fulfilment: Fulfilment; address: Address };
+  taste: { collegeId: string | null; vibes: string[]; wishlist: string[]; recent: string[] };
+  orders: AccountOrderRef[];
+};
+
+export type Account = { email: string; name: string; data: AccountData; createdAt: string; updatedAt: string };
+
+export const EMPTY_ACCOUNT_DATA: AccountData = {
+  details: { name: "", phone: "", instagram: "", fulfilment: "delivery", address: { line: "", city: "", state: "Goa", pincode: "" } },
+  taste: { collegeId: null, vibes: [], wishlist: [], recent: [] },
+  orders: [],
+};
