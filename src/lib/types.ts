@@ -195,6 +195,10 @@ export type Coupon = {
   endsAt: string | null;
   /** Where it's handed out, e.g. "WordsUp stall". */
   source: string;
+  /** Only works when the order is placed from the Stix app. */
+  appOnly: boolean;
+  /** Free stickers added to the order (we pick the designs when packing). 0 = none. */
+  freeStickers: number;
   active: boolean;
   createdAt: string;
 };

@@ -70,6 +70,8 @@ export const orderSchema = z
     couponCode: trimmed(30).default(""),
     instagram: instagramSchema,
     source: sourceSchema,
+    /** Set by the Stix app. A marketing gate for app-only codes, not security. */
+    fromApp: z.boolean().optional(),
     // Honeypot: real people never see or fill this field.
     company: z.string().max(0).optional(),
   })

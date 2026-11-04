@@ -155,6 +155,8 @@ function toCoupon(r: Row): Coupon {
     startsAt: (r.starts_at as string | null) ?? null,
     endsAt: (r.ends_at as string | null) ?? null,
     source: (r.source as string) ?? "",
+    appOnly: (r.app_only as boolean) ?? false,
+    freeStickers: (r.free_stickers as number) ?? 0,
     active: r.active as boolean,
     createdAt: r.created_at as string,
   };
@@ -475,6 +477,8 @@ export class SupabaseStore implements Store {
       starts_at: c.startsAt,
       ends_at: c.endsAt,
       source: c.source,
+      app_only: c.appOnly,
+      free_stickers: c.freeStickers,
       active: c.active,
     };
     const res = isNew ? await this.db.from("coupons").insert(row).select("*").single() : await this.db.from("coupons").update(row).eq("code", c.code).select("*").single();

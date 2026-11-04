@@ -18,6 +18,8 @@ const coupon = (over: Partial<Coupon> = {}): Coupon => ({
   maxUses: null,
   startsAt: null,
   endsAt: null,
+  appOnly: false,
+  freeStickers: 0,
   source: "stall-wordsup",
   active: true,
   createdAt: "2026-10-01T00:00:00Z",

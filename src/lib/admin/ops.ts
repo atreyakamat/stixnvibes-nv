@@ -511,10 +511,11 @@ const couponSchema = z.object({
   minOrder: z.string().trim().max(12),
   maxUses: z.string().trim().max(6),
   source: z.string().trim().max(40),
+  freeStickers: z.string().trim().max(3).optional().default(""),
 });
 
-/** Form fields as strings, plus active and startsAt / endsAt (India time, "" for none). */
-export type CouponFields = Record<string, unknown> & { active: boolean; startsAt?: unknown; endsAt?: unknown };
+/** Form fields as strings, plus active, appOnly and startsAt / endsAt (India time, "" for none). */
+export type CouponFields = Record<string, unknown> & { active: boolean; appOnly?: boolean; startsAt?: unknown; endsAt?: unknown };
 
 export async function saveCoupon(f: CouponFields): Promise<OpResult> {
   const parsed = couponSchema.safeParse(f);
@@ -533,6 +534,8 @@ export async function saveCoupon(f: CouponFields): Promise<OpResult> {
   if (minOrderPaise === null || Number.isNaN(minOrderPaise)) return fail("Minimum order is an amount like 150, or blank.");
   const maxUses = c.maxUses ? Number(c.maxUses) : null;
   if (maxUses !== null && (!Number.isInteger(maxUses) || maxUses < 1)) return fail("Max uses is a whole number, or blank for no limit.");
+  const freeStickers = c.freeStickers ? Number(c.freeStickers) : 0;
+  if (!Number.isInteger(freeStickers) || freeStickers < 0 || freeStickers > 50) return fail("Free stickers is a whole number from 0 to 50.");
   const startsAt = istInputToIso(str(f.startsAt, 40));
   const endsAt = istInputToIso(str(f.endsAt, 40));
   if (startsAt === undefined || endsAt === undefined) return fail("Pick start and end dates with the date picker, or leave them blank.");
@@ -549,6 +552,8 @@ export async function saveCoupon(f: CouponFields): Promise<OpResult> {
         startsAt,
         endsAt,
         source: cleanSource(c.source),
+        appOnly: f.appOnly === true,
+        freeStickers,
         active: f.active,
       },
       c.isNew === "1",

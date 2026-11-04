@@ -21,7 +21,7 @@ export default async function QrCard({ searchParams }: PageProps<"/admin/coupons
   const coupon = code && COUPON_CODE_RE.test(code) ? await getStore().getCoupon(code) : null;
   if (code && !coupon) notFound();
   const source = coupon?.source || cleanSource(typeof sp.src === "string" ? sp.src : "") || `qr-${code.toLowerCase()}` || "qr";
-  const path = typeof sp.path === "string" ? sp.path : "/";
+  const path = coupon?.appOnly ? "/app" : typeof sp.path === "string" ? sp.path : "/";
   const link = qrLink(source, coupon?.code, path);
   const svg = await QRCode.toString(link, { type: "svg", margin: 1, errorCorrectionLevel: "M", color: { dark: "#0b0b0a", light: "#ffffff" } });
   const deal = coupon ? (coupon.percent !== null ? `${coupon.percent}% off` : `${formatINR(coupon.amountPaise!)} off`) : null;
@@ -42,7 +42,7 @@ export default async function QrCard({ searchParams }: PageProps<"/admin/coupons
         {deal ? (
           <p className="display text-4xl leading-none">
             {deal}
-            <span className="block text-lg font-normal">on the online shop</span>
+            <span className="block text-lg font-normal">{coupon?.appOnly ? "in the Stix app" : "on the online shop"}</span>
           </p>
         ) : (
           <p className="display text-3xl leading-none">Shop the stall online</p>
@@ -54,7 +54,8 @@ export default async function QrCard({ searchParams }: PageProps<"/admin/coupons
             {coupon.minOrderPaise > 0 && ` · orders over ${formatINR(coupon.minOrderPaise)}`}
           </p>
         )}
-        <p className="text-sm">Scan, pick your stickers, DM us the order. @stixnvibes</p>
+        {coupon && coupon.freeStickers > 0 && <p className="text-sm font-semibold">+ {coupon.freeStickers} free stickers</p>}
+        <p className="text-sm">{coupon?.appOnly ? "Scan, get the Stix app, order inside it. @stixnvibes" : "Scan, pick your stickers, DM us the order. @stixnvibes"}</p>
       </article>
     </div>
   );

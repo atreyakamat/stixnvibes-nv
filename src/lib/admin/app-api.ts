@@ -287,7 +287,7 @@ on("GET", "coupons", async ({ store }) => {
 });
 on("POST", "coupons", async ({ req }) => {
   const b = await body(req);
-  return done(await ops.saveCoupon({ ...b, active: bool(b.active) }));
+  return done(await ops.saveCoupon({ ...b, active: bool(b.active), appOnly: bool(b.appOnly) }));
 });
 on("DELETE", "coupons/:code", async ({ params: [code] }) => done(await ops.deleteCoupon(code)));
 

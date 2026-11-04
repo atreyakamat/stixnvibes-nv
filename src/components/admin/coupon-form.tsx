@@ -53,6 +53,14 @@ export function CouponForm({ coupon }: { coupon?: Coupon }) {
         <span className={lbl}>Max uses (blank = no limit)</span>
         <input name="maxUses" inputMode="numeric" defaultValue={coupon?.maxUses ?? ""} className="field !py-2 text-sm tabular-nums" />
       </label>
+      <label className="block">
+        <span className={lbl}>Free stickers (0 = none)</span>
+        <input name="freeStickers" inputMode="numeric" defaultValue={coupon?.freeStickers ?? 0} className="field !py-2 text-sm tabular-nums" />
+      </label>
+      <label className="flex items-center gap-2 pb-2 text-sm">
+        <input type="checkbox" name="appOnly" defaultChecked={coupon?.appOnly ?? false} className="size-4 accent-lemon" />
+        Only in the Stix app
+      </label>
       <label className="flex items-center gap-2 pb-2 text-sm">
         <input type="checkbox" name="active" defaultChecked={coupon?.active ?? true} className="size-4 accent-lemon" />
         Active

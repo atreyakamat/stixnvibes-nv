@@ -141,6 +141,7 @@ export async function createOrder(input: OrderInput): Promise<{ order: Order }> 
   if (!settings.storeOpen) throw new OrderError("Online orders are paused. Message us on Instagram.");
 
   const coupon = await findCoupon(input.couponCode);
+  if (coupon?.appOnly && !input.fromApp) throw new OrderError(`The code ${coupon.code} works only in the Stix app. Get the app, or remove the code to order here.`);
   const uses = coupon ? await store.couponUses(coupon.code) : 0;
   const priced = priceLines(input.lines, products, liveOffers(allOffers), coupon, uses);
   if (priced.problems.length) throw new OrderError(priced.problems[0].reason, priced.problems);

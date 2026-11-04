@@ -54,7 +54,7 @@ function Totals() {
             <div key={a.offerId} className="flex justify-between gap-3 text-lemon">
               <dt>
                 {a.name}
-                {a.freeUnits > 0 && <span className="text-paper/50"> ({a.freeUnits} free)</span>}
+                {a.freeUnits > 0 && <span className="text-paper/50"> {a.offerId.startsWith("coupon:") ? `(+${a.freeUnits} free stickers, our pick)` : `(${a.freeUnits} free)`}</span>}
               </dt>
               <dd className="tabular-nums">−{formatINR(a.discountPaise)}</dd>
             </div>
