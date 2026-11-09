@@ -17,6 +17,6 @@ export async function GET(req: Request) {
   // Only "not running" and "used up" matter here; the minimum is checked against the cart.
   const problem = couponProblem(c, Number.MAX_SAFE_INTEGER, uses);
   if (problem) return json({ error: problem }, 410);
-  const { code: _c, percent, amountPaise, minOrderPaise, endsAt, description, freeStickers } = c;
-  return json({ coupon: { code: _c, percent, amountPaise, minOrderPaise, endsAt, description, freeStickers } });
+  const { code: _c, percent, amountPaise, minOrderPaise, endsAt, description, freeStickers, bonusAbovePaise, bonusStickers, firstOrderOnly } = c;
+  return json({ coupon: { code: _c, percent, amountPaise, minOrderPaise, endsAt, description, freeStickers, bonusAbovePaise, bonusStickers, firstOrderOnly } });
 }

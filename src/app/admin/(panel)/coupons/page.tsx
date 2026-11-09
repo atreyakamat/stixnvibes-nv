@@ -60,9 +60,16 @@ export default async function CouponsPage() {
                   {c.maxUses !== null && ` of ${c.maxUses}`} {uses[i] === 1 ? "time" : "times"}
                   {c.minOrderPaise > 0 && ` · min order ${formatINR(c.minOrderPaise)}`}
                 </span>
-                <Link href={`/admin/coupons/card?code=${c.code}`} className="ml-auto text-lemon underline underline-offset-2">
-                  QR card
-                </Link>
+                <span className="ml-auto flex gap-3">
+                  {c.appOnly && (
+                    <Link href={`/admin/coupons/sign?code=${c.code}`} className="text-lemon underline underline-offset-2">
+                      Stall sign
+                    </Link>
+                  )}
+                  <Link href={`/admin/coupons/card?code=${c.code}`} className="text-lemon underline underline-offset-2">
+                    QR card
+                  </Link>
+                </span>
               </div>
               <CouponForm coupon={c} />
               <form action={deleteCouponAction}>

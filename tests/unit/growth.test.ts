@@ -20,6 +20,9 @@ const coupon = (over: Partial<Coupon> = {}): Coupon => ({
   endsAt: null,
   appOnly: false,
   freeStickers: 0,
+  firstOrderOnly: false,
+  bonusAbovePaise: null,
+  bonusStickers: 0,
   source: "stall-wordsup",
   active: true,
   createdAt: "2026-10-01T00:00:00Z",
@@ -159,7 +162,7 @@ describe("analytics", () => {
       { source: "direct", visits: 1, orders: 1, sales: 1, salesPaise: 2000 },
       { source: "stall-wordsup", visits: 2, orders: 2, sales: 1, salesPaise: 1800 },
     ]);
-    expect(s.byCoupon).toEqual([{ code: "WORDSUP10", orders: 2, sales: 1, salesPaise: 1800, discountPaise: 200 }]);
+    expect(s.byCoupon).toEqual([{ code: "WORDSUP10", orders: 2, sales: 1, salesPaise: 1800, discountPaise: 200, freeStickers: 0 }]);
     expect(s.byType).toEqual([{ type: "sticker", qty: 4, paise: 4000 }]);
     expect(s.daily).toEqual([{ day: "2026-10-20", views: 1, visits: 3, orders: 3, salesPaise: 3800 }]);
   });

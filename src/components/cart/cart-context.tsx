@@ -68,7 +68,7 @@ type CartContextValue = {
 };
 
 /** The public part of a coupon the cart needs to price it. */
-export type CartCoupon = Pick<Coupon, "code" | "percent" | "amountPaise" | "minOrderPaise" | "endsAt" | "description" | "freeStickers">;
+export type CartCoupon = Pick<Coupon, "code" | "percent" | "amountPaise" | "minOrderPaise" | "endsAt" | "description" | "freeStickers" | "bonusAbovePaise" | "bonusStickers" | "firstOrderOnly">;
 
 type Lookup = { coupon?: CartCoupon; error?: string; /** The server said the code doesn't work (not a busy or offline error). */ rejected?: boolean };
 

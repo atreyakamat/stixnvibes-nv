@@ -57,6 +57,18 @@ export function CouponForm({ coupon }: { coupon?: Coupon }) {
         <span className={lbl}>Free stickers (0 = none)</span>
         <input name="freeStickers" inputMode="numeric" defaultValue={coupon?.freeStickers ?? 0} className="field !py-2 text-sm tabular-nums" />
       </label>
+      <label className="block">
+        <span className={lbl}>Bonus above ₹ (blank = none)</span>
+        <input name="bonusAbove" inputMode="decimal" defaultValue={coupon?.bonusAbovePaise ? paiseToRupees(coupon.bonusAbovePaise) : ""} className="field !py-2 text-sm tabular-nums" />
+      </label>
+      <label className="block">
+        <span className={lbl}>Bonus free stickers</span>
+        <input name="bonusStickers" inputMode="numeric" defaultValue={coupon?.bonusStickers ?? 0} className="field !py-2 text-sm tabular-nums" />
+      </label>
+      <label className="flex items-center gap-2 pb-2 text-sm">
+        <input type="checkbox" name="firstOrderOnly" defaultChecked={coupon?.firstOrderOnly ?? false} className="size-4 accent-lemon" />
+        First order only
+      </label>
       <label className="flex items-center gap-2 pb-2 text-sm">
         <input type="checkbox" name="appOnly" defaultChecked={coupon?.appOnly ?? false} className="size-4 accent-lemon" />
         Only in the Stix app

@@ -512,10 +512,12 @@ const couponSchema = z.object({
   maxUses: z.string().trim().max(6),
   source: z.string().trim().max(40),
   freeStickers: z.string().trim().max(3).optional().default(""),
+  bonusAbove: z.string().trim().max(12).optional().default(""),
+  bonusStickers: z.string().trim().max(3).optional().default(""),
 });
 
 /** Form fields as strings, plus active, appOnly and startsAt / endsAt (India time, "" for none). */
-export type CouponFields = Record<string, unknown> & { active: boolean; appOnly?: boolean; startsAt?: unknown; endsAt?: unknown };
+export type CouponFields = Record<string, unknown> & { active: boolean; appOnly?: boolean; firstOrderOnly?: boolean; startsAt?: unknown; endsAt?: unknown };
 
 export async function saveCoupon(f: CouponFields): Promise<OpResult> {
   const parsed = couponSchema.safeParse(f);
@@ -536,6 +538,11 @@ export async function saveCoupon(f: CouponFields): Promise<OpResult> {
   if (maxUses !== null && (!Number.isInteger(maxUses) || maxUses < 1)) return fail("Max uses is a whole number, or blank for no limit.");
   const freeStickers = c.freeStickers ? Number(c.freeStickers) : 0;
   if (!Number.isInteger(freeStickers) || freeStickers < 0 || freeStickers > 50) return fail("Free stickers is a whole number from 0 to 50.");
+  const bonusStickers = c.bonusStickers ? Number(c.bonusStickers) : 0;
+  if (!Number.isInteger(bonusStickers) || bonusStickers < 0 || bonusStickers > 50) return fail("Bonus stickers is a whole number from 0 to 50.");
+  const bonusAbovePaise = c.bonusAbove ? rupeesToPaise(c.bonusAbove) : null;
+  if (bonusAbovePaise !== null && (Number.isNaN(bonusAbovePaise) || bonusAbovePaise <= 0)) return fail("Bonus order amount is like 399, or blank for no bonus.");
+  if (bonusAbovePaise !== null && bonusStickers === 0) return fail("Set how many bonus stickers, or clear the bonus amount.");
   const startsAt = istInputToIso(str(f.startsAt, 40));
   const endsAt = istInputToIso(str(f.endsAt, 40));
   if (startsAt === undefined || endsAt === undefined) return fail("Pick start and end dates with the date picker, or leave them blank.");
@@ -554,6 +561,9 @@ export async function saveCoupon(f: CouponFields): Promise<OpResult> {
         source: cleanSource(c.source),
         appOnly: f.appOnly === true,
         freeStickers,
+        firstOrderOnly: f.firstOrderOnly === true,
+        bonusAbovePaise: bonusStickers > 0 ? bonusAbovePaise : null,
+        bonusStickers,
         active: f.active,
       },
       c.isNew === "1",

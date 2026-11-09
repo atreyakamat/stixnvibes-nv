@@ -218,6 +218,9 @@ describe("app-only coupon with free stickers", () => {
     source: "app-qr",
     appOnly: true,
     freeStickers: 10,
+    firstOrderOnly: false,
+    bonusAbovePaise: 39900,
+    bonusStickers: 10,
     active: true,
     createdAt: "",
   };
@@ -227,6 +230,11 @@ describe("app-only coupon with free stickers", () => {
     const t = totals([line(25000)], [], appCode);
     expect(t.totalPaise).toBe(22500);
     expect(t.applied.at(-1)).toMatchObject({ offerId: "coupon:STIXAPP", freeUnits: 10, discountPaise: 2500 });
+  });
+
+  it("adds the bonus stickers on bigger orders", () => {
+    const t = totals([line(45000)], [], appCode);
+    expect(t.applied.at(-1)).toMatchObject({ freeUnits: 20, discountPaise: 4500 });
   });
 
   it("gives nothing below the minimum", () => {
