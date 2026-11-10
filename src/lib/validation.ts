@@ -72,6 +72,8 @@ export const orderSchema = z
     source: sourceSchema,
     /** Set by the Stix app. A marketing gate for app-only codes, not security. */
     fromApp: z.boolean().optional(),
+    /** Product ids of the free stickers the customer picked (repeats allowed). */
+    freePicks: z.array(trimmed(64)).max(50).default([]),
     // Honeypot: real people never see or fill this field.
     company: z.string().max(0).optional(),
   })

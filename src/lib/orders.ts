@@ -151,6 +151,19 @@ export async function createOrder(input: OrderInput): Promise<{ order: Order }> 
   if (priced.problems.length) throw new OrderError(priced.problems[0].reason, priced.problems);
   if (priced.couponProblem) throw new OrderError(`${priced.couponProblem} Remove it to order without it.`);
 
+  // Free stickers the customer picked: only live stickers, and no more than they get.
+  const freeEntry = priced.applied.find((a) => a.offerId.startsWith("coupon:") && a.freeUnits > 0);
+  if (freeEntry && input.freePicks.length) {
+    if (input.freePicks.length > freeEntry.freeUnits) throw new OrderError(`You get ${freeEntry.freeUnits} free stickers. Pick up to ${freeEntry.freeUnits}.`);
+    const names: string[] = [];
+    for (const id of input.freePicks) {
+      const p = products.find((x) => x.id === id);
+      if (!p || p.type !== "sticker" || !canOrder(p)) throw new OrderError("One of the free stickers you picked isn't available. Pick another.");
+      names.push(p.name);
+    }
+    freeEntry.picks = names;
+  }
+
   let order: Order | null = null;
   for (let attempt = 0; attempt < 4 && !order; attempt++) {
     try {

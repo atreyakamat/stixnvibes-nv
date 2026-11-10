@@ -209,3 +209,17 @@ describe("verified buyer reviews", () => {
     expect(reviewOrderNumber({ ...order, status: "cancelled" }, "secret-key-123", "p1")).toBeNull();
   });
 });
+
+describe("free sticker picks", () => {
+  it("accepts picks up to the free count", () => {
+    const r = orderSchema.safeParse({ ...details, lines: [{ productId: "p-lofi-01", qty: 1, selections: {}, custom: {} }], freePicks: ["p-lofi-01", "p-lofi-02"] });
+    expect(r.success).toBe(true);
+    expect(r.success && r.data.freePicks).toHaveLength(2);
+  });
+  it("defaults to no picks and caps at 50", () => {
+    const base = { ...details, lines: [{ productId: "p-lofi-01", qty: 1, selections: {}, custom: {} }] };
+    const none = orderSchema.safeParse(base);
+    expect(none.success && none.data.freePicks).toEqual([]);
+    expect(orderSchema.safeParse({ ...base, freePicks: Array(51).fill("p-lofi-01") }).success).toBe(false);
+  });
+});
