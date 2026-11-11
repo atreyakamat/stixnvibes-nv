@@ -6,6 +6,7 @@ import { ConfirmSubmit } from "@/components/admin/product-form";
 import { requireAdmin } from "@/lib/admin/session";
 import { formatINR } from "@/lib/money";
 import { getStore } from "@/lib/store";
+import { codeHeadsUp } from "@/lib/code-heads-up";
 import type { Coupon } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Codes & QR" };
@@ -55,6 +56,11 @@ export default async function CouponsPage() {
             <li key={c.code} className="space-y-3 rounded-2xl border border-line p-5">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                 <span className="rounded-full bg-paper/5 px-2.5 py-1 text-xs font-medium">{state(c, uses[i], now)}</span>
+                {codeHeadsUp(c, uses[i], now).map((h) => (
+                  <span key={h} className="rounded-full bg-[#ff7a59]/15 px-2.5 py-1 text-xs text-[#ff7a59]">
+                    {h}
+                  </span>
+                ))}
                 <span className="text-mute">
                   Used {uses[i]}
                   {c.maxUses !== null && ` of ${c.maxUses}`} {uses[i] === 1 ? "time" : "times"}
