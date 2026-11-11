@@ -24,6 +24,14 @@ Both are free and need no account anywhere.
    ```
 4. Open `http://<server>:3001`, make the Uptime Kuma login, and add the monitors below.
 
+### With House of Stix
+
+House of Stix runs this folder as the `shopops` tool. In its `deploy/stack.conf`
+set `shopops` to `yes`, run `stixctl bootstrap`, put `BACKUP_TOKEN` in
+`~/stix/env/shopops.env`, then `stixctl up shopops`. Backups and Uptime Kuma's
+data then live in `~/stix/data/shopops/` (outside the clone), and Uptime opens
+from the control room.
+
 ## Monitors to add in Uptime Kuma
 
 | Name | Type | Address | Notes |
@@ -32,7 +40,9 @@ Both are free and need no account anywhere.
 | Main site | HTTP(s) | `https://www.stixnvibes.com` | |
 | Shop home page | HTTP(s) | `https://shop.stixnvibes.com` | Catches a broken deploy. |
 | YouPI | HTTP(s) | your YouPI address | Online UPI payments. |
-| InWoice | HTTP(s) | your InWoice address | |
+| InWoice | HTTP(s) - Keyword | `http://<home lab>:5000/health` | Keyword `"database":"ok"`. |
+| House of Stix | HTTP(s) | `http://<home lab>:8200` | The control room itself. |
+| CutDesk / Cricut / ReNameX | HTTP(s) | `http://<home lab>:8304/health.json`, `:8300/health`, `:8303/healthz` | |
 | Nightly backup | Push | (Uptime Kuma gives you the URL) | Heartbeat interval 90000 seconds (25 h). Put the push URL in `BACKUP_PUSH_URL` in `.env`, then `docker compose up -d`. If a night's backup fails or doesn't run, this goes red. |
 
 For alerts, go to Settings > Notifications. Telegram (make a bot with @BotFather)

@@ -3,6 +3,8 @@
 #   1. cp .env.example .env and fill it in
 #   2. docker compose up -d
 #   3. open http://<server>:3001 and add the monitors in README.md
+# House of Stix runs this as the "shopops" tool: stixctl passes STIX_ENV_FILE
+# (~/stix/env/shopops.env) and STIX_DATA, so no secret lives inside the clone.
 services:
   uptime-kuma:
     image: louislam/uptime-kuma:1.23.16
@@ -10,15 +12,17 @@ services:
     ports:
       - "3001:3001"
     volumes:
-      - ./data/uptime-kuma:/app/data
+      - ${STIX_DATA:-./data}/uptime-kuma:/app/data
     mem_limit: 256m
+    security_opt:
+      - no-new-privileges:true
 
   backup:
     build: ./backup
     restart: unless-stopped
-    env_file: .env
+    env_file: ${STIX_ENV_FILE:-.env}
     environment:
       TZ: Asia/Kolkata
     volumes:
-      - ./data/backups:/backups
+      - ${STIX_DATA:-./data}/backups:/backups
     mem_limit: 128m
