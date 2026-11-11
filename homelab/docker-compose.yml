@@ -26,3 +26,5 @@ services:
     volumes:
       - ${STIX_DATA:-./data}/backups:/backups
     mem_limit: 128m
+    security_opt:
+      - no-new-privileges:true
