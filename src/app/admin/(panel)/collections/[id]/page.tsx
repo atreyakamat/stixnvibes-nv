@@ -22,8 +22,8 @@ export default async function EditCollectionPage({ params, searchParams }: PageP
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="display text-5xl">{collection.name}</h1>
         <div className="flex gap-4 text-sm">
-          <Link href={`/admin/products/bulk`} className="text-mute hover:text-lemon">
-            Bulk add designs
+          <Link href={`/admin/products/bulk?collection=${collection.id}`} className="text-mute hover:text-lemon">
+            Import designs
           </Link>
           <Link href={`/collections/${collection.slug}`} target="_blank" className="text-mute hover:text-lemon">
             View in shop ↗

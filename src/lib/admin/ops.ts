@@ -11,6 +11,7 @@ import { normalizePhone } from "@/lib/phone";
 import { COUPON_CODE_RE, normalizeCode } from "@/lib/pricing";
 import { cleanTracking, TRACKING_RE } from "@/lib/shipping";
 import { SALE_ID_RE } from "@/lib/stall";
+import { buildOptions, DEFAULT_MIN_QTY, paperGroupFor } from "@/lib/product-import";
 import { getStore } from "@/lib/store";
 import { TEMPLATES } from "@/lib/store/seed";
 import type { ProductInput } from "@/lib/store/types";
@@ -22,6 +23,7 @@ import {
   POST_STATUSES,
   PRODUCT_STATUSES,
   PRODUCT_TYPE_IDS,
+  type OptionValue,
   type Product,
   type Settings,
 } from "@/lib/types";
@@ -332,16 +334,48 @@ export async function quickProduct(id: string, op: string, stock?: number | null
 }
 
 /**
- * Bulk add: one product per uploaded photo, all with the same type, price,
- * options and collection. Names come from the file names.
+ * Import (bulk add): one product per uploaded design. Shared settings for the
+ * batch (type, price, papers, sizes, collection, status) with per-product
+ * overrides for name, description, price, tags, stock and papers, which is
+ * what a CSV fills in. Every new field is optional, so the admin app's older
+ * "products-bulk" calls (type, price, names and images only) still work.
  */
+const optMoney = money.optional();
+const importPaper = z.object({ label: z.string().trim().min(1, "Give each paper a name.").max(40), delta: money });
 const bulkSchema = z.object({
   type: z.enum(PRODUCT_TYPE_IDS),
   collectionId: z.string().max(64),
+  /** Creates this collection (hidden) and files the batch under it. */
+  newCollection: z.string().trim().max(80).optional(),
   price: money,
   status: z.enum(PRODUCT_STATUSES),
   namePrefix: z.string().trim().max(60),
-  items: z.array(z.object({ name: z.string().trim().min(1).max(120), image: z.string().max(3_000_000) })).min(1, "Add some photos first.").max(100),
+  /** Paper choices for the batch. Missing = the type's standard ones. */
+  papers: z.array(importPaper).max(8).optional(),
+  /** Other template choices to keep, e.g. { size: ["a4", "a3"] }. Missing = all. */
+  keep: z.record(z.string().max(40), z.array(z.string().max(40)).max(20)).optional(),
+  details: z.string().trim().max(2000).optional(),
+  items: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1, "Every product needs a name.").max(120),
+        image,
+        description: z.string().trim().max(4000).optional(),
+        price: optMoney,
+        compareAt: optMoney,
+        tags: z.string().max(400).optional(),
+        stock: z
+          .string()
+          .trim()
+          .regex(/^\d{0,5}$/, "Stock is a whole number like 25, or blank for made to order.")
+          .optional(),
+        badge: z.string().trim().max(24).optional(),
+        /** Subset of the batch papers (by label) for this product only. */
+        papers: z.array(z.string().trim().max(40)).max(8).optional(),
+      }),
+    )
+    .min(1, "Add some photos first.")
+    .max(100, "Up to 100 products per import. Split the folder into batches."),
 });
 
 export async function bulkCreate(raw: unknown): Promise<OpResult> {
@@ -349,8 +383,42 @@ export async function bulkCreate(raw: unknown): Promise<OpResult> {
   if (!parsed.success) return fail(firstIssue(parsed.error));
   const b = parsed.data;
   const store = getStore();
-  const existing = new Set((await store.listProducts({ includeHidden: true })).map((p) => p.slug));
   const t = TEMPLATES[b.type];
+
+  const papers = b.papers?.map((p) => ({ label: p.label, deltaPaise: p.delta ?? 0 }));
+  if (papers && new Set(papers.map((p) => p.label.toLowerCase())).size !== papers.length) return fail("Two papers have the same name.");
+  const keep: Record<string, OptionValue[]> = {};
+  for (const g of t.options) {
+    const ids = b.keep?.[g.id];
+    if (!ids) continue;
+    keep[g.id] = g.values.filter((v) => ids.includes(v.id));
+    if (keep[g.id].length === 0 && g.id !== paperGroupFor(b.type).id) return fail(`Pick at least one ${g.name.toLowerCase()}.`);
+  }
+  const options = (only?: string[]) => {
+    if (!papers) return structuredClone(t.options).map((g) => (keep[g.id] ? { ...g, values: structuredClone(keep[g.id]) } : g));
+    const picked = only?.length ? papers.filter((p) => only.some((l) => l.toLowerCase() === p.label.toLowerCase())) : papers;
+    return buildOptions(b.type, t.options, picked, keep);
+  };
+  for (const item of b.items) {
+    const unknownPaper = papers && item.papers?.find((l) => !papers.some((p) => p.label.toLowerCase() === l.toLowerCase()));
+    if (unknownPaper) return fail(`"${item.name}" asks for paper "${unknownPaper}", which isn't in this import's paper list.`);
+  }
+
+  let collectionId = b.collectionId;
+  if (b.newCollection) {
+    const all = await store.listCollections({ includeHidden: true });
+    const same = all.find((c) => c.name.toLowerCase() === b.newCollection!.toLowerCase());
+    if (same) collectionId = same.id;
+    else {
+      const slugs = new Set(all.map((c) => c.slug));
+      let slug = toSlug(b.newCollection) || `collection-${Date.now().toString(36)}`;
+      for (let n = 2; slugs.has(slug); n++) slug = `${toSlug(b.newCollection)}-${n}`;
+      const c = await store.createCollection({ name: b.newCollection, slug, description: "", image: "", active: b.status === "live", featured: false, sortOrder: 0 });
+      collectionId = c.id;
+    }
+  }
+
+  const existing = new Set((await store.listProducts({ includeHidden: true })).map((p) => p.slug));
   let created = 0;
   for (const [i, item] of b.items.entries()) {
     const name = `${b.namePrefix ? `${b.namePrefix} ` : ""}${item.name}`.trim();
@@ -361,22 +429,22 @@ export async function bulkCreate(raw: unknown): Promise<OpResult> {
       name,
       slug,
       type: b.type,
-      collectionIds: b.collectionId ? [b.collectionId] : [],
-      description: "",
-      details: t.details,
-      tags: [],
-      images: [item.image],
+      collectionIds: collectionId ? [collectionId] : [],
+      description: item.description ?? "",
+      details: b.details || t.details,
+      tags: item.tags ? tagList(item.tags) : [],
+      images: item.image ? [item.image] : [],
       status: b.status,
       featured: false,
       soldOut: false,
-      badge: "",
+      badge: item.badge ?? "",
       sortOrder: i,
-      pricePaise: b.price,
-      compareAtPaise: null,
-      minQty: 1,
-      options: structuredClone(t.options),
+      pricePaise: item.price === undefined || item.price === null ? b.price : item.price,
+      compareAtPaise: item.compareAt ?? null,
+      minQty: DEFAULT_MIN_QTY[b.type],
+      options: options(item.papers),
       customFields: structuredClone(t.customFields),
-      stock: null,
+      stock: item.stock ? Number(item.stock) : null,
       lowStockAt: 5,
       costPaise: null,
     });
@@ -384,7 +452,9 @@ export async function bulkCreate(raw: unknown): Promise<OpResult> {
   }
   refreshShop();
   revalidatePath("/admin/products");
-  return { ok: true, message: `Added ${created} product${created === 1 ? "" : "s"}.` };
+  revalidatePath("/admin/collections");
+  const where = b.newCollection ? ` in "${b.newCollection}"` : "";
+  return { ok: true, message: `Added ${created} product${created === 1 ? "" : "s"}${where}${b.status === "hidden" ? ", hidden until you make them live" : ""}.`, id: collectionId || undefined };
 }
 
 // Collections ---------------------------------------------------------
