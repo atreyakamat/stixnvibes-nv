@@ -32,7 +32,7 @@ export default async function ProductsPage({ searchParams }: PageProps<"/admin/p
         <h1 className="display text-5xl">Products</h1>
         <div className="flex flex-wrap gap-2">
           <Link href="/admin/products/bulk" className="btn btn-ghost">
-            Bulk add
+            Import products
           </Link>
           <Link href="/admin/products/new" className="btn btn-primary">
             Add product
