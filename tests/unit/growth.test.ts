@@ -7,6 +7,7 @@ import { A4_TEMPLATE, blankSheet, CELL_IN, crc32, DEFAULT_SPEC, designBox, gapCe
 import { computeStats, MemoryStore } from "@/lib/store/memory";
 import { demoProducts, seedOffers } from "@/lib/store/seed";
 import type { Coupon, Order } from "@/lib/types";
+import { codeHeadsUp } from "@/lib/code-heads-up";
 import { cleanSource, customRequestSchema, orderSchema } from "@/lib/validation";
 
 const coupon = (over: Partial<Coupon> = {}): Coupon => ({
@@ -18,6 +19,11 @@ const coupon = (over: Partial<Coupon> = {}): Coupon => ({
   maxUses: null,
   startsAt: null,
   endsAt: null,
+  appOnly: false,
+  freeStickers: 0,
+  firstOrderOnly: false,
+  bonusAbovePaise: null,
+  bonusStickers: 0,
   source: "stall-wordsup",
   active: true,
   createdAt: "2026-10-01T00:00:00Z",
@@ -157,7 +163,7 @@ describe("analytics", () => {
       { source: "direct", visits: 1, orders: 1, sales: 1, salesPaise: 2000 },
       { source: "stall-wordsup", visits: 2, orders: 2, sales: 1, salesPaise: 1800 },
     ]);
-    expect(s.byCoupon).toEqual([{ code: "WORDSUP10", orders: 2, sales: 1, salesPaise: 1800, discountPaise: 200 }]);
+    expect(s.byCoupon).toEqual([{ code: "WORDSUP10", orders: 2, sales: 1, salesPaise: 1800, discountPaise: 200, freeStickers: 0 }]);
     expect(s.byType).toEqual([{ type: "sticker", qty: 4, paise: 4000 }]);
     expect(s.daily).toEqual([{ day: "2026-10-20", views: 1, visits: 3, orders: 3, salesPaise: 3800 }]);
   });
@@ -318,5 +324,19 @@ describe("Cricut sheets", () => {
     expect(hex.slice(at + 8, at + 26)).toBe("00002e2300002e2301"); // 11811 px/m both ways, unit metre
     expect(crc32(new TextEncoder().encode("IEND"))).toBe(0xae426082);
     expect(withDpi(out, 300)).toHaveLength(out.length); // replaces, never stacks
+  });
+});
+
+describe("code heads-up", () => {
+  const now = Date.parse("2026-11-20T00:00:00Z");
+  const c = (over: Partial<Coupon> = {}) => coupon({ createdAt: "2026-11-10T00:00:00Z", ...over });
+  it("flags a live code nobody has used", () => {
+    expect(codeHeadsUp(c(), 0, now)[0]).toMatch(/No orders in 10 days/);
+  });
+  it("flags nearly used up and ending soon, but not ended or off codes", () => {
+    expect(codeHeadsUp(c({ maxUses: 10 }), 8, now).join(" ")).toMatch(/2 uses left/);
+    expect(codeHeadsUp(c({ endsAt: "2026-11-22T00:00:00Z" }), 1, now).join(" ")).toMatch(/Ends/);
+    expect(codeHeadsUp(c({ active: false }), 0, now)).toEqual([]);
+    expect(codeHeadsUp(c({ endsAt: "2026-11-19T00:00:00Z" }), 0, now)).toEqual([]);
   });
 });

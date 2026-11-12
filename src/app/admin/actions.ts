@@ -116,7 +116,7 @@ export async function deleteCollectionAction(form: FormData) {
 
 export async function saveOfferAction(_: FormState, form: FormData): Promise<FormState> {
   await requireAdmin();
-  return asState(await ops.saveOffer({ ...Object.fromEntries(form), active: form.get("active") === "on" }));
+  return asState(await ops.saveOffer({ ...Object.fromEntries(form), active: form.get("active") === "on", appOnly: form.get("appOnly") === "on", firstOrderOnly: form.get("firstOrderOnly") === "on" }));
 }
 
 export async function deleteOfferAction(form: FormData) {

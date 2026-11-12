@@ -184,6 +184,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/admin/
                     <th className={th}>Orders</th>
                     <th className={th}>Sales</th>
                     <th className={th}>Given away</th>
+                    <th className={th}>Free stickers</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
@@ -196,6 +197,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/admin/
                       </td>
                       <td className={td}>{formatINR(c.salesPaise)}</td>
                       <td className={td}>{formatINR(c.discountPaise)}</td>
+                      <td className={td}>{c.freeStickers}</td>
                     </tr>
                   ))}
                 </tbody>

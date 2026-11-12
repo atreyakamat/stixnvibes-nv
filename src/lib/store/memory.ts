@@ -120,9 +120,10 @@ export function computeStats(events: StoredEvent[], orders: Order[], sinceIso: s
   const byCoupon = new Map<string, Stats["byCoupon"][number]>();
   for (const o of ord) {
     if (!o.couponCode) continue;
-    const c = byCoupon.get(o.couponCode) ?? byCoupon.set(o.couponCode, { code: o.couponCode, orders: 0, sales: 0, salesPaise: 0, discountPaise: 0 }).get(o.couponCode)!;
+    const c = byCoupon.get(o.couponCode) ?? byCoupon.set(o.couponCode, { code: o.couponCode, orders: 0, sales: 0, salesPaise: 0, discountPaise: 0, freeStickers: 0 }).get(o.couponCode)!;
     c.orders++;
     c.discountPaise += o.offers.filter((a) => a.offerId === `coupon:${o.couponCode}`).reduce((n, a) => n + a.discountPaise, 0);
+    c.freeStickers += o.offers.filter((a) => a.offerId === `coupon:${o.couponCode}`).reduce((n, a) => n + a.freeUnits, 0);
     if (SOLD.includes(o.status)) {
       c.sales++;
       c.salesPaise += o.totalPaise;

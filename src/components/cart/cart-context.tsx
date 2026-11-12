@@ -68,7 +68,7 @@ type CartContextValue = {
 };
 
 /** The public part of a coupon the cart needs to price it. */
-export type CartCoupon = Pick<Coupon, "code" | "percent" | "amountPaise" | "minOrderPaise" | "endsAt" | "description">;
+export type CartCoupon = Pick<Coupon, "code" | "percent" | "amountPaise" | "minOrderPaise" | "endsAt" | "description" | "freeStickers" | "bonusAbovePaise" | "bonusStickers" | "firstOrderOnly">;
 
 type Lookup = { coupon?: CartCoupon; error?: string; /** The server said the code doesn't work (not a busy or offline error). */ rejected?: boolean };
 
@@ -105,7 +105,7 @@ function rememberCode(c: CartCoupon | null) {
   }
 }
 
-const asCoupon = (c: CartCoupon): Coupon => ({ ...c, maxUses: null, startsAt: null, source: "", active: true, createdAt: "" });
+const asCoupon = (c: CartCoupon): Coupon => ({ ...c, maxUses: null, startsAt: null, source: "", appOnly: false, active: true, createdAt: "" });
 
 const KEY = "snv-cart-v3";
 const CartContext = createContext<CartContextValue | null>(null);

@@ -130,7 +130,13 @@ export default async function OrderPage({ params }: PageProps<"/admin/orders/[nu
               <div key={o.offerId} className="flex justify-between text-lemon">
                 <dt>
                   {o.name}
-                  {o.freeUnits > 0 && ` (${o.freeUnits} free)`}
+                  {o.freeUnits > 0 && (o.offerId.startsWith("coupon:") ? ` (+${o.freeUnits} free stickers)` : ` (${o.freeUnits} free)`)}
+                  {o.offerId.startsWith("coupon:") && o.freeUnits > 0 && (
+                    <span className="block text-xs text-paper/70">
+                      {o.picks?.length ? `Picked: ${o.picks.join(", ")}.` : "No picks."}
+                      {o.freeUnits - (o.picks?.length ?? 0) > 0 && ` Your pick for the other ${o.freeUnits - (o.picks?.length ?? 0)}.`}
+                    </span>
+                  )}
                 </dt>
                 <dd className="tabular-nums">−{formatINR(o.discountPaise)}</dd>
               </div>

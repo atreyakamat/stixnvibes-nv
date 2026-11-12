@@ -13,10 +13,11 @@ import {
   resolveOptions,
   shippingStatus,
   totals,
+  type PricedLine,
   unitPrice,
 } from "@/lib/pricing";
 import { demoProducts, NO_CAMPAIGN, seedOffers, seedProducts } from "@/lib/store/seed";
-import type { Offer } from "@/lib/types";
+import type { Coupon, Offer } from "@/lib/types";
 
 const offers = seedOffers();
 const sticker = (price = 1000, qty = 1) => ({ type: "sticker" as const, unitPricePaise: price, qty });
@@ -201,5 +202,45 @@ describe("MRP", () => {
     expect(mrpFor(1000, 900, 20)).toBe(1200);
     expect(mrpFor(1000, null, null)).toBeNull();
     expect(mrpFor(null, null, 20)).toBeNull();
+  });
+});
+
+describe("app-only coupon with free stickers", () => {
+  const appCode: Coupon = {
+    code: "STIXAPP",
+    description: "",
+    percent: 10,
+    amountPaise: null,
+    minOrderPaise: 19900,
+    maxUses: null,
+    startsAt: null,
+    endsAt: null,
+    source: "app-qr",
+    appOnly: true,
+    freeStickers: 10,
+    firstOrderOnly: false,
+    bonusAbovePaise: 39900,
+    bonusStickers: 10,
+    active: true,
+    createdAt: "",
+  };
+  const line = (price: number): PricedLine => ({ type: "sticker", unitPricePaise: price, qty: 1 });
+
+  it("adds free stickers and 10% when the order reaches the minimum", () => {
+    const t = totals([line(25000)], [], appCode);
+    expect(t.totalPaise).toBe(22500);
+    expect(t.applied.at(-1)).toMatchObject({ offerId: "coupon:STIXAPP", freeUnits: 10, discountPaise: 2500 });
+  });
+
+  it("adds the bonus stickers on bigger orders", () => {
+    const t = totals([line(45000)], [], appCode);
+    expect(t.applied.at(-1)).toMatchObject({ freeUnits: 20, discountPaise: 4500 });
+  });
+
+  it("gives nothing below the minimum", () => {
+    const t = totals([line(15000)], [], appCode);
+    expect(t.totalPaise).toBe(15000);
+    expect(t.applied).toHaveLength(0);
+    expect(t.couponProblem).toMatch(/or more/);
   });
 });
