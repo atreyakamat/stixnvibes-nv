@@ -40,6 +40,8 @@ export type AppCatalog = {
   version: number;
   updatedAt: string;
   shopUrl: string;
+  /** True when customers can sign in (the shop can email codes). */
+  accounts: boolean;
   /** Live and upcoming products; hidden ones stay admin only. */
   products: AppProduct[];
   collections: ReturnType<typeof appCollection>[];
@@ -76,12 +78,15 @@ export function appCatalog(input: {
   posts: BlogPost[];
   gallery: GalleryItem[];
   reviews?: Review[];
+  /** Whether customers can make accounts (needs sign-in mail set up). */
+  accounts?: boolean;
   now?: Date;
 }): AppCatalog {
   return {
     version: APP_API_VERSION,
     updatedAt: (input.now ?? new Date()).toISOString(),
     shopUrl: site.url,
+    accounts: input.accounts ?? false,
     products: input.products.filter((p) => p.status !== "hidden").map(appProduct),
     collections: input.collections.filter((c) => c.active).map(appCollection),
     offers: input.offers.filter((o) => o.active),

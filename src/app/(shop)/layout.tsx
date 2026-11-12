@@ -1,3 +1,4 @@
+import { accountsEnabled } from "@/lib/account";
 import { CartProvider } from "@/components/cart/cart-context";
 import { CartDrawer } from "@/components/cart/cart-drawer";
 import { GlassSheen } from "@/components/glass-sheen";
@@ -28,7 +29,7 @@ export default async function ShopLayout({ children }: LayoutProps<"/">) {
       <a href="#main" className="btn btn-primary sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[80]">
         Skip to content
       </a>
-      <SiteHeader notice={notice} />
+      <SiteHeader notice={notice} accounts={accountsEnabled()} />
       <main id="main" className="flex-1">
         <GlassSheen />
         {children}

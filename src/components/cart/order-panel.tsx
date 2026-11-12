@@ -13,7 +13,7 @@ import { useCart } from "./cart-context";
 
 type Details = { name: string; phone: string; instagram: string; fulfilment: Fulfilment; address: Address; note: string };
 
-const DETAILS_KEY = "snv-details-v1";
+export const DETAILS_KEY = "snv-details-v1";
 const EMPTY: Details = { name: "", phone: "", instagram: "", fulfilment: "delivery", address: { line: "", city: "", state: "Goa", pincode: "" }, note: "" };
 
 function loadDetails(): Details {

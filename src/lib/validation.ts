@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { MAX_CUSTOM_FILES, MAX_LINES, MAX_QTY_PER_LINE, UPLOAD_ID_RE } from "@/lib/constants";
+import { MAX_CUSTOM_FILES, MAX_LINES, MAX_QTY_PER_LINE, ORDER_NUMBER_RE, UPLOAD_ID_RE } from "@/lib/constants";
 import { cleanHandle, INSTAGRAM_HANDLE_RE } from "@/lib/instagram";
 import { normalizePhone } from "@/lib/phone";
-import { CUSTOM_KINDS, EVENT_TYPES, FULFILMENTS, REVIEW_PHOTOS_MAX, REVIEW_TEXT_MAX } from "@/lib/types";
+import { ACCOUNT_LIST_MAX, ACCOUNT_ORDERS_MAX, CUSTOM_KINDS, EVENT_TYPES, FULFILMENTS, REVIEW_PHOTOS_MAX, REVIEW_TEXT_MAX } from "@/lib/types";
 
 const trimmed = (max: number) => z.string().trim().max(max);
 
@@ -122,3 +122,38 @@ export const reviewSchema = z.object({
   company: z.string().max(0).optional(),
 });
 export type ReviewInput = z.infer<typeof reviewSchema>;
+
+// Customer accounts -----------------------------------------------------
+
+export const emailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .max(254)
+  .regex(/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/, "That doesn't look like an email address.");
+
+const idList = z.array(z.string().trim().min(1).max(80)).max(ACCOUNT_LIST_MAX);
+
+// Saved details are the customer's own, so they are only length-checked here.
+// Phone and address are checked properly when an order is placed.
+export const accountDataSchema = z.object({
+  details: z.object({
+    name: trimmed(60).default(""),
+    phone: trimmed(20).default(""),
+    instagram: trimmed(120).default(""),
+    fulfilment: z.enum(FULFILMENTS).default("delivery"),
+    address: addressSchema.default({ line: "", city: "", state: "Goa", pincode: "" }),
+  }),
+  taste: z.object({ collegeId: trimmed(80).nullable().default(null), vibes: idList.default([]), wishlist: idList.default([]), recent: idList.default([]) }),
+  orders: z.array(z.object({ number: z.string().regex(ORDER_NUMBER_RE), key: z.string().min(8).max(80) })).max(ACCOUNT_ORDERS_MAX).default([]),
+});
+
+export const accountSaveSchema = z.object({ name: trimmed(60).default(""), data: accountDataSchema });
+export const loginCodeSchema = z.object({ email: emailSchema, company: z.string().max(200).optional() });
+export const loginVerifySchema = z.object({
+  email: emailSchema,
+  code: z.string().trim().regex(/^\d{6}$/, "The code is 6 digits."),
+  name: trimmed(60).default(""),
+  /** The website wants a cookie; the app takes the token from the reply. */
+  web: z.boolean().default(false),
+});

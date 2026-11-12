@@ -1,3 +1,4 @@
+import { accountsEnabled } from "@/lib/account";
 import { appCatalog } from "@/lib/app-api";
 import { getColleges, getGallery, getPosts, getPublishedReviews, upcomingStalls } from "@/lib/content";
 import { getShopState } from "@/lib/shop";
@@ -17,7 +18,7 @@ export async function GET() {
     getGallery(),
     getPublishedReviews(),
   ]);
-  return Response.json(appCatalog({ products, collections, offers, settings, colleges, stalls, posts, gallery, reviews }), {
+  return Response.json(appCatalog({ products, collections, offers, settings, colleges, stalls, posts, gallery, reviews, accounts: accountsEnabled() }), {
     headers: { "Cache-Control": "public, max-age=60, stale-while-revalidate=600" },
   });
 }

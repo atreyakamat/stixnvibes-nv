@@ -1,4 +1,4 @@
-import type { BlogPost, College, Collection, Coupon, CustomRequest, CustomStatus, EventType, GalleryItem, Offer, Order, OrderStatus, Product, Review, ReviewStatus, Settings, Stall, StallSale, Stats, Upload } from "@/lib/types";
+import type { Account, AccountData, BlogPost, College, Collection, Coupon, CustomRequest, CustomStatus, EventType, GalleryItem, Offer, Order, OrderStatus, Product, Review, ReviewStatus, Settings, Stall, StallSale, Stats, Upload } from "@/lib/types";
 
 export type ProductInput = Omit<Product, "id" | "createdAt" | "updatedAt">;
 export type CollectionInput = Omit<Collection, "id" | "createdAt">;
@@ -124,6 +124,24 @@ export interface Store {
   /** Sets repliedAt when the reply text changes ("" clears it). */
   updateReview(id: string, patch: ReviewPatch): Promise<Review>;
   deleteReview(id: string): Promise<void>;
+
+  /** Customer accounts, found by email (lower case). */
+  getAccount(email: string): Promise<Account | null>;
+  /** Creates the account or replaces its name and data. */
+  saveAccount(email: string, name: string, data: AccountData): Promise<Account>;
+  /** Removes the account and any pending sign-in code. Orders stay; they belong to the shop. */
+  deleteAccount(email: string): Promise<void>;
+  /**
+   * Remembers a sign-in code (hashed) for this email, replacing any earlier
+   * one. Returns false, saving nothing, if a code went out less than
+   * minGapMs ago.
+   */
+  saveLoginCode(email: string, codeHash: string, expiresAt: string, minGapMs: number): Promise<boolean>;
+  /**
+   * Checks a code. "ok" uses it up; a wrong guess counts toward five, after
+   * which the code is dead and "locked" comes back until a new one is sent.
+   */
+  checkLoginCode(email: string, codeHash: string): Promise<"ok" | "wrong" | "expired" | "locked">;
 
   /** Every table except analytics events, for the home lab backup. */
   exportAll(): Promise<Record<string, unknown>>;

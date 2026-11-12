@@ -7,7 +7,7 @@ import { moreNav, nav, site } from "@/content/site";
 import { useCart } from "./cart/cart-context";
 import { Wordmark } from "./wordmark";
 
-export function SiteHeader({ notice }: { notice?: string }) {
+export function SiteHeader({ notice, accounts = false }: { notice?: string; accounts?: boolean }) {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -86,6 +86,14 @@ export function SiteHeader({ notice }: { notice?: string }) {
           </nav>
 
           <div className="flex items-center gap-2">
+            {accounts && (
+              <Link href="/account" className="grid size-11 place-items-center rounded-full ring-1 ring-paper/25 transition-colors hover:text-lemon hover:ring-lemon" aria-label="Your account">
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="8" r="4" />
+                  <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" strokeLinecap="round" />
+                </svg>
+              </Link>
+            )}
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
